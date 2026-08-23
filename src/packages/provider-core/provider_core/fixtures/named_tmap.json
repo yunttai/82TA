@@ -1,0 +1,9 @@
+{
+  "fixtureVersion":"1.0","provider":"TMAP_TRANSIT","operations":{"search":{
+    "success":{"fetchedAt":"2026-08-24T08:20:01+09:00","receivedAt":"2026-08-24T08:20:01+09:00","observedAt":"2026-08-24T08:20:00+09:00","schemaVersion":"tmap-transit.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[{"id":"sanitized-tmap-route","origin":{"lon":127.051,"lat":37.289},"destination":{"lon":127.111159,"lat":37.394761},"durationSeconds":2500,"p90Seconds":3300,"distanceMeters":16800,"fareKrw":2800,"routeId":"sanitized-tmap-bus-703","routeLabel":"SAN-TM-703","direction":"Sanitized Northeast","geometry":[{"lon":127.051,"lat":37.289},{"lon":127.08,"lat":37.34},{"lon":127.111159,"lat":37.394761}]}]}},
+    "empty":{"fetchedAt":"2026-08-24T08:20:01+09:00","receivedAt":"2026-08-24T08:20:01+09:00","observedAt":"2026-08-24T08:20:00+09:00","schemaVersion":"tmap-transit.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[]}},
+    "error":{"fetchedAt":"2026-08-24T08:20:01+09:00","receivedAt":"2026-08-24T08:20:01+09:00","observedAt":null,"schemaVersion":"tmap-transit.fixture.v1","httpStatus":503,"contentType":"application/json","body":{"error":"sanitized unavailable"}},
+    "rate_limited":{"fetchedAt":"2026-08-24T08:20:01+09:00","receivedAt":"2026-08-24T08:20:01+09:00","observedAt":null,"schemaVersion":"tmap-transit.fixture.v1","httpStatus":429,"contentType":"application/json","body":{"error":"sanitized rate limit"}},
+    "schema_drift":{"fetchedAt":"2026-08-24T08:20:01+09:00","receivedAt":"2026-08-24T08:20:01+09:00","observedAt":"2026-08-24T08:20:00+09:00","schemaVersion":"tmap-transit.drift","httpStatus":200,"contentType":"application/json","body":{"metaData":{"plan":"drift"}}}
+  }}
+}

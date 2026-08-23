@@ -1,0 +1,12 @@
+{
+  "fixtureVersion": "1.0",
+  "scenario": "timeout",
+  "provider": "SANITIZED_TRANSIT_FIXTURE",
+  "operation": "search",
+  "fetchedAt": "2026-08-23T08:00:00+09:00",
+  "receivedAt": "2026-08-23T08:00:02+09:00",
+  "observedAt": null,
+  "schemaVersion": "fixture-transit.v1",
+  "status": "TIMEOUT",
+  "results": []
+}

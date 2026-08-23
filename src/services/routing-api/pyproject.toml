@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "budget-route-routing-api"
+version = "0.1.0"
+description = "Private Django Routing and Intelligence API boundary"
+requires-python = ">=3.12"
+dependencies = [
+  "Django>=5.2,<5.3",
+  "jsonschema>=4.23,<5",
+  "PyYAML>=6.0,<7",
+  "psycopg[binary]>=3.2,<4",
+]
+
+[project.optional-dependencies]
+integration = [
+  "budget-route-provider-core==0.1.0",
+  "budget-route-bus-intelligence-core==0.1.0",
+  "budget-route-routing-domain==0.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["routing_api*", "transport_mapping*"]
+exclude = ["routing_api.tests*", "transport_mapping.tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["routing_api/tests"]
+pythonpath = ["."]
+addopts = "-q -p no:cacheprovider"

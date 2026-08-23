@@ -1,0 +1,9 @@
+{
+  "fixtureVersion":"1.0","provider":"KAKAO_MOBILITY","operations":{"*":{
+    "success":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":"2026-08-24T08:10:00+09:00","schemaVersion":"kakao-mobility.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[{"id":"sanitized-kakao-driving-route","origin":{"lon":127.10,"lat":37.39},"destination":{"lon":127.12,"lat":37.41},"durationSeconds":720,"p90Seconds":960,"distanceMeters":5100,"fareKrw":7800,"routeId":null,"routeLabel":null,"direction":null,"geometry":[{"lon":127.10,"lat":37.39},{"lon":127.11,"lat":37.40},{"lon":127.12,"lat":37.41}]}]}},
+    "empty":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":"2026-08-24T08:10:00+09:00","schemaVersion":"kakao-mobility.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[]}},
+    "error":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":null,"schemaVersion":"kakao-mobility.fixture.v1","httpStatus":503,"contentType":"application/json","body":{"error":"sanitized unavailable"}},
+    "rate_limited":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":null,"schemaVersion":"kakao-mobility.fixture.v1","httpStatus":429,"contentType":"application/json","body":{"error":"sanitized rate limit"}},
+    "schema_drift":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":"2026-08-24T08:10:00+09:00","schemaVersion":"kakao-mobility.drift","httpStatus":200,"contentType":"application/json","body":{"routes":{"unexpected":true}}}
+  }}
+}

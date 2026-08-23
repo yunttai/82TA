@@ -1,0 +1,9 @@
+{
+  "fixtureVersion":"1.0","provider":"KAKAO_WALK","operations":{"route":{
+    "success":{"fetchedAt":"2026-08-24T08:00:01+09:00","receivedAt":"2026-08-24T08:00:01+09:00","observedAt":"2026-08-24T08:00:00+09:00","schemaVersion":"kakao-walk.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[{"id":"sanitized-kakao-walk-route","origin":{"lon":127.10,"lat":37.39},"destination":{"lon":127.11,"lat":37.40},"durationSeconds":900,"p90Seconds":1080,"distanceMeters":1100,"fareKrw":0,"routeId":null,"routeLabel":null,"direction":null,"geometry":[{"lon":127.10,"lat":37.39},{"lon":127.105,"lat":37.395},{"lon":127.11,"lat":37.40}]}]}},
+    "empty":{"fetchedAt":"2026-08-24T08:00:01+09:00","receivedAt":"2026-08-24T08:00:01+09:00","observedAt":"2026-08-24T08:00:00+09:00","schemaVersion":"kakao-walk.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[]}},
+    "error":{"fetchedAt":"2026-08-24T08:00:01+09:00","receivedAt":"2026-08-24T08:00:01+09:00","observedAt":null,"schemaVersion":"kakao-walk.fixture.v1","httpStatus":503,"contentType":"application/json","body":{"error":"sanitized unavailable"}},
+    "rate_limited":{"fetchedAt":"2026-08-24T08:00:01+09:00","receivedAt":"2026-08-24T08:00:01+09:00","observedAt":null,"schemaVersion":"kakao-walk.fixture.v1","httpStatus":429,"contentType":"application/json","body":{"error":"sanitized rate limit"}},
+    "schema_drift":{"fetchedAt":"2026-08-24T08:00:01+09:00","receivedAt":"2026-08-24T08:00:01+09:00","observedAt":"2026-08-24T08:00:00+09:00","schemaVersion":"kakao-walk.drift","httpStatus":200,"contentType":"application/json","body":{"routes":[{"durationSeconds":"900"}]}}
+  }}
+}

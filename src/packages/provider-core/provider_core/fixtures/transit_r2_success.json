@@ -1,0 +1,62 @@
+{
+  "fixtureVersion": "1.0",
+  "scenario": "r2_success",
+  "provider": "SANITIZED_TRANSIT_FIXTURE",
+  "operation": "search",
+  "fetchedAt": "2026-08-24T18:10:01+09:00",
+  "receivedAt": "2026-08-24T18:10:01+09:00",
+  "observedAt": "2026-08-24T18:10:00+09:00",
+  "schemaVersion": "fixture-transit.v1",
+  "status": "OK",
+  "results": [
+    {
+      "id": "sanitized-r2-itinerary",
+      "legs": [
+        {
+          "id": "sanitized-r2-leg",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {
+            "name": "Sanitized R2 North Origin",
+            "lon": 127.111159,
+            "lat": 37.394761,
+            "externalId": "sanitized-r2-stop-origin",
+            "sequence": 3
+          },
+          "to": {
+            "name": "Sanitized R2 South Destination",
+            "lon": 127.187456,
+            "lat": 37.222345,
+            "externalId": "sanitized-r2-stop-destination",
+            "sequence": 29
+          },
+          "p50Seconds": 3600,
+          "p90Seconds": 4500,
+          "distanceMeters": 29100,
+          "fareExpectedKrw": 3000,
+          "fareLowerKrw": 3000,
+          "fareUpperKrw": 3000,
+          "expectedStartAt": "2026-08-24T18:10:00+09:00",
+          "expectedEndAt": "2026-08-24T19:10:00+09:00",
+          "transit": {
+            "routeLabel": "SAN-R2-702",
+            "externalRouteId": "sanitized-r2-route-702",
+            "routeType": "SEAT_BUS",
+            "direction": "Sanitized R2 Southbound Terminal",
+            "branchId": "sanitized-r2-return",
+            "boardingSequence": 3,
+            "alightingSequence": 29,
+            "terminalNames": ["Sanitized R2 North Terminal", "Sanitized R2 South Terminal"],
+            "liveVehicleObserved": null
+          },
+          "geometry": [
+            {"lon": 127.111159, "lat": 37.394761},
+            {"lon": 127.131800, "lat": 37.349100},
+            {"lon": 127.159900, "lat": 37.285400},
+            {"lon": 127.187456, "lat": 37.222345}
+          ]
+        }
+      ]
+    }
+  ]
+}

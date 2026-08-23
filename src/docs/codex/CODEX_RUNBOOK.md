@@ -22,9 +22,12 @@
 ## 2. 최초 실행
 
 ```bash
+python -m pip install -r src/scripts/requirements-validation.txt
 python src/scripts/validate_repository.py
 python src/scripts/verify_contract_lock.py
 ```
+
+`.codegraph/`는 `.gitignore`에 포함된 로컬 코드 인덱스이며 제품 산출물이 아니다. 인덱스 유무는 사용자가 결정하고 repository layout 검증은 이를 허용한다.
 
 그 뒤 `src/docs/codex-prompts/00_REPOSITORY_ORIENTATION.md`를 붙여넣는다.
 
