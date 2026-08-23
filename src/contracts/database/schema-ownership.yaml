@@ -1,0 +1,58 @@
+version: 1.0.0
+schemas:
+  service:
+    owner: service-product
+    database: service_db
+    allowedReaders: [service-api]
+    forbiddenReaders: [routing-api, transport-collector, model-jobs]
+    tables:
+      - auth_user
+      - user_profile
+      - user_preference
+      - saved_place
+      - favorite_journey
+      - anonymous_session
+      - route_search
+      - route_search_result
+      - route_feedback
+      - consent_record
+      - account_audit_event
+  routing:
+    owner: routing-intelligence
+    database: routing_db
+    allowedReaders: [routing-api, transport-collector, data-quality, model-jobs]
+    forbiddenReaders: [service-api, web]
+    tables:
+      - provider
+      - provider_operation_state
+      - transport_route
+      - transport_stop
+      - route_stop
+      - provider_entity
+      - entity_mapping
+      - mapping_review
+      - bus_vehicle
+      - bus_vehicle_trip
+      - bus_location_observation
+      - bus_arrival_observation
+      - vehicle_capacity_assertion
+      - route_optimization_run
+      - route_candidate
+      - route_leg
+      - bus_leg_enrichment
+      - transfer_evaluation
+      - model_family
+      - model_version
+      - model_metric
+      - model_deployment
+      - prediction_audit
+      - ingestion_source
+      - ingestion_checkpoint
+      - data_quality_run
+rules:
+  crossSchemaForeignKeys: forbidden
+  crossSchemaOrmImports: forbidden
+  crossSchemaDirectQueries: forbidden
+  exchangeMechanisms:
+    - versioned_api
+    - anonymized_domain_event

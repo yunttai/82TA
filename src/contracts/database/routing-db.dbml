@@ -1,0 +1,303 @@
+Project routing_db {
+  database_type: 'PostgreSQL + PostGIS'
+  Note: 'Owned only by Routing & Intelligence'
+}
+
+Table provider {
+  id uuid [pk]
+  code varchar [unique, not null]
+  category varchar [not null]
+  enabled boolean [not null, default: true]
+  config_without_secret jsonb [not null, default: '{}']
+  updated_at timestamptz [not null]
+}
+
+Table provider_operation_state {
+  id uuid [pk]
+  provider_id uuid [not null, ref: > provider.id]
+  operation varchar [not null]
+  documentation_state varchar [not null]
+  key_verification_state varchar [not null]
+  production_state varchar [not null]
+  health varchar [not null]
+  consecutive_failures integer [not null, default: 0]
+  checked_at timestamptz [not null]
+  indexes { (provider_id, operation) [unique] }
+}
+
+Table transport_route {
+  id uuid [pk]
+  canonical_name varchar [not null]
+  mode varchar [not null]
+  route_type varchar
+  region varchar
+  geometry geography
+  valid_from timestamptz [not null]
+  valid_to timestamptz
+}
+
+Table transport_stop {
+  id uuid [pk]
+  canonical_name varchar [not null]
+  region varchar
+  coordinate geography [not null]
+  attributes jsonb [not null, default: '{}']
+  valid_from timestamptz [not null]
+  valid_to timestamptz
+}
+
+Table route_stop {
+  route_id uuid [not null, ref: > transport_route.id]
+  stop_id uuid [not null, ref: > transport_stop.id]
+  sequence integer [not null]
+  direction varchar [not null]
+  cumulative_distance numeric
+  indexes { (route_id, sequence, direction) [pk] }
+}
+
+Table provider_entity {
+  id uuid [pk]
+  provider_id uuid [not null, ref: > provider.id]
+  entity_type varchar [not null]
+  external_id varchar [not null]
+  fingerprint varchar [not null]
+  normalized_identity jsonb [not null]
+  valid_from timestamptz [not null]
+  valid_to timestamptz
+  indexes { (provider_id, entity_type, external_id, valid_from) [unique] }
+}
+
+Table entity_mapping {
+  id uuid [pk]
+  provider_entity_id uuid [not null, ref: > provider_entity.id]
+  transport_route_id uuid [ref: > transport_route.id]
+  transport_stop_id uuid [ref: > transport_stop.id]
+  direction varchar
+  score numeric [not null]
+  grade varchar [not null]
+  signal_breakdown jsonb [not null]
+  algorithm_version varchar [not null]
+  valid_from timestamptz [not null]
+  valid_to timestamptz
+}
+
+Table mapping_review {
+  id uuid [pk]
+  entity_mapping_id uuid [not null, ref: > entity_mapping.id]
+  status varchar [not null]
+  reviewer varchar
+  note text
+  reviewed_at timestamptz
+}
+
+Table bus_vehicle {
+  id uuid [pk]
+  provider_vehicle_token varchar [unique, not null]
+  vehicle_type varchar
+  first_seen_at timestamptz [not null]
+  last_seen_at timestamptz [not null]
+}
+
+Table bus_vehicle_trip {
+  id uuid [pk]
+  route_id uuid [not null, ref: > transport_route.id]
+  vehicle_id uuid [not null, ref: > bus_vehicle.id]
+  service_date date [not null]
+  direction varchar [not null]
+  inferred_start_at timestamptz [not null]
+  inferred_end_at timestamptz
+  identity_version varchar [not null]
+}
+
+Table bus_location_observation {
+  id bigint [pk, increment]
+  trip_id uuid [not null, ref: > bus_vehicle_trip.id]
+  stop_id uuid [ref: > transport_stop.id]
+  station_sequence integer
+  remaining_seats integer
+  crowded_code integer
+  coordinate geography
+  observed_at timestamptz [not null]
+  ingested_at timestamptz [not null]
+  source varchar [not null]
+  quality_flags jsonb [not null, default: '[]']
+  indexes { (trip_id, observed_at) }
+}
+
+Table bus_arrival_observation {
+  id bigint [pk, increment]
+  trip_id uuid [not null, ref: > bus_vehicle_trip.id]
+  stop_id uuid [not null, ref: > transport_stop.id]
+  provider_eta_seconds integer
+  remaining_seats integer
+  observed_at timestamptz [not null]
+  predicted_arrival_at timestamptz
+  ingested_at timestamptz [not null]
+  source varchar [not null]
+  quality_flags jsonb [not null, default: '[]']
+  indexes { (stop_id, observed_at) }
+}
+
+Table vehicle_capacity_assertion {
+  id uuid [pk]
+  vehicle_id uuid [not null, ref: > bus_vehicle.id]
+  capacity integer [not null]
+  source varchar [not null]
+  confidence numeric [not null]
+  valid_from timestamptz [not null]
+  valid_to timestamptz
+}
+
+Table route_optimization_run {
+  id uuid [pk]
+  request_id varchar [unique, not null]
+  request_fingerprint varchar [not null]
+  origin geography [not null]
+  destination geography [not null]
+  departure_time timestamptz [not null]
+  constraints jsonb [not null]
+  status varchar [not null]
+  ranking_policy_version varchar [not null]
+  duration_ms integer
+  provider_summary jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+  expires_at timestamptz [not null]
+}
+
+Table route_candidate {
+  id uuid [pk]
+  run_id uuid [not null, ref: > route_optimization_run.id]
+  route_key varchar [not null]
+  pattern varchar [not null]
+  p50_seconds integer [not null]
+  p90_seconds integer [not null]
+  taxi_cost_expected integer [not null]
+  taxi_cost_upper integer [not null]
+  total_fare_expected integer [not null]
+  walk_seconds integer [not null]
+  transfer_count integer [not null]
+  reliability_score numeric [not null]
+  pareto boolean [not null]
+  reason_codes jsonb [not null]
+  warning_codes jsonb [not null]
+  indexes { (run_id, route_key) [unique] }
+}
+
+Table route_leg {
+  id uuid [pk]
+  candidate_id uuid [not null, ref: > route_candidate.id]
+  sequence integer [not null]
+  mode varchar [not null]
+  route_id uuid [ref: > transport_route.id]
+  from_stop_id uuid [ref: > transport_stop.id]
+  to_stop_id uuid [ref: > transport_stop.id]
+  expected_start_at timestamptz
+  expected_end_at timestamptz
+  p50_seconds integer [not null]
+  p90_seconds integer [not null]
+  fare_expected integer [not null]
+  geometry geography
+  provenance jsonb [not null]
+  indexes { (candidate_id, sequence) [unique] }
+}
+
+Table bus_leg_enrichment {
+  route_leg_id uuid [pk, ref: - route_leg.id]
+  entity_mapping_id uuid [ref: > entity_mapping.id]
+  expected_wait_seconds integer [not null]
+  p90_wait_seconds integer [not null]
+  boardability_proxy numeric
+  no_seat_probability numeric
+  coverage varchar [not null]
+  eta_model_version varchar
+  seat_model_version varchar
+  candidate_vehicles jsonb [not null]
+}
+
+Table transfer_evaluation {
+  id uuid [pk]
+  route_leg_id uuid [not null, ref: > route_leg.id]
+  available_seconds integer [not null]
+  required_seconds integer [not null]
+  margin_p50_seconds integer [not null]
+  margin_p90_seconds integer [not null]
+  success_proxy numeric
+  reason_codes jsonb [not null]
+}
+
+Table model_family {
+  id uuid [pk]
+  purpose varchar [unique, not null]
+  target_definition text [not null]
+  owner varchar [not null]
+}
+
+Table model_version {
+  id uuid [pk]
+  family_id uuid [not null, ref: > model_family.id]
+  version varchar [unique, not null]
+  status varchar [not null]
+  artifact_uri varchar [not null]
+  artifact_sha256 varchar [not null]
+  feature_schema_version varchar [not null]
+  training_scope jsonb [not null]
+  created_at timestamptz [not null]
+}
+
+Table model_metric {
+  id uuid [pk]
+  model_version_id uuid [not null, ref: > model_version.id]
+  split_name varchar [not null]
+  slice_key varchar [not null]
+  metrics jsonb [not null]
+  evaluated_at timestamptz [not null]
+}
+
+Table model_deployment {
+  id uuid [pk]
+  model_version_id uuid [not null, ref: > model_version.id]
+  environment varchar [not null]
+  deployment_state varchar [not null]
+  traffic_fraction numeric [not null]
+  activated_at timestamptz
+  deactivated_at timestamptz
+}
+
+Table prediction_audit {
+  id bigint [pk, increment]
+  model_version_id uuid [not null, ref: > model_version.id]
+  request_id varchar [not null]
+  entity_key varchar [not null]
+  input_summary jsonb [not null]
+  prediction jsonb [not null]
+  created_at timestamptz [not null]
+}
+
+Table ingestion_source {
+  id uuid [pk]
+  code varchar [unique, not null]
+  data_type varchar [not null]
+  owner varchar [not null]
+}
+
+Table ingestion_checkpoint {
+  id uuid [pk]
+  source_id uuid [not null, ref: > ingestion_source.id]
+  partition_key varchar [not null]
+  last_observed_at timestamptz
+  last_success_at timestamptz
+  status varchar [not null]
+  cursor jsonb [not null, default: '{}']
+  indexes { (source_id, partition_key) [unique] }
+}
+
+Table data_quality_run {
+  id uuid [pk]
+  source_id uuid [not null, ref: > ingestion_source.id]
+  dataset_version varchar [not null]
+  status varchar [not null]
+  metrics jsonb [not null]
+  violations jsonb [not null]
+  started_at timestamptz [not null]
+  finished_at timestamptz
+}

@@ -1,0 +1,60 @@
+version: 1.0.0
+events:
+  RouteSearchCompleted:
+    owner: service-product
+    consumers: [analytics]
+    payload:
+      searchId: string
+      status: [COMPLETE, PARTIAL, NO_FEASIBLE_ROUTE]
+      generatedAt: date-time
+      regionPair: string
+      selectedRecommendationTypes: array[string]
+    forbiddenFields: [userId, email, exactOrigin, exactDestination]
+  RouteSearchFeedbackSubmitted:
+    owner: service-product
+    consumers: [routing-intelligence]
+    payload:
+      routingRequestId: string
+      selectedRouteId: string
+      actualDurationSeconds: integer|null
+      actualTaxiCost: integer|null
+      arrivedOnTime: boolean|null
+      busOutcome: object|null
+      submittedAt: date-time
+    forbiddenFields: [userId, email, savedPlaceLabel]
+  ProviderCapabilityChanged:
+    owner: routing-intelligence
+    consumers: [service-product, operations]
+    payload:
+      provider: string
+      operation: string
+      previousState: string
+      currentState: string
+      changedAt: date-time
+  MappingReviewRequired:
+    owner: routing-intelligence
+    consumers: [operations]
+    payload:
+      mappingId: uuid
+      provider: string
+      score: number
+      grade: [MEDIUM, LOW]
+      reasonCodes: array[string]
+      createdAt: date-time
+  ModelActivated:
+    owner: routing-intelligence
+    consumers: [service-product, operations]
+    payload:
+      purpose: string
+      version: string
+      environment: string
+      activatedAt: date-time
+  DataQualityViolationDetected:
+    owner: routing-intelligence
+    consumers: [operations]
+    payload:
+      source: string
+      datasetVersion: string
+      severity: string
+      violations: array[object]
+      detectedAt: date-time

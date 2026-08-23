@@ -1,0 +1,35 @@
+{
+  "contractVersion": "1.0",
+  "searchId": "01JEXAMPLE",
+  "status": "PARTIAL",
+  "generatedAt": "2026-08-23T07:40:05.421+09:00",
+  "expiresAt": "2026-08-23T07:42:05.421+09:00",
+  "baseline": null,
+  "recommendations": {
+    "fastest": null,
+    "stable": null,
+    "efficient": null,
+    "publicTransitOnly": null
+  },
+  "paretoFrontier": [],
+  "warnings": [
+    "PROVIDER_PARTIAL_FAILURE"
+  ],
+  "support": {
+    "features": {
+      "currentTransit": true,
+      "futureTransit": false,
+      "currentTaxi": true,
+      "futureTaxi": false,
+      "multiDestinationTaxi": false,
+      "busSeatRisk": true,
+      "busEtaModel": true,
+      "taxiBridge": true,
+      "realtimeRerouting": false
+    },
+    "busIntelligenceCoverage": "PARTIAL",
+    "degraded": [
+      "KAKAO_MULTI_DESTINATION_UNVERIFIED"
+    ]
+  }
+}

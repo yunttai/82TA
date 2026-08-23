@@ -1,0 +1,31 @@
+{
+  "contractVersion": "1.0",
+  "requestId": "01JEXAMPLE",
+  "origin": {
+    "coordinate": {"lon": 127.187456, "lat": 37.222345},
+    "regionHint": "GYEONGGI_YONGIN"
+  },
+  "destination": {
+    "coordinate": {"lon": 127.111159, "lat": 37.394761},
+    "regionHint": "GYEONGGI_SEONGNAM"
+  },
+  "departureTime": "2026-08-23T07:40:00+09:00",
+  "arrivalDeadline": null,
+  "constraints": {
+    "taxiBudget": {"currency": "KRW", "maxAmount": 10000, "strict": true},
+    "maxWalkSeconds": 900,
+    "maxTransfers": 3,
+    "maxTaxiLegs": 2,
+    "allowTaxiBridge": true,
+    "allowedModes": ["WALK", "TAXI", "BUS", "SUBWAY", "GTX"]
+  },
+  "preference": {
+    "profile": "BALANCED",
+    "riskAversion": 0.6,
+    "walkingAversion": 0.3,
+    "transferAversion": 0.4,
+    "accessibility": {"avoidStairs": false}
+  },
+  "requestedRecommendations": ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"],
+  "clientContext": {"locale": "ko-KR", "timezone": "Asia/Seoul"}
+}

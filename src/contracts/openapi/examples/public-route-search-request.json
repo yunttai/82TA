@@ -1,0 +1,31 @@
+{
+  "origin": {
+    "displayName": "명지대학교 자연캠퍼스",
+    "coordinate": {"lon": 127.187456, "lat": 37.222345},
+    "provider": "KAKAO_LOCAL",
+    "providerPlaceId": "example-origin"
+  },
+  "destination": {
+    "displayName": "판교역",
+    "coordinate": {"lon": 127.111159, "lat": 37.394761},
+    "provider": "KAKAO_LOCAL",
+    "providerPlaceId": "example-destination"
+  },
+  "departure": {
+    "type": "DEPART_AT",
+    "time": "2026-08-23T07:40:00+09:00"
+  },
+  "arrivalDeadline": null,
+  "taxiBudget": {"currency": "KRW", "maxAmount": 10000, "strict": true},
+  "preferences": {
+    "maxWalkSeconds": 900,
+    "maxTransfers": 3,
+    "maxTaxiLegs": 2,
+    "allowTaxiBridge": true,
+    "avoidHighBusSeatRisk": false,
+    "optimization": "BALANCED",
+    "accessibility": {"avoidStairs": false, "wheelchair": false}
+  },
+  "requestedRecommendations": ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"],
+  "saveToHistory": true
+}

@@ -1,0 +1,11 @@
+{
+  "eval_id": 0,
+  "eval_name": "bus-intelligence-delivery-structural-eval",
+  "prompt": "버스 ETA·좌석·expected wait 구현해줘",
+  "assertions": [
+    "bus-intelligence-delivery SKILL.md frontmatter가 유효하다",
+    "공통 context/contract gate를 우회하지 않는다",
+    "최종 제품 산출물을 src 아래에 둔다",
+    "오류·부분 실패·재실행 경로를 명시한다"
+  ]
+}

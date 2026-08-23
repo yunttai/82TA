@@ -1,0 +1,8 @@
+project_doc_max_bytes = 65536
+project_root_markers = [".git", "AGENTS.md"]
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 8
+default_subagent_reasoning_effort = "high"
+interrupt_message = true

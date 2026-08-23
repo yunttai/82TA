@@ -1,1 +1,36 @@
+# Harness workspace
+_workspace/**
+!_workspace/README.md
+!_workspace/service-product/.gitkeep
+!_workspace/routing-intelligence/.gitkeep
+!_workspace/integration/.gitkeep
+
+# Generated product artifacts
+src/generated/**
+!src/generated/README.md
+
+# Secrets and local runtime
+**/.env
+**/.env.*
+!**/.env.example
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/node_modules/
+**/dist/
+**/build/
+**/.coverage
+**/coverage/
+**/*.sqlite3
+**/*.db
+**/*.pkl
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 기타 등등
 .codegraph

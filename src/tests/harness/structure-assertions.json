@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "assertions": [
+    {
+      "id": "H-STRUCT-001",
+      "text": "모든 product artifacts는 src 아래에 있다"
+    },
+    {
+      "id": "H-STRUCT-002",
+      "text": "두 primary orchestrator가 존재한다"
+    },
+    {
+      "id": "H-CONTEXT-001",
+      "text": "두 orchestrator가 manifest, lock, context snapshot을 요구한다"
+    },
+    {
+      "id": "H-CONTRACT-001",
+      "text": "공통 PRD, OpenAPI, DBML, codes는 단일 원본이다"
+    },
+    {
+      "id": "H-OWN-001",
+      "text": "Service와 Routing write ownership이 겹치지 않는다"
+    },
+    {
+      "id": "H-DB-001",
+      "text": "cross-service DB read와 FK가 금지된다"
+    },
+    {
+      "id": "H-QA-001",
+      "text": "QA가 producer와 consumer를 동시에 읽는다"
+    },
+    {
+      "id": "H-EVOLVE-001",
+      "text": "부분 재실행과 하네스 진화 절차가 있다"
+    },
+    {
+      "id": "H-TRIGGER-001",
+      "text": "모든 skill에 8개 이상의 should/should-not trigger test가 있다"
+    }
+  ]
+}

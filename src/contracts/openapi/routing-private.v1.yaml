@@ -1,0 +1,294 @@
+openapi: 3.1.0
+info:
+  title: Budget Route Routing & Intelligence API
+  version: 1.0.0
+servers:
+  - url: https://routing.internal.example.invalid
+security:
+  - serviceBearer: []
+paths:
+  /v1/routes/optimize:
+    post:
+      operationId: optimizeRoutes
+      parameters:
+        - in: header
+          name: X-Correlation-Id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: X-Request-Deadline
+          required: true
+          schema: {type: string, format: date-time}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OptimizeRouteRequest'}
+      responses:
+        '200':
+          description: Optimized route candidates
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OptimizeRouteResponse'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        '504': {$ref: '#/components/responses/Problem'}
+  /v1/capabilities:
+    get:
+      operationId: getRoutingCapabilities
+      parameters:
+        - in: query
+          name: originRegion
+          schema: {type: string}
+        - in: query
+          name: destinationRegion
+          schema: {type: string}
+      responses:
+        '200':
+          description: Provider and model capabilities
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoutingCapabilities'}
+  /v1/health/live:
+    get:
+      operationId: routingLiveness
+      security: []
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, const: ok}
+  /v1/health/ready:
+    get:
+      operationId: routingReadiness
+      responses:
+        '200':
+          description: Dependencies ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, checks]
+                properties:
+                  status: {type: string, enum: [ready, degraded]}
+                  checks: {type: object}
+        '503': {$ref: '#/components/responses/Problem'}
+  /v1/version:
+    get:
+      operationId: routingVersion
+      responses:
+        '200':
+          description: Build and policy versions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [buildVersion, contractVersion, rankingPolicyVersion, models]
+                properties:
+                  buildVersion: {type: string}
+                  contractVersion: {type: string}
+                  rankingPolicyVersion: {type: string}
+                  models:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        purpose: {type: string}
+                        version: {type: string}
+  /internal/admin/cache/invalidate:
+    post:
+      operationId: invalidateRoutingCache
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace]
+              properties:
+                namespace: {type: string}
+                fingerprint: {type: [string, 'null']}
+      responses:
+        '202': {description: Invalidation accepted}
+  /internal/admin/models/{version}/activate:
+    post:
+      operationId: activateModelVersion
+      parameters:
+        - in: path
+          name: version
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose, environment]
+              properties:
+                purpose: {type: string, enum: [BUS_ETA, SEAT_RISK, CALIBRATION, TAXI_DISPATCH_WAIT]}
+                environment: {type: string, enum: [dev, staging, prod]}
+                trafficFraction: {type: number, minimum: 0, maximum: 1, default: 1}
+      responses:
+        '202': {description: Activation scheduled}
+        '409': {$ref: '#/components/responses/Problem'}
+components:
+  securitySchemes:
+    serviceBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Problem:
+      description: Problem Details
+      content:
+        application/problem+json:
+          schema: {$ref: './common/components.v1.yaml#/components/schemas/ProblemDetails'}
+  schemas:
+    OptimizeRouteRequest:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, requestId, origin, destination, departureTime, constraints, preference, requestedRecommendations, clientContext]
+      properties:
+        contractVersion: {type: string, const: '1.0'}
+        requestId: {type: string}
+        origin:
+          type: object
+          additionalProperties: false
+          required: [coordinate]
+          properties:
+            coordinate: {$ref: './common/components.v1.yaml#/components/schemas/Coordinate'}
+            regionHint: {type: [string, 'null']}
+        destination:
+          type: object
+          additionalProperties: false
+          required: [coordinate]
+          properties:
+            coordinate: {$ref: './common/components.v1.yaml#/components/schemas/Coordinate'}
+            regionHint: {type: [string, 'null']}
+        departureTime: {type: string, format: date-time}
+        arrivalDeadline: {type: [string, 'null'], format: date-time}
+        constraints: {$ref: './common/components.v1.yaml#/components/schemas/RouteConstraints'}
+        preference: {$ref: './common/components.v1.yaml#/components/schemas/OptimizationPreference'}
+        requestedRecommendations:
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [FASTEST, STABLE, EFFICIENT, PUBLIC_TRANSIT_ONLY]}
+        clientContext:
+          type: object
+          additionalProperties: false
+          required: [locale, timezone]
+          properties:
+            locale: {type: string, default: ko-KR}
+            timezone: {type: string, const: Asia/Seoul}
+    OptimizeRouteResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, requestId, status, generatedAt, expiresAt, computation, recommendations, routes, paretoRouteIds, providerStatus, modelVersions, warningCodes]
+      properties:
+        contractVersion: {type: string}
+        requestId: {type: string}
+        status: {type: string, enum: [COMPLETE, PARTIAL, NO_FEASIBLE_ROUTE, PROVIDER_UNAVAILABLE]}
+        generatedAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+        computation:
+          type: object
+          additionalProperties: false
+          required: [durationMs, rankingPolicyVersion, candidateCounts, cache]
+          properties:
+            durationMs: {type: integer, minimum: 0}
+            rankingPolicyVersion: {type: string}
+            mappingVersion: {type: [string, 'null']}
+            candidateCounts:
+              type: object
+              required: [generated, coarsePruned, fullyEvaluated, pareto]
+              properties:
+                generated: {type: integer, minimum: 0}
+                coarsePruned: {type: integer, minimum: 0}
+                fullyEvaluated: {type: integer, minimum: 0}
+                pareto: {type: integer, minimum: 0}
+            cache: {type: object}
+        recommendations:
+          type: object
+          additionalProperties: false
+          properties:
+            fastest: {type: [string, 'null']}
+            stable: {type: [string, 'null']}
+            efficient: {type: [string, 'null']}
+            publicTransitOnly: {type: [string, 'null']}
+        routes:
+          type: array
+          items: {$ref: './common/components.v1.yaml#/components/schemas/RouteCandidate'}
+        paretoRouteIds:
+          type: array
+          items: {type: string}
+        providerStatus:
+          type: array
+          items: {$ref: './common/components.v1.yaml#/components/schemas/ProviderStatus'}
+        modelVersions:
+          type: array
+          items:
+            type: object
+            required: [purpose, version]
+            properties:
+              purpose: {type: string}
+              version: {type: string}
+        warningCodes:
+          type: array
+          items: {type: string}
+    RoutingCapabilities:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, region, features, providers, models, degraded]
+      properties:
+        generatedAt: {type: string, format: date-time}
+        region:
+          type: object
+          properties:
+            originSupported: {type: boolean}
+            destinationSupported: {type: boolean}
+        features:
+          type: object
+          properties:
+            currentTransit: {type: boolean}
+            futureTransit: {type: boolean}
+            currentTaxi: {type: boolean}
+            futureTaxi: {type: boolean}
+            multiDestinationTaxi: {type: boolean}
+            busSeatRisk: {type: boolean}
+            busEtaModel: {type: boolean}
+            taxiBridge: {type: boolean}
+            realtimeRerouting: {type: boolean}
+        providers:
+          type: array
+          items:
+            type: object
+            required: [provider, documentationState, keyVerificationState, productionState, health]
+            properties:
+              provider: {type: string}
+              documentationState: {type: string, enum: [UNKNOWN, DOCUMENTED]}
+              keyVerificationState: {type: string, enum: [UNVERIFIED, KEY_VERIFIED, FAILED]}
+              productionState: {type: string, enum: [UNAPPROVED, PRODUCTION_APPROVED, BLOCKED]}
+              health: {type: string}
+        models:
+          type: array
+          items:
+            type: object
+            properties:
+              purpose: {type: string}
+              version: {type: string}
+              state: {type: string}
+        degraded: {type: array, items: {type: string}}

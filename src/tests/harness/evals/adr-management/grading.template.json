@@ -1,0 +1,30 @@
+{
+  "expectations": [
+    {
+      "text": "adr-management SKILL.md frontmatter가 유효하다",
+      "passed": false,
+      "evidence": "Runtime evaluation not executed yet"
+    },
+    {
+      "text": "공통 context/contract gate를 우회하지 않는다",
+      "passed": false,
+      "evidence": "Runtime evaluation not executed yet"
+    },
+    {
+      "text": "최종 제품 산출물을 src 아래에 둔다",
+      "passed": false,
+      "evidence": "Runtime evaluation not executed yet"
+    },
+    {
+      "text": "오류·부분 실패·재실행 경로를 명시한다",
+      "passed": false,
+      "evidence": "Runtime evaluation not executed yet"
+    }
+  ],
+  "summary": {
+    "passed": 0,
+    "failed": 4,
+    "total": 4,
+    "pass_rate": 0.0
+  }
+}

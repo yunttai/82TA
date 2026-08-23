@@ -1,0 +1,25 @@
+=== validate_repository ===
+OpenAPI YAML and local $ref targets OK
+OPENAPI EXAMPLES OK: 4 canonical examples
+CODEX HARNESS REGISTRY OK: 2 harnesses, 18 agents, 25 registered skills
+CODEX HARNESS EVALS OK: 25 skills
+CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+REPOSITORY VALIDATION OK
+
+=== verify_contract_lock ===
+CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+
+=== snapshot service ===
+CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+_workspace/service-product/00_context_snapshot_20260822T235833Z.json
+
+=== snapshot routing ===
+CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+_workspace/routing-intelligence/00_context_snapshot_20260822T235834Z.json
+
+=== snapshot integration ===
+CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+_workspace/integration/00_context_snapshot_20260822T235835Z.json
+
+=== compare snapshots ===
+CONTEXT PARITY OK: context=1.0.1 contract=1.0.0 aggregate=c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a

@@ -1,0 +1,54 @@
+version: 1.0.0
+reasonCodes:
+  FASTER_THAN_PUBLIC_TRANSIT: 대중교통 기준보다 빠름
+  BEST_MARGINAL_TIME_SAVING: 추가 비용 대비 절감시간이 가장 큼
+  LOW_TRANSFER_RISK: 보수적 환승 여유가 큼
+  UPSTREAM_STOP_HIGHER_BOARDABILITY: 상류 정류장이 좌석 가용성·대기를 개선
+  HIGH_BUS_SEAT_RISK_AVOIDED: 높은 좌석 부족 위험을 회피
+  TAXI_BRIDGE_CONNECTS_FAST_LINES: 짧은 택시로 두 고속 대중교통망 연결
+  WITHIN_STRICT_TAXI_BUDGET: 비용 상한이 예산 이내
+  NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET: 추가 예산의 한계효용이 낮음
+  LOWER_WALKING_TIME: 도보를 유의미하게 감소
+  LOWER_P90_ARRIVAL_TIME: 보수적 도착시간이 우수
+warningCodes:
+  BUS_DATA_UNAVAILABLE: 버스 실시간 정보 없음
+  BUS_MAPPING_LOW_CONFIDENCE: Kakao↔GBIS 매핑 신뢰도 부족
+  ETA_MODEL_FALLBACK: 공식 ETA 없이 자체 모델 사용
+  HISTORICAL_PROXY_USED: 실시간 대신 과거 proxy 사용
+  TAXI_FARE_MAY_VARY: 실제 택시요금과 다를 수 있음
+  TAXI_DISPATCH_WAIT_ESTIMATED: 배차 대기가 자체 추정값
+  TRANSFER_MARGIN_LOW: 환승 여유 부족
+  GEOMETRY_PARTIAL: 일부 geometry 불완전
+  PROVIDER_PARTIAL_FAILURE: 일부 Provider 실패
+  DATA_STALE: freshness 기준 초과
+  BUDGET_NEAR_LIMIT: 비용 상한이 예산에 근접
+  BOARDABILITY_IS_PROXY: 실제 승차 outcome이 아닌 대용값
+  FEATURE_OUT_OF_DISTRIBUTION: 모델 학습 범위 밖 가능성
+  FUTURE_TRANSIT_ESTIMATED: 미래 transit이 과거 이력 기반
+errorCodes:
+  INVALID_COORDINATE: {httpStatus: 400, retryable: false}
+  UNSUPPORTED_TIME: {httpStatus: 400, retryable: false}
+  CONSTRAINT_OUT_OF_RANGE: {httpStatus: 400, retryable: false}
+  AUTH_REQUIRED: {httpStatus: 401, retryable: false}
+  SERVICE_AUTH_REQUIRED: {httpStatus: 401, retryable: false}
+  FORBIDDEN: {httpStatus: 403, retryable: false}
+  SEARCH_NOT_FOUND: {httpStatus: 404, retryable: false}
+  NO_ROUTE_FOUND: {httpStatus: 404, retryable: false}
+  IDEMPOTENCY_CONFLICT: {httpStatus: 409, retryable: false}
+  CONTRACT_VERSION_CONFLICT: {httpStatus: 409, retryable: false}
+  UNSUPPORTED_REGION: {httpStatus: 422, retryable: false}
+  RATE_LIMITED: {httpStatus: 429, retryable: true}
+  PROVIDER_BAD_RESPONSE: {httpStatus: 502, retryable: true}
+  TRANSIT_PROVIDER_UNAVAILABLE: {httpStatus: 503, retryable: true}
+  MODEL_NOT_READY: {httpStatus: 503, retryable: true}
+  ROUTING_DEADLINE_EXCEEDED: {httpStatus: 504, retryable: true}
+enums:
+  TravelMode: [WALK, WAIT, TRANSFER, TAXI, BUS, SUBWAY, GTX, TRAIN]
+  RecommendationType: [FASTEST, STABLE, EFFICIENT, PUBLIC_TRANSIT_ONLY]
+  RoutePattern: [TRANSIT_ONLY, TAXI_TRANSIT, TRANSIT_TAXI, TAXI_TRANSIT_TAXI, TAXI_ONLY, TRANSIT_TAXI_BRIDGE_TRANSIT, UPSTREAM_STOP_TAXI_TRANSIT]
+  DataOrigin: [OBSERVED, PROVIDER_ESTIMATE, MODEL_PREDICTED, HISTORICAL_PROXY, USER_INPUT, UNKNOWN]
+  ConfidenceGrade: [HIGH, MEDIUM, LOW, UNKNOWN]
+  CoverageLevel: [LIVE, PARTIAL, HISTORICAL, UNSUPPORTED, UNKNOWN]
+  SearchStatus: [VALIDATING, SEARCHING, COMPLETE, PARTIAL, NO_FEASIBLE_ROUTE, PROVIDER_UNAVAILABLE, FAILED, EXPIRED]
+  ProviderStatus: [OK, PARTIAL, TIMEOUT, RATE_LIMITED, UNAVAILABLE, BAD_RESPONSE, DISABLED]
+  ModelDeploymentState: [REGISTERED, VALIDATED, SHADOW, CANARY, ACTIVE, RETIRED, REJECTED]

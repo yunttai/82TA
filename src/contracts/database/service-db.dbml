@@ -1,0 +1,128 @@
+Project service_db {
+  database_type: 'PostgreSQL'
+  Note: 'Owned only by Django Service Backend'
+}
+
+Table auth_user {
+  id uuid [pk]
+  email varchar [unique, not null]
+  password_hash varchar
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  deleted_at timestamptz
+}
+
+Table user_profile {
+  user_id uuid [pk, ref: - auth_user.id]
+  locale varchar [not null, default: 'ko-KR']
+  timezone varchar [not null, default: 'Asia/Seoul']
+  updated_at timestamptz [not null]
+}
+
+Table user_preference {
+  user_id uuid [pk, ref: - auth_user.id]
+  default_taxi_budget integer [not null, default: 10000]
+  max_walk_seconds integer [not null, default: 900]
+  max_transfers integer [not null, default: 3]
+  max_taxi_legs integer [not null, default: 2]
+  optimization_profile varchar [not null, default: 'BALANCED']
+  accessibility jsonb [not null, default: '{}']
+  privacy jsonb [not null, default: '{}']
+  version integer [not null, default: 1]
+  updated_at timestamptz [not null]
+}
+
+Table saved_place {
+  id uuid [pk]
+  user_id uuid [not null, ref: > auth_user.id]
+  label varchar [not null]
+  display_name varchar [not null]
+  coordinate geography [not null]
+  provider varchar
+  provider_place_id varchar
+  is_sensitive boolean [not null, default: true]
+  created_at timestamptz [not null]
+  deleted_at timestamptz
+}
+
+Table favorite_journey {
+  id uuid [pk]
+  user_id uuid [not null, ref: > auth_user.id]
+  origin_saved_place_id uuid [ref: > saved_place.id]
+  destination_saved_place_id uuid [ref: > saved_place.id]
+  default_constraints jsonb [not null]
+  nickname varchar [not null]
+  created_at timestamptz [not null]
+}
+
+Table anonymous_session {
+  id uuid [pk]
+  token_hash varchar [unique, not null]
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null]
+}
+
+Table route_search {
+  id uuid [pk]
+  user_id uuid [ref: > auth_user.id]
+  anonymous_session_id uuid [ref: > anonymous_session.id]
+  origin_coordinate geography [not null]
+  destination_coordinate geography [not null]
+  origin_display_name varchar
+  destination_display_name varchar
+  departure_time timestamptz [not null]
+  arrival_deadline timestamptz
+  taxi_budget_max integer [not null]
+  strict_budget boolean [not null]
+  constraints jsonb [not null]
+  status varchar [not null]
+  routing_request_id varchar [unique, not null]
+  contract_version varchar [not null]
+  created_at timestamptz [not null]
+  expires_at timestamptz [not null]
+}
+
+Table route_search_result {
+  id uuid [pk]
+  route_search_id uuid [not null, ref: > route_search.id]
+  recommendation_type varchar [not null]
+  routing_route_id varchar [not null]
+  p50_seconds integer [not null]
+  p90_seconds integer [not null]
+  taxi_cost_expected integer [not null]
+  taxi_cost_upper integer [not null]
+  reliability_score numeric [not null]
+  public_result jsonb [not null]
+  created_at timestamptz [not null]
+}
+
+Table route_feedback {
+  id uuid [pk]
+  route_search_id uuid [not null, ref: - route_search.id]
+  user_id uuid [ref: > auth_user.id]
+  selected_route_id varchar [not null]
+  actual_duration_seconds integer
+  actual_taxi_cost integer
+  arrived_on_time boolean
+  bus_outcome jsonb
+  rating integer
+  comment text
+  created_at timestamptz [not null]
+}
+
+Table consent_record {
+  id uuid [pk]
+  user_id uuid [not null, ref: > auth_user.id]
+  consent_type varchar [not null]
+  document_version varchar [not null]
+  accepted boolean [not null]
+  recorded_at timestamptz [not null]
+}
+
+Table account_audit_event {
+  id uuid [pk]
+  user_id uuid [ref: > auth_user.id]
+  event_type varchar [not null]
+  safe_metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null]
+}

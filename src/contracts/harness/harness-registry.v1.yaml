@@ -1,0 +1,130 @@
+version: 1.0.1
+project: budget-route-platform
+canonicalContext:
+  manifest: src/contracts/CONTEXT_MANIFEST.json
+  lock: src/contracts/CONTRACT_LOCK.json
+  sharedDocs: src/docs/shared
+  contracts: src/contracts
+  rule: two harnesses must start from the same aggregateSha256
+harnesses:
+  service-product:
+    orchestrator: .agents/skills/service-product-orchestrator/SKILL.md
+    workspace: _workspace/service-product
+    finalWriteScopes:
+    - src/apps/web
+    - src/services/service-api
+    - src/docs/harnesses/service-product
+    - src/tests/contracts
+    - src/tests/integration
+    - src/tests/e2e
+    - src/tests/security
+    deniedScopes:
+    - src/services/routing-api
+    - src/packages/routing-domain
+    - src/packages/bus-intelligence-core
+    - src/packages/provider-core
+    - src/workers
+    agents:
+    - service-product-lead
+    - service-ux-engineer
+    - service-frontend-engineer
+    - service-backend-engineer
+    - service-data-engineer
+    - service-security-engineer
+    - service-qa-engineer
+    sharedAgents:
+    - contract-steward
+    - architecture-auditor
+    - integration-qa
+    primarySkills:
+    - service-product-orchestrator
+    - service-work-planning
+    - service-ux-design
+    - service-web-delivery
+    - service-backend-delivery
+    - service-data-lifecycle
+    - service-security-review
+    - service-incremental-qa
+    agentDefinitionRoot: .codex/agents
+    skillRoot: .agents/skills
+    taskLedger: WORKPLAN.md
+  routing-intelligence:
+    orchestrator: .agents/skills/routing-intelligence-orchestrator/SKILL.md
+    workspace: _workspace/routing-intelligence
+    finalWriteScopes:
+    - src/services/routing-api
+    - src/packages/routing-domain
+    - src/packages/bus-intelligence-core
+    - src/packages/provider-core
+    - src/workers
+    - src/docs/harnesses/routing-intelligence
+    - src/tests/contracts
+    - src/tests/integration
+    - src/tests/replay
+    - src/tests/performance
+    - src/tests/security
+    deniedScopes:
+    - src/apps/web
+    - src/services/service-api
+    agents:
+    - routing-technical-lead
+    - provider-integration-engineer
+    - transport-mapping-engineer
+    - route-optimization-engineer
+    - bus-intelligence-engineer
+    - routing-data-ml-engineer
+    - routing-security-performance-engineer
+    - routing-qa-engineer
+    sharedAgents:
+    - contract-steward
+    - architecture-auditor
+    - integration-qa
+    primarySkills:
+    - routing-intelligence-orchestrator
+    - routing-work-planning
+    - provider-adapter-delivery
+    - transport-mapping-delivery
+    - route-optimizer-delivery
+    - bus-intelligence-delivery
+    - routing-data-mlops
+    - routing-api-delivery
+    - routing-security-performance
+    - routing-incremental-qa
+    agentDefinitionRoot: .codex/agents
+    skillRoot: .agents/skills
+    taskLedger: WORKPLAN.md
+sharedSkills:
+- shared-context-loader
+- shared-contract-governance
+- integration-coherence-qa
+- source-layout-guard
+- adr-management
+- platform-release-gate
+- harness-evolution
+integration:
+  workspace: _workspace/integration
+  mandatoryChecks:
+  - same-context-aggregate-hash
+  - public-openapi-consumer
+  - private-openapi-producer-consumer
+  - dbml-orm-migration
+  - code-registry-ui-domain
+  - no-cross-database-access
+  - no-user-identity-in-routing
+  - deterministic-replay
+  - source-layout
+  mergeRule: implementation cannot be integrated while any mandatory check is FAIL
+    or UNVERIFIED
+runtime: codex
+instructionFiles:
+  root: AGENTS.md
+  projectConfig: .codex/config.toml
+  customAgents: .codex/agents
+  skills: .agents/skills
+  prompts: src/docs/codex-prompts
+coordination:
+  mechanism: Codex primary thread + named custom subagents + durable _workspace ledgers
+  taskLedgerPattern: _workspace/{workstream}/WORKPLAN.md
+  statusPattern: _workspace/{workstream}/STATUS.md
+  handoffPattern: _workspace/{workstream}/HANDOFF.md
+  inspectionCommand: /agent

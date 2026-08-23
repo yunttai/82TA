@@ -1,0 +1,399 @@
+openapi: 3.1.0
+info:
+  title: Budget Route Service Public API
+  version: 1.0.0
+servers:
+  - url: https://api.example.invalid
+paths:
+  /api/v1/places/suggest:
+    get:
+      operationId: suggestPlaces
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - in: query
+          name: lon
+          schema: {type: number}
+        - in: query
+          name: lat
+          schema: {type: number}
+      responses:
+        '200':
+          description: Place suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
+        '400': {$ref: '#/components/responses/Problem'}
+  /api/v1/places/reverse-geocode:
+    get:
+      operationId: reverseGeocode
+      parameters:
+        - in: query
+          name: lon
+          required: true
+          schema: {type: number}
+        - in: query
+          name: lat
+          required: true
+          schema: {type: number}
+      responses:
+        '200':
+          description: Place display information
+          content:
+            application/json:
+              schema: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
+        '400': {$ref: '#/components/responses/Problem'}
+  /api/v1/route-searches:
+    post:
+      operationId: createRouteSearch
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+        - in: header
+          name: X-Correlation-Id
+          required: false
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PublicRouteSearchRequest'}
+      responses:
+        '200':
+          description: Route search result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicRouteSearchResponse'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+    get:
+      operationId: listRouteSearches
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Search history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/PublicRouteSearchResponse'}
+  /api/v1/route-searches/{searchId}:
+    get:
+      operationId: getRouteSearch
+      parameters:
+        - in: path
+          name: searchId
+          required: true
+          schema: {type: string}
+        - in: header
+          name: X-Guest-Token
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: Stored route search
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicRouteSearchResponse'}
+        '404': {$ref: '#/components/responses/Problem'}
+  /api/v1/route-searches/{searchId}/feedback:
+    post:
+      operationId: submitRouteFeedback
+      parameters:
+        - in: path
+          name: searchId
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RouteFeedbackInput'}
+      responses:
+        '204': {description: Feedback accepted}
+        '404': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/preferences:
+    get:
+      operationId: getPreferences
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: User preferences
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserPreferences'}
+    put:
+      operationId: updatePreferences
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserPreferences'}
+      responses:
+        '200':
+          description: Updated preferences
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserPreferences'}
+  /api/v1/me/saved-places:
+    get:
+      operationId: listSavedPlaces
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Saved places
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/SavedPlace'}
+    post:
+      operationId: createSavedPlace
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SavedPlaceInput'}
+      responses:
+        '201':
+          description: Saved place
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedPlace'}
+  /api/v1/me/favorite-journeys:
+    get:
+      operationId: listFavoriteJourneys
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Favorite journeys
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/FavoriteJourney'}
+    post:
+      operationId: createFavoriteJourney
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FavoriteJourneyInput'}
+      responses:
+        '201':
+          description: Favorite journey
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FavoriteJourney'}
+  /api/v1/me/data:
+    delete:
+      operationId: deleteUserData
+      security: [{sessionCookie: []}]
+      responses:
+        '202': {description: Deletion scheduled}
+  /api/v1/support/capabilities:
+    get:
+      operationId: getPublicCapabilities
+      responses:
+        '200':
+          description: Supported regions and features
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicCapabilities'}
+  /api/v1/health:
+    get:
+      operationId: publicHealth
+      responses:
+        '200':
+          description: Minimal public health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, enum: [ok, degraded]}
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: sessionid
+  responses:
+    Problem:
+      description: Problem Details
+      content:
+        application/problem+json:
+          schema: {$ref: './common/components.v1.yaml#/components/schemas/ProblemDetails'}
+  schemas:
+    PublicRouteSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [origin, destination, departure, taxiBudget, preferences, requestedRecommendations]
+      properties:
+        origin: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
+        destination: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
+        departure:
+          type: object
+          additionalProperties: false
+          required: [type, time]
+          properties:
+            type: {type: string, enum: [DEPART_AT, ARRIVE_BY]}
+            time: {type: string, format: date-time}
+        arrivalDeadline: {type: [string, 'null'], format: date-time}
+        taxiBudget: {$ref: './common/components.v1.yaml#/components/schemas/TaxiBudget'}
+        preferences:
+          type: object
+          additionalProperties: false
+          required: [maxWalkSeconds, maxTransfers, maxTaxiLegs, optimization]
+          properties:
+            maxWalkSeconds: {type: integer, minimum: 0, maximum: 7200}
+            maxTransfers: {type: integer, minimum: 0, maximum: 8}
+            maxTaxiLegs: {type: integer, minimum: 0, maximum: 3}
+            allowTaxiBridge: {type: boolean}
+            avoidHighBusSeatRisk: {type: boolean}
+            optimization: {type: string, enum: [FASTEST, STABLE, EFFICIENT, BALANCED]}
+            accessibility: {$ref: './common/components.v1.yaml#/components/schemas/Accessibility'}
+        requestedRecommendations:
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [FASTEST, STABLE, EFFICIENT, PUBLIC_TRANSIT_ONLY]}
+        saveToHistory: {type: boolean, default: false}
+    PublicRouteSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, searchId, status, generatedAt, expiresAt, recommendations, warnings, support]
+      properties:
+        contractVersion: {type: string}
+        searchId: {type: string}
+        status: {type: string, enum: [COMPLETE, PARTIAL, NO_FEASIBLE_ROUTE, PROVIDER_UNAVAILABLE, FAILED, EXPIRED]}
+        generatedAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+        baseline:
+          oneOf:
+            - {$ref: './common/components.v1.yaml#/components/schemas/RouteCandidate'}
+            - {type: 'null'}
+        recommendations:
+          type: object
+          additionalProperties: false
+          properties:
+            fastest:
+              oneOf: [{$ref: './common/components.v1.yaml#/components/schemas/RouteCandidate'}, {type: 'null'}]
+            stable:
+              oneOf: [{$ref: './common/components.v1.yaml#/components/schemas/RouteCandidate'}, {type: 'null'}]
+            efficient:
+              oneOf: [{$ref: './common/components.v1.yaml#/components/schemas/RouteCandidate'}, {type: 'null'}]
+            publicTransitOnly:
+              oneOf: [{$ref: './common/components.v1.yaml#/components/schemas/RouteCandidate'}, {type: 'null'}]
+        paretoFrontier:
+          type: array
+          items:
+            type: object
+            required: [routeId, taxiCostUpper, p50Seconds, p90Seconds]
+            properties:
+              routeId: {type: string}
+              taxiCostUpper: {type: integer}
+              p50Seconds: {type: integer}
+              p90Seconds: {type: integer}
+        warnings: {type: array, items: {type: string}}
+        support: {$ref: '#/components/schemas/PublicCapabilities'}
+    RouteFeedbackInput:
+      type: object
+      additionalProperties: false
+      required: [selectedRouteId]
+      properties:
+        selectedRouteId: {type: string}
+        actualDurationSeconds: {type: [integer, 'null'], minimum: 0}
+        actualTaxiCost: {type: [integer, 'null'], minimum: 0}
+        arrivedOnTime: {type: [boolean, 'null']}
+        busOutcome: {type: [object, 'null']}
+        rating: {type: [integer, 'null'], minimum: 1, maximum: 5}
+        comment: {type: [string, 'null'], maxLength: 1000}
+    UserPreferences:
+      type: object
+      additionalProperties: false
+      required: [defaultTaxiBudget, maxWalkSeconds, maxTransfers, maxTaxiLegs, optimizationProfile]
+      properties:
+        defaultTaxiBudget: {type: integer, minimum: 0}
+        maxWalkSeconds: {type: integer, minimum: 0, maximum: 7200}
+        maxTransfers: {type: integer, minimum: 0, maximum: 8}
+        maxTaxiLegs: {type: integer, minimum: 0, maximum: 3}
+        optimizationProfile: {type: string, enum: [FASTEST, STABLE, EFFICIENT, BALANCED]}
+        accessibility: {$ref: './common/components.v1.yaml#/components/schemas/Accessibility'}
+        privacy: {type: object}
+    SavedPlaceInput:
+      type: object
+      additionalProperties: false
+      required: [label, place]
+      properties:
+        label: {type: string, maxLength: 50}
+        place: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
+        isSensitive: {type: boolean, default: true}
+    SavedPlace:
+      allOf:
+        - {$ref: '#/components/schemas/SavedPlaceInput'}
+        - type: object
+          required: [id, createdAt]
+          properties:
+            id: {type: string, format: uuid}
+            createdAt: {type: string, format: date-time}
+    FavoriteJourneyInput:
+      type: object
+      additionalProperties: false
+      required: [nickname, originSavedPlaceId, destinationSavedPlaceId, defaultConstraints]
+      properties:
+        nickname: {type: string, maxLength: 100}
+        originSavedPlaceId: {type: string, format: uuid}
+        destinationSavedPlaceId: {type: string, format: uuid}
+        defaultConstraints: {type: object}
+    FavoriteJourney:
+      allOf:
+        - {$ref: '#/components/schemas/FavoriteJourneyInput'}
+        - type: object
+          required: [id, createdAt]
+          properties:
+            id: {type: string, format: uuid}
+            createdAt: {type: string, format: date-time}
+    PublicCapabilities:
+      type: object
+      additionalProperties: false
+      required: [features, degraded]
+      properties:
+        region:
+          type: object
+          properties:
+            originSupported: {type: boolean}
+            destinationSupported: {type: boolean}
+        features:
+          type: object
+          properties:
+            currentTransit: {type: boolean}
+            futureTransit: {type: boolean}
+            currentTaxi: {type: boolean}
+            futureTaxi: {type: boolean}
+            multiDestinationTaxi: {type: boolean}
+            busSeatRisk: {type: boolean}
+            busEtaModel: {type: boolean}
+            taxiBridge: {type: boolean}
+            realtimeRerouting: {type: boolean}
+        busIntelligenceCoverage: {type: string, enum: [LIVE, PARTIAL, HISTORICAL, UNSUPPORTED, UNKNOWN]}
+        degraded: {type: array, items: {type: string}}

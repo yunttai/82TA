@@ -1,0 +1,259 @@
+openapi: 3.1.0
+info:
+  title: Budget Route Common Components
+  version: 1.0.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+paths: {}
+components:
+  schemas:
+    Coordinate:
+      type: object
+      additionalProperties: false
+      required: [lon, lat]
+      properties:
+        lon: {type: number, minimum: 124, maximum: 132}
+        lat: {type: number, minimum: 33, maximum: 39.5}
+    Confidence:
+      type: object
+      additionalProperties: false
+      required: [score, grade]
+      properties:
+        score: {type: number, minimum: 0, maximum: 1}
+        grade: {type: string, enum: [HIGH, MEDIUM, LOW, UNKNOWN]}
+    Provenance:
+      type: object
+      additionalProperties: false
+      required: [provider, origin, receivedAt, confidence]
+      properties:
+        provider: {type: string}
+        origin:
+          type: string
+          enum: [OBSERVED, PROVIDER_ESTIMATE, MODEL_PREDICTED, HISTORICAL_PROXY, USER_INPUT, UNKNOWN]
+        observedAt: {type: [string, 'null'], format: date-time}
+        receivedAt: {type: string, format: date-time}
+        ageSeconds: {type: [integer, 'null'], minimum: 0}
+        confidence: {$ref: '#/components/schemas/Confidence'}
+        fallbackLevel: {type: integer, minimum: 0, default: 0}
+    MoneyRange:
+      type: object
+      additionalProperties: false
+      required: [currency, expected, lower, upper, origin]
+      properties:
+        currency: {type: string, const: KRW}
+        expected: {type: integer, minimum: 0}
+        lower: {type: integer, minimum: 0}
+        upper: {type: integer, minimum: 0}
+        origin:
+          type: string
+          enum: [OBSERVED, PROVIDER_ESTIMATE, MODEL_PREDICTED, HISTORICAL_PROXY, USER_INPUT, UNKNOWN]
+    TimeEstimate:
+      type: object
+      additionalProperties: false
+      required: [p50Seconds, p90Seconds, confidence, origin]
+      properties:
+        p50Seconds: {type: integer, minimum: 0}
+        p90Seconds: {type: integer, minimum: 0}
+        lowerSeconds: {type: [integer, 'null'], minimum: 0}
+        upperSeconds: {type: [integer, 'null'], minimum: 0}
+        confidence: {$ref: '#/components/schemas/Confidence'}
+        origin:
+          type: string
+          enum: [OBSERVED, PROVIDER_ESTIMATE, MODEL_PREDICTED, HISTORICAL_PROXY, USER_INPUT, UNKNOWN]
+    PlaceRef:
+      type: object
+      additionalProperties: false
+      required: [displayName, coordinate]
+      properties:
+        displayName: {type: string, minLength: 1, maxLength: 200}
+        coordinate: {$ref: '#/components/schemas/Coordinate'}
+        provider: {type: [string, 'null']}
+        providerPlaceId: {type: [string, 'null']}
+        regionCode: {type: [string, 'null']}
+    TaxiBudget:
+      type: object
+      additionalProperties: false
+      required: [currency, maxAmount, strict]
+      properties:
+        currency: {type: string, const: KRW}
+        maxAmount: {type: integer, minimum: 0, maximum: 500000}
+        strict: {type: boolean}
+    Accessibility:
+      type: object
+      additionalProperties: false
+      properties:
+        avoidStairs: {type: boolean, default: false}
+        wheelchair: {type: boolean, default: false}
+    RouteConstraints:
+      type: object
+      additionalProperties: false
+      required: [taxiBudget, maxWalkSeconds, maxTransfers, maxTaxiLegs, allowedModes]
+      properties:
+        taxiBudget: {$ref: '#/components/schemas/TaxiBudget'}
+        maxWalkSeconds: {type: integer, minimum: 0, maximum: 7200}
+        maxTransfers: {type: integer, minimum: 0, maximum: 8}
+        maxTaxiLegs: {type: integer, minimum: 0, maximum: 3}
+        allowTaxiBridge: {type: boolean, default: false}
+        allowedModes:
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [WALK, WAIT, TRANSFER, TAXI, BUS, SUBWAY, GTX, TRAIN]}
+        accessibility: {$ref: '#/components/schemas/Accessibility'}
+    OptimizationPreference:
+      type: object
+      additionalProperties: false
+      required: [profile]
+      properties:
+        profile: {type: string, enum: [FASTEST, STABLE, EFFICIENT, BALANCED]}
+        riskAversion: {type: number, minimum: 0, maximum: 1, default: 0.5}
+        walkingAversion: {type: number, minimum: 0, maximum: 1, default: 0.5}
+        transferAversion: {type: number, minimum: 0, maximum: 1, default: 0.5}
+        accessibility: {$ref: '#/components/schemas/Accessibility'}
+    StopRef:
+      type: object
+      additionalProperties: false
+      required: [name, coordinate]
+      properties:
+        name: {type: string}
+        coordinate: {$ref: '#/components/schemas/Coordinate'}
+        canonicalStopId: {type: [string, 'null'], format: uuid}
+        providerStopId: {type: [string, 'null']}
+    Geometry:
+      type: object
+      additionalProperties: false
+      required: [encoding]
+      properties:
+        encoding: {type: string, enum: [GEOJSON, POLYLINE, NONE]}
+        value: {}
+    SeatRisk:
+      type: object
+      additionalProperties: false
+      required: [noSeatProbability, lowSeat2Probability, modelVersion]
+      properties:
+        noSeatProbability: {type: number, minimum: 0, maximum: 1}
+        lowSeat2Probability: {type: number, minimum: 0, maximum: 1}
+        lowSeat5Probability: {type: [number, 'null'], minimum: 0, maximum: 1}
+        modelVersion: {type: string}
+    CandidateVehicle:
+      type: object
+      additionalProperties: false
+      required: [vehicleRef, eta]
+      properties:
+        vehicleRef: {type: string}
+        eta: {$ref: '#/components/schemas/TimeEstimate'}
+        remainSeatObserved: {type: [integer, 'null'], minimum: 0}
+        seatRiskAtBoarding:
+          oneOf:
+            - {$ref: '#/components/schemas/SeatRisk'}
+            - {type: 'null'}
+        boardabilityProxy: {type: [number, 'null'], minimum: 0, maximum: 1}
+    BusLegIntelligence:
+      type: object
+      additionalProperties: false
+      required: [candidateVehicles, expectedWaitSeconds, p90WaitSeconds, coverage, warnings]
+      properties:
+        mapping:
+          type: object
+          additionalProperties: false
+          properties:
+            gbisRouteId: {type: [string, 'null']}
+            boardingStationId: {type: [string, 'null']}
+            alightingStationId: {type: [string, 'null']}
+            score: {type: number, minimum: 0, maximum: 1}
+            grade: {type: string, enum: [HIGH, MEDIUM, LOW, UNKNOWN]}
+            mappingVersion: {type: string}
+        userArrivalTime: {type: [string, 'null'], format: date-time}
+        candidateVehicles:
+          type: array
+          items: {$ref: '#/components/schemas/CandidateVehicle'}
+        expectedWaitSeconds: {type: integer, minimum: 0}
+        p90WaitSeconds: {type: integer, minimum: 0}
+        coverage: {type: string, enum: [LIVE, PARTIAL, HISTORICAL, UNSUPPORTED, UNKNOWN]}
+        warnings: {type: array, items: {type: string}}
+    RouteLeg:
+      type: object
+      additionalProperties: false
+      required: [legId, sequence, mode, from, to, duration, distanceMeters, fare, geometry, provenance]
+      properties:
+        legId: {type: string}
+        sequence: {type: integer, minimum: 0}
+        mode: {type: string, enum: [WALK, WAIT, TRANSFER, TAXI, BUS, SUBWAY, GTX, TRAIN]}
+        from: {$ref: '#/components/schemas/StopRef'}
+        to: {$ref: '#/components/schemas/StopRef'}
+        expectedStartAt: {type: [string, 'null'], format: date-time}
+        expectedEndAt: {type: [string, 'null'], format: date-time}
+        duration: {$ref: '#/components/schemas/TimeEstimate'}
+        distanceMeters: {type: integer, minimum: 0}
+        fare: {$ref: '#/components/schemas/MoneyRange'}
+        geometry: {$ref: '#/components/schemas/Geometry'}
+        transit: {type: [object, 'null']}
+        busIntelligence:
+          oneOf:
+            - {$ref: '#/components/schemas/BusLegIntelligence'}
+            - {type: 'null'}
+        provenance:
+          type: array
+          items: {$ref: '#/components/schemas/Provenance'}
+    RouteCandidate:
+      type: object
+      additionalProperties: false
+      required: [routeId, pattern, totalDuration, taxiCost, totalFareExpected, walkSeconds, transferCount, taxiLegCount, reliabilityScore, legs, reasonCodes, warningCodes]
+      properties:
+        routeId: {type: string}
+        pattern:
+          type: string
+          enum: [TRANSIT_ONLY, TAXI_TRANSIT, TRANSIT_TAXI, TAXI_TRANSIT_TAXI, TAXI_ONLY, TRANSIT_TAXI_BRIDGE_TRANSIT, UPSTREAM_STOP_TAXI_TRANSIT]
+        totalDuration: {$ref: '#/components/schemas/TimeEstimate'}
+        arrivalAt:
+          type: object
+          properties:
+            p50: {type: [string, 'null'], format: date-time}
+            p90: {type: [string, 'null'], format: date-time}
+        taxiCost: {$ref: '#/components/schemas/MoneyRange'}
+        totalFareExpected: {type: integer, minimum: 0}
+        walkSeconds: {type: integer, minimum: 0}
+        transferCount: {type: integer, minimum: 0}
+        taxiLegCount: {type: integer, minimum: 0}
+        reliabilityScore: {type: number, minimum: 0, maximum: 1}
+        dominance:
+          type: object
+          properties:
+            onParetoFrontier: {type: boolean}
+        legs:
+          type: array
+          items: {$ref: '#/components/schemas/RouteLeg'}
+        reasonCodes: {type: array, items: {type: string}}
+        warningCodes: {type: array, items: {type: string}}
+        provenance:
+          type: array
+          items: {$ref: '#/components/schemas/Provenance'}
+    ProviderStatus:
+      type: object
+      additionalProperties: false
+      required: [provider, status, latencyMs, cache]
+      properties:
+        provider: {type: string}
+        operation: {type: [string, 'null']}
+        status: {type: string, enum: [OK, PARTIAL, TIMEOUT, RATE_LIMITED, UNAVAILABLE, BAD_RESPONSE, DISABLED]}
+        latencyMs: {type: integer, minimum: 0}
+        cache: {type: boolean}
+        messageCode: {type: [string, 'null']}
+    ProblemDetails:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, retryable, correlationId, violations, safeContext]
+      properties:
+        type: {type: string, format: uri}
+        title: {type: string}
+        status: {type: integer}
+        code: {type: string}
+        detail: {type: [string, 'null']}
+        retryable: {type: boolean}
+        correlationId: {type: string}
+        violations:
+          type: array
+          items:
+            type: object
+            properties:
+              field: {type: string}
+              message: {type: string}
+        safeContext: {type: object}

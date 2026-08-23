@@ -1,0 +1,31 @@
+{
+  "contractVersion": "1.0",
+  "requestId": "01JEXAMPLE",
+  "status": "PARTIAL",
+  "generatedAt": "2026-08-23T07:40:05.230+09:00",
+  "expiresAt": "2026-08-23T07:42:05.230+09:00",
+  "computation": {
+    "durationMs": 5140,
+    "rankingPolicyVersion": "rank-1.0.0",
+    "mappingVersion": "map-1.0.0",
+    "candidateCounts": {"generated": 84, "coarsePruned": 27, "fullyEvaluated": 12, "pareto": 5},
+    "cache": {"transitHit": false, "taxiMatrixHit": true, "busRealtimeHit": false}
+  },
+  "recommendations": {
+    "fastest": "route_01",
+    "stable": "route_03",
+    "efficient": "route_02",
+    "publicTransitOnly": "route_public_01"
+  },
+  "routes": [],
+  "paretoRouteIds": ["route_public_01", "route_02", "route_01"],
+  "providerStatus": [
+    {"provider": "KAKAO_TRANSIT", "operation": "SEARCH", "status": "OK", "latencyMs": 1120, "cache": false, "messageCode": null},
+    {"provider": "GBIS", "operation": "ARRIVALS", "status": "PARTIAL", "latencyMs": 830, "cache": false, "messageCode": "NO_SEAT_DATA_FOR_ROUTE"}
+  ],
+  "modelVersions": [
+    {"purpose": "BUS_ETA", "version": "eta-2026.08.2"},
+    {"purpose": "SEAT_RISK", "version": "seat-2026.08.3"}
+  ],
+  "warningCodes": ["PROVIDER_PARTIAL_FAILURE"]
+}

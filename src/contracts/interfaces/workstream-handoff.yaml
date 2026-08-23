@@ -1,0 +1,32 @@
+schemaVersion: '1.0'
+producer: routing-intelligence
+consumer: service-product
+synchronousBoundary:
+  method: POST
+  path: /v1/routes/optimize
+  source: src/contracts/openapi/routing-private.v1.yaml
+serviceResponsibilities:
+  - validate-public-user-input-and-quota
+  - resolve-user-owned-preferences
+  - call-generated-routing-client
+  - persist-user-owned-search-and-public-projection
+  - render-semantic-status-reason-warning-provenance
+routingResponsibilities:
+  - orchestrate-transport-providers
+  - normalize-provider-responses
+  - map-transit-entities
+  - generate-and-rank-route-candidates
+  - run-bus-intelligence-and-model-inference
+  - return-versioned-provenance-and-capabilities
+forbiddenLeakage:
+  - service-must-not-recalculate-time-cost-ranking
+  - service-must-not-read-routing-database
+  - routing-must-not-receive-user-identity
+  - routing-must-not-read-service-database
+  - frontend-must-not-call-routing-directly
+integrationEvidence:
+  - generated-client-is-current
+  - request-response-examples-validate
+  - consumer-driven-contract-tests-pass
+  - partial-and-error-states-render
+  - correlation-deadline-idempotency-propagate

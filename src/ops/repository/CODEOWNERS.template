@@ -1,0 +1,13 @@
+/src/apps/web/                         @service-owner
+/src/services/service-api/            @service-owner
+/src/docs/harnesses/service-product/  @service-owner
+/src/services/routing-api/            @routing-owner
+/src/packages/routing-domain/         @routing-owner
+/src/packages/bus-intelligence-core/  @routing-owner
+/src/packages/provider-core/          @routing-owner
+/src/workers/                          @routing-owner
+/src/docs/harnesses/routing-intelligence/ @routing-owner
+/src/contracts/                       @service-owner @routing-owner
+/src/docs/shared/                     @service-owner @routing-owner
+/src/infra/                            @service-owner @routing-owner
+/src/tests/integration/               @service-owner @routing-owner

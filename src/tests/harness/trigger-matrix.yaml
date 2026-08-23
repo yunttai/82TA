@@ -1,0 +1,502 @@
+schemaVersion: '1.0'
+purpose: Trigger boundary tests for all Budget Route Platform harness skills
+skills:
+- skill: adr-management
+  shouldTrigger:
+  - 아키텍처 결정을 ADR로 기록해줘
+  - 이전 결과 기반으로 아키텍처 결정을 ADR로 기록 작업을 이어서 해줘
+  - 아키텍처 결정을 ADR로 기록하고 테스트까지 만들어줘
+  - 아키텍처 결정을 ADR로 기록할 때 공통 계약을 지켜줘
+  - 아키텍처 결정을 ADR로 기록 작업을 부분 재실행해줘
+  - 아키텍처 결정을 ADR로 기록 범위의 PR을 검토해줘
+  - 아키텍처 결정을 ADR로 기록 과정에서 발견된 문제를 보완해줘
+  - 아키텍처 결정을 ADR로 기록 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 기존 결정을 바꾸지 않는 단순 구현해줘
+  - 기존 결정을 바꾸지 않는 단순 구현만 빠르게 처리해줘
+  - 기존 결정을 바꾸지 않는 단순 구현 관련 일반 설명을 해줘
+  - 기존 결정을 바꾸지 않는 단순 구현 예시만 작성해줘
+  - 기존 결정을 바꾸지 않는 단순 구현 작업을 이전 결과 기반으로 이어서 해줘
+  - 기존 결정을 바꾸지 않는 단순 구현 범위의 PR을 검토해줘
+  - 기존 결정을 바꾸지 않는 단순 구현 테스트를 만들어줘
+  - 기존 결정을 바꾸지 않는 단순 구현 완료 기준을 정리해줘
+- skill: bus-intelligence-delivery
+  shouldTrigger:
+  - 버스 ETA·좌석·expected wait 구현해줘
+  - 이전 결과 기반으로 버스 ETA·좌석·expected wait 구현 작업을 이어서 해줘
+  - 버스 ETA·좌석·expected wait 구현하고 테스트까지 만들어줘
+  - 버스 ETA·좌석·expected wait 구현할 때 공통 계약을 지켜줘
+  - 버스 ETA·좌석·expected wait 구현 작업을 부분 재실행해줘
+  - 버스 ETA·좌석·expected wait 구현 범위의 PR을 검토해줘
+  - 버스 ETA·좌석·expected wait 구현 과정에서 발견된 문제를 보완해줘
+  - 버스 ETA·좌석·expected wait 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - Frontend CSS해줘
+  - Frontend CSS만 빠르게 처리해줘
+  - Frontend CSS 관련 일반 설명을 해줘
+  - Frontend CSS 예시만 작성해줘
+  - Frontend CSS 작업을 이전 결과 기반으로 이어서 해줘
+  - Frontend CSS 범위의 PR을 검토해줘
+  - Frontend CSS 테스트를 만들어줘
+  - Frontend CSS 완료 기준을 정리해줘
+- skill: harness-evolution
+  shouldTrigger:
+  - 에이전트·스킬·오케스트레이터를 감사·진화해줘
+  - 이전 결과 기반으로 에이전트·스킬·오케스트레이터를 감사·진화 작업을 이어서 해줘
+  - 에이전트·스킬·오케스트레이터를 감사·진화하고 테스트까지 만들어줘
+  - 에이전트·스킬·오케스트레이터를 감사·진화할 때 공통 계약을 지켜줘
+  - 에이전트·스킬·오케스트레이터를 감사·진화 작업을 부분 재실행해줘
+  - 에이전트·스킬·오케스트레이터를 감사·진화 범위의 PR을 검토해줘
+  - 에이전트·스킬·오케스트레이터를 감사·진화 과정에서 발견된 문제를 보완해줘
+  - 에이전트·스킬·오케스트레이터를 감사·진화 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 제품 기능 구현해줘
+  - 제품 기능 구현만 빠르게 처리해줘
+  - 제품 기능 구현 관련 일반 설명을 해줘
+  - 제품 기능 구현 예시만 작성해줘
+  - 제품 기능 구현 작업을 이전 결과 기반으로 이어서 해줘
+  - 제품 기능 구현 범위의 PR을 검토해줘
+  - 제품 기능 구현 테스트를 만들어줘
+  - 제품 기능 구현 완료 기준을 정리해줘
+- skill: integration-coherence-qa
+  shouldTrigger:
+  - 두 하네스 통합 정합성 검사해줘
+  - OpenAPI와 generated client가 같은지 확인해줘
+  - Routing response와 Service projection을 교차 검증해줘
+  - DBML과 Django migration drift를 검사해줘
+  - reason code가 UI까지 연결됐는지 봐줘
+  - Frontend, Service, Routing을 합치기 전에 QA해줘
+  - mock와 real Routing 응답 parity를 검사해줘
+  - 공통 context hash와 contract version을 확인해줘
+  - staging release 전 cross-boundary 테스트해줘
+  - Public API 응답과 React hook 타입을 동시에 비교해줘
+  shouldNotTrigger:
+  - 단일 Python 함수의 코드 스타일만 리뷰해줘
+  - UI 색상을 바꿔줘
+  - 새 ETA 모델을 학습해줘
+  - Kakao API 문서를 요약해줘
+  - PostgreSQL 인덱스 하나만 추천해줘
+  - 한 개 endpoint의 비즈니스 로직을 구현해줘
+  - 배너 이미지를 생성해줘
+  - 커밋 메시지를 작성해줘
+  - 일반적인 QA란 무엇인지 설명해줘
+  - 코드를 실행하지 않고 README만 다듬어줘
+- skill: platform-release-gate
+  shouldTrigger:
+  - 상용 릴리스 가능 여부를 evidence로 판정해줘
+  - 이전 결과 기반으로 상용 릴리스 가능 여부를 evidence로 판정 작업을 이어서 해줘
+  - 상용 릴리스 가능 여부를 evidence로 판정하고 테스트까지 만들어줘
+  - 상용 릴리스 가능 여부를 evidence로 판정할 때 공통 계약을 지켜줘
+  - 상용 릴리스 가능 여부를 evidence로 판정 작업을 부분 재실행해줘
+  - 상용 릴리스 가능 여부를 evidence로 판정 범위의 PR을 검토해줘
+  - 상용 릴리스 가능 여부를 evidence로 판정 과정에서 발견된 문제를 보완해줘
+  - 상용 릴리스 가능 여부를 evidence로 판정 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 기능 하나를 구현해줘
+  - 기능 하나를 구현만 빠르게 처리해줘
+  - 기능 하나를 구현 관련 일반 설명을 해줘
+  - 기능 하나를 구현 예시만 작성해줘
+  - 기능 하나를 구현 작업을 이전 결과 기반으로 이어서 해줘
+  - 기능 하나를 구현 범위의 PR을 검토해줘
+  - 기능 하나를 구현 테스트를 만들어줘
+  - 기능 하나를 구현 완료 기준을 정리해줘
+- skill: provider-adapter-delivery
+  shouldTrigger:
+  - 외부 교통 API adapter와 resilience 구현해줘
+  - 이전 결과 기반으로 외부 교통 API adapter와 resilience 구현 작업을 이어서 해줘
+  - 외부 교통 API adapter와 resilience 구현하고 테스트까지 만들어줘
+  - 외부 교통 API adapter와 resilience 구현할 때 공통 계약을 지켜줘
+  - 외부 교통 API adapter와 resilience 구현 작업을 부분 재실행해줘
+  - 외부 교통 API adapter와 resilience 구현 범위의 PR을 검토해줘
+  - 외부 교통 API adapter와 resilience 구현 과정에서 발견된 문제를 보완해줘
+  - 외부 교통 API adapter와 resilience 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 로그인 UI 구현해줘
+  - 로그인 UI 구현만 빠르게 처리해줘
+  - 로그인 UI 구현 관련 일반 설명을 해줘
+  - 로그인 UI 구현 예시만 작성해줘
+  - 로그인 UI 구현 작업을 이전 결과 기반으로 이어서 해줘
+  - 로그인 UI 구현 범위의 PR을 검토해줘
+  - 로그인 UI 구현 테스트를 만들어줘
+  - 로그인 UI 구현 완료 기준을 정리해줘
+- skill: route-optimizer-delivery
+  shouldTrigger:
+  - time-dependent 후보·Pareto 알고리즘 구현해줘
+  - 이전 결과 기반으로 time-dependent 후보·Pareto 알고리즘 구현 작업을 이어서 해줘
+  - time-dependent 후보·Pareto 알고리즘 구현하고 테스트까지 만들어줘
+  - time-dependent 후보·Pareto 알고리즘 구현할 때 공통 계약을 지켜줘
+  - time-dependent 후보·Pareto 알고리즘 구현 작업을 부분 재실행해줘
+  - time-dependent 후보·Pareto 알고리즘 구현 범위의 PR을 검토해줘
+  - time-dependent 후보·Pareto 알고리즘 구현 과정에서 발견된 문제를 보완해줘
+  - time-dependent 후보·Pareto 알고리즘 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 계정 데이터 삭제해줘
+  - 계정 데이터 삭제만 빠르게 처리해줘
+  - 계정 데이터 삭제 관련 일반 설명을 해줘
+  - 계정 데이터 삭제 예시만 작성해줘
+  - 계정 데이터 삭제 작업을 이전 결과 기반으로 이어서 해줘
+  - 계정 데이터 삭제 범위의 PR을 검토해줘
+  - 계정 데이터 삭제 테스트를 만들어줘
+  - 계정 데이터 삭제 완료 기준을 정리해줘
+- skill: routing-api-delivery
+  shouldTrigger:
+  - Django private Routing endpoint 구현해줘
+  - 이전 결과 기반으로 Django private Routing endpoint 구현 작업을 이어서 해줘
+  - Django private Routing endpoint 구현하고 테스트까지 만들어줘
+  - Django private Routing endpoint 구현할 때 공통 계약을 지켜줘
+  - Django private Routing endpoint 구현 작업을 부분 재실행해줘
+  - Django private Routing endpoint 구현 범위의 PR을 검토해줘
+  - Django private Routing endpoint 구현 과정에서 발견된 문제를 보완해줘
+  - Django private Routing endpoint 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - React 검색 화면해줘
+  - React 검색 화면만 빠르게 처리해줘
+  - React 검색 화면 관련 일반 설명을 해줘
+  - React 검색 화면 예시만 작성해줘
+  - React 검색 화면 작업을 이전 결과 기반으로 이어서 해줘
+  - React 검색 화면 범위의 PR을 검토해줘
+  - React 검색 화면 테스트를 만들어줘
+  - React 검색 화면 완료 기준을 정리해줘
+- skill: routing-data-mlops
+  shouldTrigger:
+  - 수집·feature·ETA/Seat 모델·registry 구현해줘
+  - 이전 결과 기반으로 수집·feature·ETA/Seat 모델·registry 구현 작업을 이어서 해줘
+  - 수집·feature·ETA/Seat 모델·registry 구현하고 테스트까지 만들어줘
+  - 수집·feature·ETA/Seat 모델·registry 구현할 때 공통 계약을 지켜줘
+  - 수집·feature·ETA/Seat 모델·registry 구현 작업을 부분 재실행해줘
+  - 수집·feature·ETA/Seat 모델·registry 구현 범위의 PR을 검토해줘
+  - 수집·feature·ETA/Seat 모델·registry 구현 과정에서 발견된 문제를 보완해줘
+  - 수집·feature·ETA/Seat 모델·registry 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 사용자 즐겨찾기해줘
+  - 사용자 즐겨찾기만 빠르게 처리해줘
+  - 사용자 즐겨찾기 관련 일반 설명을 해줘
+  - 사용자 즐겨찾기 예시만 작성해줘
+  - 사용자 즐겨찾기 작업을 이전 결과 기반으로 이어서 해줘
+  - 사용자 즐겨찾기 범위의 PR을 검토해줘
+  - 사용자 즐겨찾기 테스트를 만들어줘
+  - 사용자 즐겨찾기 완료 기준을 정리해줘
+- skill: routing-incremental-qa
+  shouldTrigger:
+  - Provider·mapping·algorithm·model 경계 QA해줘
+  - 이전 결과 기반으로 Provider·mapping·algorithm·model 경계 QA 작업을 이어서 해줘
+  - Provider·mapping·algorithm·model 경계 QA하고 테스트까지 만들어줘
+  - Provider·mapping·algorithm·model 경계 QA할 때 공통 계약을 지켜줘
+  - Provider·mapping·algorithm·model 경계 QA 작업을 부분 재실행해줘
+  - Provider·mapping·algorithm·model 경계 QA 범위의 PR을 검토해줘
+  - Provider·mapping·algorithm·model 경계 QA 과정에서 발견된 문제를 보완해줘
+  - Provider·mapping·algorithm·model 경계 QA 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 새 Public 화면 구현해줘
+  - 새 Public 화면 구현만 빠르게 처리해줘
+  - 새 Public 화면 구현 관련 일반 설명을 해줘
+  - 새 Public 화면 구현 예시만 작성해줘
+  - 새 Public 화면 구현 작업을 이전 결과 기반으로 이어서 해줘
+  - 새 Public 화면 구현 범위의 PR을 검토해줘
+  - 새 Public 화면 구현 테스트를 만들어줘
+  - 새 Public 화면 구현 완료 기준을 정리해줘
+- skill: routing-intelligence-orchestrator
+  shouldTrigger:
+  - 라우팅 인텔리전스 하네스 실행해줘
+  - 교통 API 서버와 경로 알고리즘 개발을 이어서 해줘
+  - Kakao와 GBIS를 연결해 Bus Intelligence를 구현해줘
+  - ETA, 좌석 모델, Pareto까지 Routing 쪽을 전체 개발해줘
+  - 이전 Routing 결과 기반으로 부분 재실행해줘
+  - Provider cache와 deadline을 개선하고 replay까지 검증해줘
+  - legacy BusCrowdRisk를 새 monorepo 모듈로 마이그레이션해줘
+  - 선탑승 정류장과 Taxi Bridge 후보를 엔진에 추가해줘
+  - Routing private API와 모델을 합쳐서 구현해줘
+  - 교통 데이터 수집부터 optimize 응답까지 작업 분배해줘
+  shouldNotTrigger:
+  - 로그인 화면을 구현해줘
+  - React 추천 카드 디자인을 수정해줘
+  - 검색 기록 Public API를 추가해줘
+  - 즐겨찾기 Django 모델을 만들어줘
+  - Kakao Local 자동완성 UI를 구현해줘
+  - 계정 탈퇴 화면을 보완해줘
+  - 사용자 프로필 설정 페이지를 만들어줘
+  - PWA 설치 배너를 추가해줘
+  - 검색 결과 카드 접근성을 검사해줘
+  - Service session cookie 정책을 구현해줘
+- skill: routing-security-performance
+  shouldTrigger:
+  - Private Routing 보안·deadline·quota 검증해줘
+  - 이전 결과 기반으로 Private Routing 보안·deadline·quota 검증 작업을 이어서 해줘
+  - Private Routing 보안·deadline·quota 검증하고 테스트까지 만들어줘
+  - Private Routing 보안·deadline·quota 검증할 때 공통 계약을 지켜줘
+  - Private Routing 보안·deadline·quota 검증 작업을 부분 재실행해줘
+  - Private Routing 보안·deadline·quota 검증 범위의 PR을 검토해줘
+  - Private Routing 보안·deadline·quota 검증 과정에서 발견된 문제를 보완해줘
+  - Private Routing 보안·deadline·quota 검증 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - UX 문구 작성해줘
+  - UX 문구 작성만 빠르게 처리해줘
+  - UX 문구 작성 관련 일반 설명을 해줘
+  - UX 문구 작성 예시만 작성해줘
+  - UX 문구 작성 작업을 이전 결과 기반으로 이어서 해줘
+  - UX 문구 작성 범위의 PR을 검토해줘
+  - UX 문구 작성 테스트를 만들어줘
+  - UX 문구 작성 완료 기준을 정리해줘
+- skill: routing-work-planning
+  shouldTrigger:
+  - Routing 요구를 Provider·모델·알고리즘 task로 분해해줘
+  - 이전 결과 기반으로 Routing 요구를 Provider·모델·알고리즘 task로 분해 작업을 이어서 해줘
+  - Routing 요구를 Provider·모델·알고리즘 task로 분해하고 테스트까지 만들어줘
+  - Routing 요구를 Provider·모델·알고리즘 task로 분해할 때 공통 계약을 지켜줘
+  - Routing 요구를 Provider·모델·알고리즘 task로 분해 작업을 부분 재실행해줘
+  - Routing 요구를 Provider·모델·알고리즘 task로 분해 범위의 PR을 검토해줘
+  - Routing 요구를 Provider·모델·알고리즘 task로 분해 과정에서 발견된 문제를 보완해줘
+  - Routing 요구를 Provider·모델·알고리즘 task로 분해 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 사용자 화면 기획해줘
+  - 사용자 화면 기획만 빠르게 처리해줘
+  - 사용자 화면 기획 관련 일반 설명을 해줘
+  - 사용자 화면 기획 예시만 작성해줘
+  - 사용자 화면 기획 작업을 이전 결과 기반으로 이어서 해줘
+  - 사용자 화면 기획 범위의 PR을 검토해줘
+  - 사용자 화면 기획 테스트를 만들어줘
+  - 사용자 화면 기획 완료 기준을 정리해줘
+- skill: service-backend-delivery
+  shouldTrigger:
+  - Django Public API와 RoutingGateway 구현해줘
+  - 이전 결과 기반으로 Django Public API와 RoutingGateway 구현 작업을 이어서 해줘
+  - Django Public API와 RoutingGateway 구현하고 테스트까지 만들어줘
+  - Django Public API와 RoutingGateway 구현할 때 공통 계약을 지켜줘
+  - Django Public API와 RoutingGateway 구현 작업을 부분 재실행해줘
+  - Django Public API와 RoutingGateway 구현 범위의 PR을 검토해줘
+  - Django Public API와 RoutingGateway 구현 과정에서 발견된 문제를 보완해줘
+  - Django Public API와 RoutingGateway 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - Bus Intelligence 모델해줘
+  - Bus Intelligence 모델만 빠르게 처리해줘
+  - Bus Intelligence 모델 관련 일반 설명을 해줘
+  - Bus Intelligence 모델 예시만 작성해줘
+  - Bus Intelligence 모델 작업을 이전 결과 기반으로 이어서 해줘
+  - Bus Intelligence 모델 범위의 PR을 검토해줘
+  - Bus Intelligence 모델 테스트를 만들어줘
+  - Bus Intelligence 모델 완료 기준을 정리해줘
+- skill: service-data-lifecycle
+  shouldTrigger:
+  - Service DB와 개인정보 삭제·보존 구현해줘
+  - 이전 결과 기반으로 Service DB와 개인정보 삭제·보존 구현 작업을 이어서 해줘
+  - Service DB와 개인정보 삭제·보존 구현하고 테스트까지 만들어줘
+  - Service DB와 개인정보 삭제·보존 구현할 때 공통 계약을 지켜줘
+  - Service DB와 개인정보 삭제·보존 구현 작업을 부분 재실행해줘
+  - Service DB와 개인정보 삭제·보존 구현 범위의 PR을 검토해줘
+  - Service DB와 개인정보 삭제·보존 구현 과정에서 발견된 문제를 보완해줘
+  - Service DB와 개인정보 삭제·보존 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - Routing observation DB해줘
+  - Routing observation DB만 빠르게 처리해줘
+  - Routing observation DB 관련 일반 설명을 해줘
+  - Routing observation DB 예시만 작성해줘
+  - Routing observation DB 작업을 이전 결과 기반으로 이어서 해줘
+  - Routing observation DB 범위의 PR을 검토해줘
+  - Routing observation DB 테스트를 만들어줘
+  - Routing observation DB 완료 기준을 정리해줘
+- skill: service-incremental-qa
+  shouldTrigger:
+  - Public API와 React·DB 경계 QA해줘
+  - 이전 결과 기반으로 Public API와 React·DB 경계 QA 작업을 이어서 해줘
+  - Public API와 React·DB 경계 QA하고 테스트까지 만들어줘
+  - Public API와 React·DB 경계 QA할 때 공통 계약을 지켜줘
+  - Public API와 React·DB 경계 QA 작업을 부분 재실행해줘
+  - Public API와 React·DB 경계 QA 범위의 PR을 검토해줘
+  - Public API와 React·DB 경계 QA 과정에서 발견된 문제를 보완해줘
+  - Public API와 React·DB 경계 QA 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 새 기능 설계해줘
+  - 새 기능 설계만 빠르게 처리해줘
+  - 새 기능 설계 관련 일반 설명을 해줘
+  - 새 기능 설계 예시만 작성해줘
+  - 새 기능 설계 작업을 이전 결과 기반으로 이어서 해줘
+  - 새 기능 설계 범위의 PR을 검토해줘
+  - 새 기능 설계 테스트를 만들어줘
+  - 새 기능 설계 완료 기준을 정리해줘
+- skill: service-product-orchestrator
+  shouldTrigger:
+  - 서비스 제품 하네스 실행해줘
+  - React 웹앱과 Django 서비스 백엔드를 같이 개발해줘
+  - 경로 검색 UI와 Public API 작업 이어서 해줘
+  - 이전 Service Product 결과 기반으로 부분 재실행해줘
+  - 장소 검색, 로그인, 즐겨찾기까지 서비스 쪽을 보완해줘
+  - PARTIAL 응답 화면과 Service projection을 같이 고쳐줘
+  - 모바일 PWA 경로 결과 기능을 vertical slice로 구현해줘
+  - Frontend와 Service Backend 분업을 다시 조율해줘
+  - 서비스 제품 하네스에서 검색 기록 기능을 추가해줘
+  - 공통 계약은 유지하면서 사용자 제품만 업데이트해줘
+  shouldNotTrigger:
+  - GBIS 수집기를 구현해줘
+  - Pareto pruning 알고리즘을 최적화해줘
+  - 버스 ETA 모델을 재학습해줘
+  - Kakao Transit과 GBIS 노선을 매핑해줘
+  - Routing API 내부 candidate bound를 줄여줘
+  - GITS Provider adapter를 추가해줘
+  - Seat Risk calibration을 검토해줘
+  - 교통 API 스키마 drift를 처리해줘
+  - 모델 artifact rollback을 구현해줘
+  - Routing DB partition을 설계해줘
+- skill: service-security-review
+  shouldTrigger:
+  - Public Web과 사용자 위치 보안 검토해줘
+  - 이전 결과 기반으로 Public Web과 사용자 위치 보안 검토 작업을 이어서 해줘
+  - Public Web과 사용자 위치 보안 검토하고 테스트까지 만들어줘
+  - Public Web과 사용자 위치 보안 검토할 때 공통 계약을 지켜줘
+  - Public Web과 사용자 위치 보안 검토 작업을 부분 재실행해줘
+  - Public Web과 사용자 위치 보안 검토 범위의 PR을 검토해줘
+  - Public Web과 사용자 위치 보안 검토 과정에서 발견된 문제를 보완해줘
+  - Public Web과 사용자 위치 보안 검토 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - Pareto 수학 검증해줘
+  - Pareto 수학 검증만 빠르게 처리해줘
+  - Pareto 수학 검증 관련 일반 설명을 해줘
+  - Pareto 수학 검증 예시만 작성해줘
+  - Pareto 수학 검증 작업을 이전 결과 기반으로 이어서 해줘
+  - Pareto 수학 검증 범위의 PR을 검토해줘
+  - Pareto 수학 검증 테스트를 만들어줘
+  - Pareto 수학 검증 완료 기준을 정리해줘
+- skill: service-ux-design
+  shouldTrigger:
+  - 경로 결과 UX와 상태를 설계해줘
+  - 이전 결과 기반으로 경로 결과 UX와 상태를 설계 작업을 이어서 해줘
+  - 경로 결과 UX와 상태를 설계하고 테스트까지 만들어줘
+  - 경로 결과 UX와 상태를 설계할 때 공통 계약을 지켜줘
+  - 경로 결과 UX와 상태를 설계 작업을 부분 재실행해줘
+  - 경로 결과 UX와 상태를 설계 범위의 PR을 검토해줘
+  - 경로 결과 UX와 상태를 설계 과정에서 발견된 문제를 보완해줘
+  - 경로 결과 UX와 상태를 설계 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - Provider adapter 구현해줘
+  - Provider adapter 구현만 빠르게 처리해줘
+  - Provider adapter 구현 관련 일반 설명을 해줘
+  - Provider adapter 구현 예시만 작성해줘
+  - Provider adapter 구현 작업을 이전 결과 기반으로 이어서 해줘
+  - Provider adapter 구현 범위의 PR을 검토해줘
+  - Provider adapter 구현 테스트를 만들어줘
+  - Provider adapter 구현 완료 기준을 정리해줘
+- skill: service-web-delivery
+  shouldTrigger:
+  - React PWA와 지도 UI 구현해줘
+  - 이전 결과 기반으로 React PWA와 지도 UI 구현 작업을 이어서 해줘
+  - React PWA와 지도 UI 구현하고 테스트까지 만들어줘
+  - React PWA와 지도 UI 구현할 때 공통 계약을 지켜줘
+  - React PWA와 지도 UI 구현 작업을 부분 재실행해줘
+  - React PWA와 지도 UI 구현 범위의 PR을 검토해줘
+  - React PWA와 지도 UI 구현 과정에서 발견된 문제를 보완해줘
+  - React PWA와 지도 UI 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - Django Routing 알고리즘해줘
+  - Django Routing 알고리즘만 빠르게 처리해줘
+  - Django Routing 알고리즘 관련 일반 설명을 해줘
+  - Django Routing 알고리즘 예시만 작성해줘
+  - Django Routing 알고리즘 작업을 이전 결과 기반으로 이어서 해줘
+  - Django Routing 알고리즘 범위의 PR을 검토해줘
+  - Django Routing 알고리즘 테스트를 만들어줘
+  - Django Routing 알고리즘 완료 기준을 정리해줘
+- skill: service-work-planning
+  shouldTrigger:
+  - Service 요구를 구현 task로 분해해줘
+  - 이전 결과 기반으로 Service 요구를 구현 task로 분해 작업을 이어서 해줘
+  - Service 요구를 구현 task로 분해하고 테스트까지 만들어줘
+  - Service 요구를 구현 task로 분해할 때 공통 계약을 지켜줘
+  - Service 요구를 구현 task로 분해 작업을 부분 재실행해줘
+  - Service 요구를 구현 task로 분해 범위의 PR을 검토해줘
+  - Service 요구를 구현 task로 분해 과정에서 발견된 문제를 보완해줘
+  - Service 요구를 구현 task로 분해 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - Routing 알고리즘 작업해줘
+  - Routing 알고리즘 작업만 빠르게 처리해줘
+  - Routing 알고리즘 작업 관련 일반 설명을 해줘
+  - Routing 알고리즘 작업 예시만 작성해줘
+  - Routing 알고리즘 작업 작업을 이전 결과 기반으로 이어서 해줘
+  - Routing 알고리즘 작업 범위의 PR을 검토해줘
+  - Routing 알고리즘 작업 테스트를 만들어줘
+  - Routing 알고리즘 작업 완료 기준을 정리해줘
+- skill: shared-context-loader
+  shouldTrigger:
+  - 이 프로젝트 작업 시작 전에 공통 컨텍스트 로드해줘
+  - Service 하네스 실행용 snapshot을 만들어줘
+  - Routing 작업을 이전 결과 기반으로 이어가자
+  - 두 팀이 같은 PRD를 보는지 확인해줘
+  - context lock 검증하고 작업 브리프 만들어줘
+  - 부분 재실행 전에 manifest를 읽어줘
+  - 두 snapshot hash를 비교해줘
+  - 공통 ERD와 API 기준으로 작업 범위를 정해줘
+  - 새 세션에서 Service 작업 컨텍스트 복구해줘
+  - Routing 작업에 필요한 canonical 문서만 골라 읽어줘
+  shouldNotTrigger:
+  - 공통 API 자체를 변경해줘
+  - React 화면을 구현해줘
+  - 모델을 학습해줘
+  - 새 DB 테이블을 설계해줘
+  - Provider endpoint를 호출해줘
+  - 계약 breaking change를 승인해줘
+  - 사용자용 문구를 작성해줘
+  - AWS 인프라를 배포해줘
+  - 성능 부하 테스트를 실행해줘
+  - PR을 merge해줘
+- skill: shared-contract-governance
+  shouldTrigger:
+  - 두 서버가 공유하는 API 필드를 추가해줘
+  - ERD와 OpenAPI가 안 맞는데 공통 계약을 고쳐줘
+  - Routing 응답의 P90 의미를 변경해야 해
+  - Service와 Routing DTO drift를 해결해줘
+  - 새 warning code를 공통으로 등록해줘
+  - DB ownership 변경을 검토해줘
+  - 공통 PRD와 API 명세를 함께 업데이트해줘
+  - private endpoint의 breaking change를 설계해줘
+  - 두 하네스 context hash가 달라졌어
+  - 계약 버전과 migration 계획을 만들어줘
+  shouldNotTrigger:
+  - 기존 OpenAPI 그대로 Django view만 구현해줘
+  - React 카드 CSS를 고쳐줘
+  - GBIS timeout retry 코드를 작성해줘
+  - 이미 승인된 DBML대로 migration을 생성해줘
+  - Route optimizer unit test를 작성해줘
+  - 현재 계약으로 mock fixture를 만들어줘
+  - Service API 성능을 측정해줘
+  - 기존 reason code 문구만 번역해줘
+  - 승인된 model artifact를 배포해줘
+  - 현행 API 사용법을 설명해줘
+- skill: source-layout-guard
+  shouldTrigger:
+  - 모든 소스가 src 아래 있는지 검사해줘
+  - 루트에 생긴 backend 폴더를 정책에 맞게 정리해줘
+  - 새 파일을 어디에 둬야 하는지 판정해줘
+  - PR 전에 src-only 구조 검증해줘
+  - _workspace 결과를 최종 src 위치로 승격해줘
+  - 루트 오염을 찾아줘
+  - docs와 scripts가 잘못 배치됐는지 확인해줘
+  - 저장소 경로 정책 위반을 수정해줘
+  - 실제 구현물이 src 밖에 없는지 검사해줘
+  - 하네스 파일과 제품 파일을 구분해줘
+  shouldNotTrigger:
+  - src 폴더 안의 알고리즘 정확도를 검증해줘
+  - React 컴포넌트를 작성해줘
+  - API field 의미를 바꿔줘
+  - DB index 성능을 개선해줘
+  - 버스 ETA를 계산해줘
+  - Kakao key 권한을 시험해줘
+  - 사용자 여정을 설계해줘
+  - 모델 calibration을 해줘
+  - 로그인 보안을 검토해줘
+  - AWS 비용을 계산해줘
+- skill: transport-mapping-delivery
+  shouldTrigger:
+  - Kakao와 GBIS 노선·정류장 매핑 구현해줘
+  - 이전 결과 기반으로 Kakao와 GBIS 노선·정류장 매핑 구현 작업을 이어서 해줘
+  - Kakao와 GBIS 노선·정류장 매핑 구현하고 테스트까지 만들어줘
+  - Kakao와 GBIS 노선·정류장 매핑 구현할 때 공통 계약을 지켜줘
+  - Kakao와 GBIS 노선·정류장 매핑 구현 작업을 부분 재실행해줘
+  - Kakao와 GBIS 노선·정류장 매핑 구현 범위의 PR을 검토해줘
+  - Kakao와 GBIS 노선·정류장 매핑 구현 과정에서 발견된 문제를 보완해줘
+  - Kakao와 GBIS 노선·정류장 매핑 구현 후 완료 조건을 검사해줘
+  shouldNotTrigger:
+  - 검색 기록 API해줘
+  - 검색 기록 API만 빠르게 처리해줘
+  - 검색 기록 API 관련 일반 설명을 해줘
+  - 검색 기록 API 예시만 작성해줘
+  - 검색 기록 API 작업을 이전 결과 기반으로 이어서 해줘
+  - 검색 기록 API 범위의 PR을 검토해줘
+  - 검색 기록 API 테스트를 만들어줘
+  - 검색 기록 API 완료 기준을 정리해줘

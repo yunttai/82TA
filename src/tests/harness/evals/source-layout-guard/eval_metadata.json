@@ -1,0 +1,11 @@
+{
+  "eval_id": 0,
+  "eval_name": "source-layout-guard-structural-eval",
+  "prompt": "모든 소스가 src 아래 있는지 검사해줘",
+  "assertions": [
+    "source-layout-guard SKILL.md frontmatter가 유효하다",
+    "공통 context/contract gate를 우회하지 않는다",
+    "최종 제품 산출물을 src 아래에 둔다",
+    "오류·부분 실패·재실행 경로를 명시한다"
+  ]
+}

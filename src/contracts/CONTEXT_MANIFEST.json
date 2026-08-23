@@ -1,0 +1,63 @@
+{
+  "project": "budget-route-platform",
+  "contextVersion": "1.0.1",
+  "contractVersion": "1.0.0",
+  "canonicalFiles": [
+    "src/docs/shared/PROJECT_CONTEXT.md",
+    "src/docs/shared/PRD.md",
+    "src/docs/shared/GLOSSARY.md",
+    "src/docs/shared/CONTEXT_MAP.md",
+    "src/docs/shared/SYSTEM_ARCHITECTURE.md",
+    "src/docs/shared/ERD.md",
+    "src/docs/shared/API_CONTRACT_GUIDE.md",
+    "src/docs/shared/DATA_MODEL_AND_OWNERSHIP.md",
+    "src/docs/shared/NON_FUNCTIONAL_REQUIREMENTS.md",
+    "src/docs/shared/SECURITY_PRIVACY.md",
+    "src/docs/shared/TEST_ACCEPTANCE.md",
+    "src/docs/shared/PROVIDER_CAPABILITY_MATRIX.md",
+    "src/docs/shared/INTEGRATION_PLAYBOOK.md",
+    "src/docs/shared/RELEASE_GATES.md",
+    "src/docs/shared/SOURCE_LAYOUT_POLICY.md",
+    "src/contracts/openapi/common/components.v1.yaml",
+    "src/contracts/openapi/service-public.v1.yaml",
+    "src/contracts/openapi/routing-private.v1.yaml",
+    "src/contracts/openapi/examples/routing-optimize-response.json",
+    "src/contracts/openapi/examples/routing-optimize-request.json",
+    "src/contracts/openapi/examples/public-route-search-response.json",
+    "src/contracts/openapi/examples/public-route-search-request.json",
+    "src/contracts/database/service-db.dbml",
+    "src/contracts/database/routing-db.dbml",
+    "src/contracts/database/schema-ownership.yaml",
+    "src/contracts/events/domain-events.v1.yaml",
+    "src/contracts/codes/reason-warning-error-codes.yaml",
+    "src/contracts/compatibility/compatibility-policy.md",
+    "src/docs/shared/REQUIREMENTS_TRACEABILITY.md",
+    "src/docs/shared/DECISION_AND_CHANGE_CONTROL.md",
+    "src/contracts/traceability/requirements-traceability.yaml",
+    "src/contracts/ownership/workstream-ownership.yaml",
+    "src/contracts/versions/platform-versions.json",
+    "src/contracts/interfaces/workstream-handoff.yaml",
+    "src/contracts/harness/harness-registry.v1.yaml"
+  ],
+  "owners": {
+    "service-product": [
+      "src/apps/web",
+      "src/services/service-api",
+      "src/docs/harnesses/service-product"
+    ],
+    "routing-intelligence": [
+      "src/services/routing-api",
+      "src/packages/routing-domain",
+      "src/packages/bus-intelligence-core",
+      "src/packages/provider-core",
+      "src/workers",
+      "src/docs/harnesses/routing-intelligence"
+    ],
+    "joint": [
+      "src/docs/shared",
+      "src/contracts",
+      "src/infra",
+      "src/tests/integration"
+    ]
+  }
+}

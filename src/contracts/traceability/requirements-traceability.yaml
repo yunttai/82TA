@@ -1,0 +1,86 @@
+schemaVersion: '1.0'
+project: budget-route-platform
+sourceOfTruth: src/docs/shared/PRD.md
+requirements:
+  FR-PLACE-001:
+    title: 장소명·주소 자동완성과 좌표 확정
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1places~1suggest
+    implementationPaths:
+      - src/services/service-api
+      - src/apps/web
+    tests: [CT-SVC-PLACE-001, E2E-SEARCH-001]
+    releaseGate: place-search-contract-and-abuse-controls
+  FR-ROUTE-010:
+    title: strict budget은 taxi upper cost 기준
+    owner: routing-intelligence
+    contracts:
+      - src/contracts/openapi/common/components.v1.yaml#/components/schemas/MoneyRange
+      - src/contracts/openapi/common/components.v1.yaml#/components/schemas/RouteConstraints
+    implementationPaths:
+      - src/packages/routing-domain
+    tests: [UT-BUDGET-001, PROP-BUDGET-001, FIELD-BUDGET-R1-R4]
+    releaseGate: zero-verified-strict-budget-violations
+  FR-BUS-001:
+    title: Transit BUS step을 GBIS route·station·direction과 매핑
+    owner: routing-intelligence
+    contracts:
+      - src/contracts/database/routing-db.dbml
+      - src/contracts/openapi/common/components.v1.yaml#/components/schemas/BusLegIntelligence
+    implementationPaths:
+      - src/packages/provider-core
+      - src/services/routing-api
+    tests: [MAP-GOLD-001, MAP-DIRECTION-001, MAP-LOW-BLOCK-001]
+    releaseGate: high-mapping-precision
+  FR-BUS-010:
+    title: missing label을 negative로 사용하지 않음
+    owner: routing-intelligence
+    contracts:
+      - src/contracts/database/routing-db.dbml
+    implementationPaths:
+      - src/workers/model-jobs
+      - src/packages/bus-intelligence-core
+    tests: [MODEL-LABEL-NULL-001, MODEL-LEAKAGE-001]
+    releaseGate: label-coverage-and-null-policy
+  FR-OPT-002:
+    title: 지배 후보 제거와 Pareto Frontier
+    owner: routing-intelligence
+    contracts:
+      - src/contracts/openapi/routing-private.v1.yaml#/components/schemas/OptimizeRouteResponse
+    implementationPaths:
+      - src/packages/routing-domain
+    tests: [UT-PARETO-001, PROP-PARETO-001, REPLAY-R1-R4]
+    releaseGate: deterministic-frontier-replay
+  FR-UI-007:
+    title: COMPLETE·PARTIAL·unsupported·expired 상태 표현
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml
+      - src/contracts/codes/reason-warning-error-codes.yaml
+    implementationPaths:
+      - src/apps/web
+      - src/services/service-api
+    tests: [CT-STATUS-001, E2E-PARTIAL-001, E2E-EXPIRED-001]
+    releaseGate: all-semantic-states-rendered
+  FR-IAM-005:
+    title: 검색 기록·장소·계정 삭제
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml
+      - src/contracts/database/service-db.dbml
+    implementationPaths:
+      - src/services/service-api
+    tests: [DATA-DELETE-001, SEC-IDOR-DELETE-001]
+    releaseGate: deletion-runbook-and-evidence
+  FR-OPS-004:
+    title: Public·Routing health·version endpoint
+    owner: joint
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml
+      - src/contracts/openapi/routing-private.v1.yaml
+    implementationPaths:
+      - src/services/service-api
+      - src/services/routing-api
+    tests: [OPS-HEALTH-001, OPS-VERSION-001]
+    releaseGate: readiness-and-version-observable

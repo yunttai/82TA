@@ -1,0 +1,50 @@
+schemaVersion: '1.0'
+workstreams:
+  service-product:
+    harness: service-product-orchestrator
+    owns:
+      - src/apps/web/**
+      - src/services/service-api/**
+      - src/docs/harnesses/service-product/**
+    mayProposeButNotDirectlyChange:
+      - src/docs/shared/**
+      - src/contracts/**
+      - src/infra/**
+      - src/tests/integration/**
+    forbidden:
+      - src/services/routing-api/**
+      - src/packages/routing-domain/**
+      - src/packages/bus-intelligence-core/**
+      - src/packages/provider-core/**
+      - src/workers/**
+    database: Service DB
+  routing-intelligence:
+    harness: routing-intelligence-orchestrator
+    owns:
+      - src/services/routing-api/**
+      - src/packages/routing-domain/**
+      - src/packages/provider-core/**
+      - src/packages/bus-intelligence-core/**
+      - src/workers/**
+      - src/docs/harnesses/routing-intelligence/**
+    mayProposeButNotDirectlyChange:
+      - src/docs/shared/**
+      - src/contracts/**
+      - src/infra/**
+      - src/tests/integration/**
+    forbidden:
+      - src/apps/web/**
+      - src/services/service-api/**
+    database: Routing DB
+joint:
+  governedBy: shared-contract-governance
+  paths:
+    - src/docs/shared/**
+    - src/contracts/**
+    - src/infra/**
+    - src/tests/integration/**
+rules:
+  - no-cross-service-database-read
+  - no-shared-orm-models
+  - no-duplicated-common-contracts
+  - all-product-artifacts-under-src
