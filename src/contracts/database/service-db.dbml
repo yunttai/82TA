@@ -42,6 +42,7 @@ Table saved_place {
   provider_place_id varchar
   is_sensitive boolean [not null, default: true]
   created_at timestamptz [not null]
+  updated_at timestamptz [not null]
   deleted_at timestamptz
 }
 
@@ -53,6 +54,8 @@ Table favorite_journey {
   default_constraints jsonb [not null]
   nickname varchar [not null]
   created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz
 }
 
 Table anonymous_session {
@@ -60,9 +63,21 @@ Table anonymous_session {
   token_hash varchar [unique, not null]
   expires_at timestamptz [not null]
   created_at timestamptz [not null]
+  revoked_at timestamptz
+}
+
+Table authenticated_session {
+  id uuid [pk]
+  user_id uuid [not null, ref: > auth_user.id]
+  token_hash varchar [unique, not null]
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null]
+  last_seen_at timestamptz
+  revoked_at timestamptz
 }
 
 Table route_search {
+  Note: 'Exactly one of user_id or anonymous_session_id owns a row; save_to_history requires user_id and current SEARCH_HISTORY consent.'
   id uuid [pk]
   user_id uuid [ref: > auth_user.id]
   anonymous_session_id uuid [ref: > anonymous_session.id]
@@ -78,6 +93,8 @@ Table route_search {
   status varchar [not null]
   routing_request_id varchar [unique, not null]
   contract_version varchar [not null]
+  save_to_history boolean [not null, default: false]
+  retention_until timestamptz [not null]
   created_at timestamptz [not null]
   expires_at timestamptz [not null]
 }
@@ -117,6 +134,19 @@ Table consent_record {
   document_version varchar [not null]
   accepted boolean [not null]
   recorded_at timestamptz [not null]
+}
+
+Table data_rights_job {
+  id uuid [pk]
+  user_id uuid [not null, ref: > auth_user.id]
+  job_type varchar [not null, note: 'EXPORT or DELETE']
+  status varchar [not null, note: 'PENDING, RUNNING, COMPLETE, FAILED']
+  artifact_ref varchar [note: 'Internal encrypted object reference; never exposed directly']
+  download_expires_at timestamptz
+  failure_code varchar
+  requested_at timestamptz [not null]
+  started_at timestamptz
+  completed_at timestamptz
 }
 
 Table account_audit_event {

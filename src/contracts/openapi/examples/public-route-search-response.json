@@ -15,6 +15,11 @@
   "warnings": [
     "PROVIDER_PARTIAL_FAILURE"
   ],
+  "history": {
+    "saved": true,
+    "ownerKind": "USER",
+    "retainedUntil": "2026-11-21T07:40:05.421+09:00"
+  },
   "support": {
     "features": {
       "currentTransit": true,

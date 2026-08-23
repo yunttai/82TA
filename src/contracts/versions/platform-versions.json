@@ -1,13 +1,13 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.0.1",
-  "contractVersion": "1.0.0",
+  "contextVersion": "1.1.0",
+  "contractVersion": "1.1.0",
   "publicApiMajor": 1,
   "routingApiMajor": 1,
-  "databaseContractVersion": "1.0.0",
-  "codeRegistryVersion": "1.0.0",
+  "databaseContractVersion": "1.1.0",
+  "codeRegistryVersion": "1.1.0",
   "rankingPolicyVersion": "0.1.0-planned",
   "mappingPolicyVersion": "0.1.0-planned",
   "featureSchemaVersion": "0.1.0-planned",
-  "status": "CODEX_HARNESS_BASELINE"
+  "status": "SERVICE_CONTRACT_MINOR_1_1"
 }
