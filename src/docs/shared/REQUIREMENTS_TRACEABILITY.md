@@ -29,7 +29,7 @@
 | FR-IAM-001~007 | Service | Service DBML, Public OpenAPI | `src/services/service-api` | SEC-IAM-*, DATA-DELETE-* |
 | FR-OPS-001~006 | Joint/Routing | health/version/capability, events | `src/services`, `src/workers`, `src/infra` | RES-*, PERF-*, DR-* |
 
-Service IAM 1.1 세부 evidence에는 guest token expiry/ownership, preference ETag 충돌, saved-place/favorite IDOR, versioned consent, export URL 만료, deletion job 및 backup/analytics 삭제 증빙을 포함한다.
+Service IAM 1.3 세부 evidence에는 이메일 가입·로그인 password hashing/CSRF/rate limit/session revoke, 닉네임 profile migration, 가입 시 필수 개인정보 안내와 독립 선택 동의 기록, guest token expiry/ownership, preference ETag 충돌, saved-place/favorite IDOR, versioned consent, export URL 만료, deletion job 및 backup/analytics 삭제 증빙을 포함한다.
 
 첫 Service↔Routing 통합의 1.1 교정 evidence는 `FR-OPT-002`의 nonempty R1
 canonical chain·참조 무결성·등록 code 검증, `FR-UI-007`의 Public 422/504

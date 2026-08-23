@@ -14,7 +14,7 @@ from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 
 from .contracts import CanonicalContracts
-from .models import AnonymousSession, ServiceUser
+from .models import AnonymousSession, AuthenticatedSession, ServiceUser
 
 SAFE_HEADER_VALUE = re.compile(r"^[^\x00-\x1f\x7f]{1,256}$")
 contracts = CanonicalContracts()
@@ -108,9 +108,25 @@ def token_digest(token: str) -> str:
 def current_subject(request: HttpRequest, *, required: bool = True, user_only: bool = False) -> Subject | None:
     user_id = request.session.get("service_user_id")
     if user_id:
-        user = ServiceUser.objects.filter(id=user_id, is_active=True, deleted_at__isnull=True).first()
-        if user is not None:
-            return Subject(kind="USER", user=user)
+        authenticated_session_id = request.session.get("service_authenticated_session_id")
+        session_key = request.session.session_key
+        authenticated = (
+            AuthenticatedSession.objects.select_related("user")
+            .filter(
+                id=authenticated_session_id,
+                user_id=user_id,
+                token_hash=token_digest(session_key),
+                revoked_at__isnull=True,
+                expires_at__gt=timezone.now(),
+                user__is_active=True,
+                user__deleted_at__isnull=True,
+            )
+            .first()
+            if authenticated_session_id and session_key
+            else None
+        )
+        if authenticated is not None:
+            return Subject(kind="USER", user=authenticated.user)
         request.session.flush()
 
     if not user_only:

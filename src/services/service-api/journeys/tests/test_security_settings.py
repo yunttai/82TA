@@ -20,6 +20,7 @@ class ProductionSettingsTests(SimpleTestCase):
         "DATABASE_URL",
         "SERVICE_ENVIRONMENT",
         "SERVICE_SECRET_KEY",
+        "SERVICE_DEBUG",
         "SERVICE_ROUTING_GATEWAY",
         "SERVICE_ROUTING_JWT_SECRET",
         "SERVICE_ROUTING_JWT_ISSUER",
@@ -32,6 +33,7 @@ class ProductionSettingsTests(SimpleTestCase):
         "SERVICE_TRUST_PROXY_HEADERS",
         "SERVICE_TRUSTED_PROXY_IPS",
         "SERVICE_CONSENT_DOCUMENT_VERSION",
+        "SERVICE_CONSENT_SERVICE_PRIVACY_DOCUMENT_VERSION",
         "SERVICE_CONSENT_SEARCH_HISTORY_DOCUMENT_VERSION",
         "SERVICE_CONSENT_PRECISE_LOCATION_DOCUMENT_VERSION",
         "SERVICE_CONSENT_PRODUCT_ANALYTICS_DOCUMENT_VERSION",
@@ -218,19 +220,33 @@ class ProductionSettingsTests(SimpleTestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("current consent document version is required in production", result.stderr)
 
-    def test_per_purpose_consent_version_overrides_common_version(self) -> None:
+    def test_production_rejects_debug(self) -> None:
         result = self._import_settings(
-            code=(
-                "import service_api.settings as s; "
-                "print(s.CONSENT_DOCUMENT_VERSIONS['SEARCH_HISTORY']); "
-                "print(s.CONSENT_DOCUMENT_VERSIONS['ROUTING_FEEDBACK'])"
-            ),
+            DATABASE_URL="postgresql://service:secret@db.internal/service",
+            SERVICE_DEBUG="true",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SERVICE_DEBUG must be false in production", result.stderr)
+
+    def test_registration_consent_versions_are_one_deployment_bundle(self) -> None:
+        result = self._import_settings(
             DATABASE_URL="postgresql://service:secret@db.internal/service",
             SERVICE_CONSENT_DOCUMENT_VERSION="privacy-common",
             SERVICE_CONSENT_SEARCH_HISTORY_DOCUMENT_VERSION="privacy-search-v2",
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.splitlines(), ["privacy-search-v2", "privacy-common"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Purpose-specific consent document versions are unsupported", result.stderr)
+
+        aligned = self._import_settings(
+            code=(
+                "import service_api.settings as s; "
+                "print(sorted(set(s.CONSENT_DOCUMENT_VERSIONS.values())))"
+            ),
+            DATABASE_URL="postgresql://service:secret@db.internal/service",
+            SERVICE_CONSENT_DOCUMENT_VERSION="privacy-common",
+        )
+        self.assertEqual(aligned.returncode, 0, aligned.stderr)
+        self.assertEqual(aligned.stdout.strip(), "['privacy-common']")
 
     def test_production_requires_explicit_data_rights_artifact_backend(self) -> None:
         result = self._import_settings(

@@ -187,6 +187,8 @@ GBIS 좌석 데이터가 없더라도 transit·taxi 경로를 `PARTIAL`로 제�
 
 Service 계정·개인정보 계약은 다음을 만족한다.
 
+- V1 선택 로그인은 이메일과 12자 이상의 비밀번호로 가입·로그인하며, 비밀번호 원문은 저장·로그·응답하지 않고 적응형 단방향 hash만 저장한다. 로그인 실패는 계정 존재 여부를 구분하지 않는 동일 오류를 반환한다.
+- 가입은 2~20자의 표시 닉네임과 현재 개인정보 처리·데이터 권리 문서의 필수 확인을 요구한다. 검색 기록, 정확한 저장 장소, 제품 분석, 경로 의견의 선택 동의는 각각 독립적이고 기본 거절이며 가입 후 변경할 수 있다.
 - guest credential은 짧은 수명의 opaque 값으로 발급하고 서버에는 hash만 저장한다.
 - `saveToHistory=true`는 로그인 사용자와 유효한 `SEARCH_HISTORY` 동의를 요구한다. guest 검색 결과는 응답·idempotency TTL 동안만 보유하고 이력 목록에 넣지 않는다.
 - preference GET은 version ETag를 반환하며, first-party update는 `If-Match`로 충돌을 검출한다. 1.0 consumer의 무조건 PUT은 migration window 동안만 허용한다.

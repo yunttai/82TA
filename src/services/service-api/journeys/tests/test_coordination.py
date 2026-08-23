@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 import fakeredis
 from django.test import Client, TestCase, override_settings
+from django.utils import timezone
 from redis.exceptions import ConnectionError
 
 from identity.repository import IdentityRepository
+from identity.sessions import SessionRepository
 from journeys import views
+from journeys.api_common import token_digest
 from journeys.contracts import LockedFixtures
 from journeys.coordination import (
     RedisCoordination,
@@ -139,6 +143,13 @@ class RedisCoordinationTests(TestCase):
             client = Client(enforce_csrf_checks=False)
             session = client.session
             session["service_user_id"] = str(user.id)
+            session.save()
+            authenticated_session = SessionRepository.create_authenticated(
+                user_id=user.id,
+                token_hash=token_digest(session.session_key),
+                expires_at=timezone.now() + timedelta(hours=1),
+            )
+            session["service_authenticated_session_id"] = str(authenticated_session.id)
             session.save()
             return client
 

@@ -1,11 +1,61 @@
 openapi: 3.1.0
 info:
   title: Budget Route Service Public API
-  version: 1.1.0
+  version: 1.3.0
 servers:
   - url: https://api.example.invalid
 security: []
 paths:
+  /api/v1/auth/register:
+    post:
+      operationId: registerWithEmail
+      description: Creates an account and starts an authenticated HttpOnly cookie session. CSRF protection is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailRegistrationInput'}
+            example:
+              email: user@example.com
+              password: correct-horse-battery-staple
+              nickname: 82TA 사용자
+              documentVersion: local-development
+              requiredPrivacyAccepted: true
+              optionalConsents:
+                SEARCH_HISTORY: false
+                PRECISE_LOCATION: false
+                PRODUCT_ANALYTICS: false
+                ROUTING_FEEDBACK: false
+      responses:
+        '201':
+          description: Registered USER session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SessionContext'}
+              example: {subjectType: USER, authenticated: true, expiresAt: '2026-09-06T12:00:00+09:00', email: user@example.com}
+        '400': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+  /api/v1/auth/login:
+    post:
+      operationId: loginWithEmail
+      description: Verifies an email credential and starts an authenticated HttpOnly cookie session. Failure does not reveal whether the account exists. CSRF protection is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailCredentialInput'}
+            example: {email: user@example.com, password: correct-horse-battery-staple}
+      responses:
+        '200':
+          description: Authenticated USER session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SessionContext'}
+              example: {subjectType: USER, authenticated: true, expiresAt: '2026-09-06T12:00:00+09:00', email: user@example.com}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
   /api/v1/guest-sessions:
     post:
       operationId: createGuestSession
@@ -595,6 +645,46 @@ components:
         subjectType: {type: string, enum: [GUEST, USER]}
         authenticated: {type: boolean}
         expiresAt: {type: string, format: date-time}
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Present only for the current authenticated USER session.
+        nickname:
+          type: string
+          minLength: 2
+          maxLength: 20
+          description: Present only for the current authenticated USER session.
+    EmailRegistrationInput:
+      type: object
+      additionalProperties: false
+      required: [email, password, nickname, documentVersion, requiredPrivacyAccepted, optionalConsents]
+      properties:
+        email: {type: string, format: email, maxLength: 254}
+        password: {type: string, minLength: 12, maxLength: 128, writeOnly: true}
+        nickname: {type: string, minLength: 2, maxLength: 20}
+        documentVersion: {type: string, minLength: 1, maxLength: 64}
+        requiredPrivacyAccepted: {type: boolean, const: true}
+        optionalConsents:
+          type: object
+          additionalProperties: false
+          required: [SEARCH_HISTORY, PRECISE_LOCATION, PRODUCT_ANALYTICS, ROUTING_FEEDBACK]
+          properties:
+            SEARCH_HISTORY: {type: boolean}
+            PRECISE_LOCATION: {type: boolean}
+            PRODUCT_ANALYTICS: {type: boolean}
+            ROUTING_FEEDBACK: {type: boolean}
+    EmailCredentialInput:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: {type: string, format: email, maxLength: 254}
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+          writeOnly: true
     RouteFeedbackInput:
       type: object
       additionalProperties: false
@@ -680,7 +770,7 @@ components:
         defaultConstraints: {type: object}
     ConsentType:
       type: string
-      enum: [SEARCH_HISTORY, PRECISE_LOCATION, PRODUCT_ANALYTICS, ROUTING_FEEDBACK]
+      enum: [SERVICE_PRIVACY, SEARCH_HISTORY, PRECISE_LOCATION, PRODUCT_ANALYTICS, ROUTING_FEEDBACK]
     ConsentInput:
       type: object
       additionalProperties: false

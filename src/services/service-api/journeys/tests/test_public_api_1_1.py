@@ -11,8 +11,10 @@ from django.utils import timezone
 
 from consent.repository import ConsentRepository
 from identity.repository import IdentityRepository
+from identity.sessions import SessionRepository
 from journeys import views
 from journeys.abuse import reset_rate_limits
+from journeys.api_common import token_digest
 from journeys.contracts import CanonicalContracts, LockedFixtures
 from journeys.models import (
     AnonymousSession,
@@ -36,8 +38,16 @@ class PublicApi11Tests(TestCase):
 
     def login(self, client: Client | None = None, user=None) -> Client:
         client = client or self.client
+        user = user or self.user
         session = client.session
-        session["service_user_id"] = str((user or self.user).id)
+        session["service_user_id"] = str(user.id)
+        session.save()
+        authenticated = SessionRepository.create_authenticated(
+            user_id=user.id,
+            token_hash=token_digest(session.session_key),
+            expires_at=timezone.now() + timedelta(seconds=settings.AUTH_SESSION_TTL_SECONDS),
+        )
+        session["service_authenticated_session_id"] = str(authenticated.id)
         session.save()
         return client
 

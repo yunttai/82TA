@@ -200,6 +200,7 @@ class UserProfile(models.Model):
         on_delete=models.CASCADE,
         related_name="profile",
     )
+    nickname = models.CharField(max_length=20, default="82TA 사용자")
     locale = models.CharField(max_length=35, default="ko-KR")
     timezone = models.CharField(max_length=63, default="Asia/Seoul")
     updated_at = models.DateTimeField(auto_now=True)

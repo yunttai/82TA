@@ -36,8 +36,9 @@ malformed/oversized이면 직선으로 위장하지 않는다.
 남기지 않는다. Service Worker는 shell/정적 asset만 캐시하고 `/api/**`는 절대
 가로채거나 캐시하지 않는다.
 
-현재 Public 1.1.0 계약에 없는 사용자 회원가입·로그인·복구·guest merge, 개별
-검색 기록 삭제, consent 문서 배포는 임의 endpoint 없이 미지원 상태로 남긴다.
+Public 1.3.0의 이메일 회원가입·로그인은 HttpOnly Django session으로 처리한다.
+아직 계약에 없는 계정 복구·이메일 확인·guest merge, 개별 검색 기록 삭제,
+consent 문서 배포는 임의 endpoint 없이 미지원 상태로 남긴다.
 동의 변경과 production build를 활성화하려면 배포 환경에서
 `VITE_PRIVACY_DOCUMENT_VERSION`을 Service가 현재 게시한 동의 문서 version과
 정확히 같은 값으로 설정해야 한다. 누락되거나 안전한 version 형식이 아니면

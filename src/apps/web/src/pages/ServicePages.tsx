@@ -20,6 +20,8 @@ import {
   listConsents,
   listRouteSearches,
   listSavedPlaces,
+  loginWithEmail,
+  registerWithEmail,
   revokeCurrentSession,
   recordConsent,
   updatePreferences,
@@ -41,6 +43,7 @@ import {
   currentGuestToken,
   inspectCurrentSession,
   rememberGuestSession,
+  rememberUserSession,
 } from "../shared/session/sessionMemory";
 
 interface PageFrameProps {
@@ -78,8 +81,11 @@ function safeDownloadUrl(value: string | null | undefined): string | null {
 export function HistoryPage() {
   const [items, setItems] = useState<PublicRouteSearchResponse[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
   useEffect(() => {
-    void listRouteSearches().then(({ data, response }) => {
+    void inspectCurrentSession().then(async (session) => {
+      if (session?.subjectType !== "USER") { setAuthRequired(true); return; }
+      const { data, response } = await listRouteSearches();
       if (!response.ok || data === undefined) setFailed(true);
       else setItems(data.items);
     }).catch(() => setFailed(true));
@@ -88,7 +94,7 @@ export function HistoryPage() {
   return (
     <PageFrame eyebrow="내 이동" title="검색 기록">
       <p className="page-lead">기록 저장에 동의한 로그인 사용자에게만 표시됩니다.</p>
-      {items === null || items.length === 0 ? <LoadMessage failed={failed} empty={items?.length === 0} /> : (
+      {authRequired ? <div className="auth-required"><strong>로그인이 필요한 기능이에요</strong><p>로그인하면 동의한 검색 기록을 안전하게 보관할 수 있어요.</p><a className="primary-link" href="/account?next=/history">로그인하기</a></div> : items === null || items.length === 0 ? <LoadMessage failed={failed} empty={items?.length === 0} /> : (
         <ul className="resource-list">
           {items.map((item) => (
             <li key={item.searchId}>
@@ -221,6 +227,7 @@ export function FavoritesPage() {
   const [favorites, setFavorites] = useState<FavoriteJourney[] | null>(null);
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [failed, setFailed] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
 
   async function reload() {
     const [favoriteResult, placeResult] = await Promise.all([listFavoriteJourneys(), listSavedPlaces()]);
@@ -231,7 +238,12 @@ export function FavoritesPage() {
     setPlaces(placeResult.data);
   }
 
-  useEffect(() => { void reload().catch(() => setFailed(true)); }, []);
+  useEffect(() => {
+    void inspectCurrentSession().then((session) => {
+      if (session?.subjectType !== "USER") { setAuthRequired(true); return; }
+      void reload().catch(() => setFailed(true));
+    }).catch(() => setFailed(true));
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -271,7 +283,7 @@ export function FavoritesPage() {
   return (
     <PageFrame eyebrow="내 이동" title="즐겨찾는 여정">
       <p className="page-lead">저장 장소 두 곳을 연결해 자주 쓰는 여정을 만듭니다.</p>
-      {places.length >= 2 ? (
+      {authRequired ? <div className="auth-required"><strong>로그인이 필요한 기능이에요</strong><p>로그인하면 자주 가는 여정을 여러 기기에서 관리할 수 있어요.</p><a className="primary-link" href="/account?next=/favorites">로그인하기</a></div> : places.length >= 2 ? (
         <form className="resource-form compact-form" onSubmit={(event) => void submit(event)}>
           <label className="field"><span>여정 이름</span><input name="nickname" maxLength={100} required /></label>
           <label className="field"><span>출발 장소</span><select name="originSavedPlaceId">{places.map((place) => <option key={place.id} value={place.id}>{place.label}</option>)}</select></label>
@@ -279,9 +291,9 @@ export function FavoritesPage() {
           <button className="primary-button" type="submit">즐겨찾기 저장</button>
         </form>
       ) : <p className="degraded-notice">즐겨찾기를 만들려면 저장 장소가 두 개 이상 필요합니다.</p>}
-      {favorites === null || favorites.length === 0 ? <LoadMessage failed={failed} empty={favorites?.length === 0} /> : (
+      {!authRequired && (favorites === null || favorites.length === 0 ? <LoadMessage failed={failed} empty={favorites?.length === 0} /> : (
         <ul className="resource-list">{favorites.map((item) => <li key={item.id}><strong>{item.nickname}</strong><span>{new Date(item.createdAt).toLocaleDateString("ko-KR")}</span><div className="item-actions"><button type="button" onClick={() => void rename(item)}>이름 수정</button><button type="button" onClick={() => void remove(item)}>삭제</button></div></li>)}</ul>
-      )}
+      ))}
     </PageFrame>
   );
 }
@@ -387,6 +399,8 @@ export function AccountPage() {
   const [session, setSession] = useState<SessionContext | null>(null);
   const [guestToken, setGuestToken] = useState<string | undefined>(currentGuestToken());
   const [status, setStatus] = useState<"LOADING" | "READY" | "SIGNED_OUT" | "FAILED">("LOADING");
+  const [mode, setMode] = useState<"LOGIN" | "REGISTER">("LOGIN");
+  const [authStatus, setAuthStatus] = useState<"IDLE" | "SENDING" | "INVALID" | "DUPLICATE" | "FAILED">("IDLE");
 
   useEffect(() => {
     void inspectCurrentSession().then((current) => {
@@ -419,29 +433,89 @@ export function AccountPage() {
     } catch { setStatus("FAILED"); }
   }
 
+  async function submitCredential(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = form.get("email");
+    const password = form.get("password");
+    if (typeof email !== "string" || typeof password !== "string") return;
+    setAuthStatus("SENDING");
+    try {
+      const result = mode === "LOGIN"
+        ? await loginWithEmail({ email: email.trim(), password })
+        : await registerWithEmail({
+            email: email.trim(),
+            password,
+            nickname: String(form.get("nickname") ?? "").trim(),
+            documentVersion: import.meta.env.VITE_PRIVACY_DOCUMENT_VERSION ?? "local-development",
+            requiredPrivacyAccepted: true,
+            optionalConsents: {
+              SEARCH_HISTORY: form.get("SEARCH_HISTORY") === "on",
+              PRECISE_LOCATION: form.get("PRECISE_LOCATION") === "on",
+              PRODUCT_ANALYTICS: form.get("PRODUCT_ANALYTICS") === "on",
+              ROUTING_FEEDBACK: form.get("ROUTING_FEEDBACK") === "on",
+            },
+          });
+      if (result.response.status === 401) { setAuthStatus("INVALID"); return; }
+      if (result.response.status === 409) { setAuthStatus("DUPLICATE"); return; }
+      if (!result.response.ok || result.data === undefined) throw new Error("Authentication failed");
+      rememberUserSession(result.data);
+      setGuestToken(undefined);
+      setSession(result.data);
+      setStatus("READY");
+      setAuthStatus("IDLE");
+      const next = new URLSearchParams(window.location.search).get("next");
+      if (next === "/history" || next === "/favorites") window.location.assign(next);
+    } catch {
+      setAuthStatus("FAILED");
+    }
+  }
+
   return (
-    <PageFrame eyebrow="계정" title="게스트로 바로 사용">
-      <p className="page-lead">경로 검색은 로그인 없이 사용할 수 있습니다. 게스트 credential은 현재 page memory에서만 유지하고 URL·localStorage·로그에 넣지 않습니다.</p>
-      {session !== null && <div className="coverage-chip">{session.subjectType === "USER" ? "로그인 사용자" : "게스트"} · {new Date(session.expiresAt).toLocaleString("ko-KR")}까지</div>}
-      {status === "SIGNED_OUT" && <button className="primary-button" type="button" onClick={() => void startGuestSession()}>게스트 세션 시작</button>}
-      {status === "READY" && <button className="secondary-button" type="button" onClick={() => void signOut()}>현재 세션 종료</button>}
-      {status === "LOADING" && <p role="status">세션을 확인하는 중…</p>}
-      {status === "FAILED" && <p className="degraded-notice" role="alert">세션 Backend를 사용할 수 없습니다. guest route search는 계속 사용할 수 있습니다.</p>}
-      <div className="degraded-notice"><strong>사용자 로그인 연동 대기</strong><p>현재 계약에는 guest/session 조회·종료는 있지만 사용자 로그인 생성 방식은 정의되지 않았습니다.</p></div>
-      <a className="primary-link" href="/privacy">개인정보와 데이터 권리 확인</a>
+    <PageFrame eyebrow="계정" title={session?.subjectType === "USER" ? "로그인 상태" : "로그인하고 저장하기"}>
+      <p className="page-lead">길찾기는 로그인 없이 사용할 수 있어요. 로그인하면 검색 기록과 즐겨찾기, 설정을 계정에 안전하게 저장할 수 있습니다.</p>
+      {session?.subjectType === "USER" && <section className="account-profile-card" aria-label="로그인 상태"><div className="profile-avatar" aria-hidden="true">{(session.nickname ?? session.email ?? "8").slice(0, 1).toUpperCase()}</div><div><span className="profile-status">로그인됨</span><strong>{session.nickname ?? "82TA 사용자"}</strong><small>{session.email}</small><small>{new Date(session.expiresAt).toLocaleString("ko-KR")}까지 유지</small></div></section>}
+      {session?.subjectType === "GUEST" && <div className="coverage-chip">게스트 · {new Date(session.expiresAt).toLocaleString("ko-KR")}까지</div>}
+      {session?.subjectType !== "USER" && (
+        <div className="auth-card">
+          <div className="auth-mode" role="tablist" aria-label="계정 방식">
+            <button type="button" role="tab" aria-selected={mode === "LOGIN"} onClick={() => { setMode("LOGIN"); setAuthStatus("IDLE"); }}>로그인</button>
+            <button type="button" role="tab" aria-selected={mode === "REGISTER"} onClick={() => { setMode("REGISTER"); setAuthStatus("IDLE"); }}>회원가입</button>
+          </div>
+          <form className="auth-form" onSubmit={(event) => void submitCredential(event)}>
+            {mode === "REGISTER" && <label className="field"><span>닉네임</span><input name="nickname" type="text" autoComplete="nickname" minLength={2} maxLength={20} required /><small>내 정보와 로그인 상태에 표시됩니다.</small></label>}
+            <label className="field"><span>이메일</span><input name="email" type="email" autoComplete="email" maxLength={254} required /></label>
+            <label className="field"><span>비밀번호</span><input name="password" type="password" autoComplete={mode === "LOGIN" ? "current-password" : "new-password"} minLength={12} maxLength={128} required /><small>12자 이상 입력해 주세요.</small></label>
+            {mode === "REGISTER" && <fieldset className="signup-consents"><legend>개인정보와 데이터 권리</legend><label><input name="requiredPrivacyAccepted" type="checkbox" required /><span><strong>[필수] 개인정보 처리와 데이터 권리 안내 동의</strong><small>서비스 제공, 계정 관리와 데이터 열람·삭제 요청 처리를 위한 안내입니다. <a href="/privacy" target="_blank">내용 보기</a></small></span></label><p>선택 동의</p><label><input name="SEARCH_HISTORY" type="checkbox" /><span>검색 기록 저장</span></label><label><input name="PRECISE_LOCATION" type="checkbox" /><span>정확한 저장 장소</span></label><label><input name="PRODUCT_ANALYTICS" type="checkbox" /><span>제품 개선 분석</span></label><label><input name="ROUTING_FEEDBACK" type="checkbox" /><span>경로 의견 활용</span></label><small className="consent-help">선택 항목은 동의하지 않아도 가입할 수 있고, 언제든 내 정보에서 바꿀 수 있어요.</small></fieldset>}
+            <button className="primary-button" type="submit" disabled={authStatus === "SENDING"}>{authStatus === "SENDING" ? "확인 중…" : mode === "LOGIN" ? "로그인" : "계정 만들기"}</button>
+            {authStatus === "INVALID" && <p className="auth-error" role="alert">이메일 또는 비밀번호가 올바르지 않습니다.</p>}
+            {authStatus === "DUPLICATE" && <p className="auth-error" role="alert">이미 가입된 이메일입니다. 로그인해 주세요.</p>}
+            {authStatus === "FAILED" && <p className="auth-error" role="alert">지금은 계정 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.</p>}
+          </form>
+        </div>
+      )}
+      <div className="account-session-actions">
+        {status === "SIGNED_OUT" && <button className="primary-button" type="button" onClick={() => void startGuestSession()}>게스트 세션 시작</button>}
+        {status === "READY" && <button className="secondary-button" type="button" onClick={() => void signOut()}>{session?.subjectType === "USER" ? "로그아웃" : "게스트 세션 종료"}</button>}
+        {status === "LOADING" && <p role="status">세션을 확인하는 중…</p>}
+        {status === "FAILED" && <p className="degraded-notice" role="alert">세션 Backend를 사용할 수 없습니다. guest route search는 계속 사용할 수 있습니다.</p>}
+        <a className="primary-link" href="/privacy">개인정보와 데이터 권리 확인</a>
+      </div>
     </PageFrame>
   );
 }
 
 export function MePage() {
+  const [session, setSession] = useState<SessionContext | null>(null);
+  useEffect(() => { void inspectCurrentSession().then(setSession).catch(() => setSession(null)); }, []);
   return (
-    <PageFrame eyebrow="내 정보" title="설정과 데이터">
+    <PageFrame eyebrow="내 정보" title={session?.subjectType === "USER" ? session.nickname ?? "82TA 사용자" : "내 정보"}>
       <div className="me-grid">
         <a href="/preferences"><strong>이동 선호</strong><span>예산·도보·환승 기본값</span></a>
         <a href="/places"><strong>저장 장소</strong><span>민감 위치 관리</span></a>
         <a href="/support"><strong>지원 범위</strong><span>현재 기능과 제한</span></a>
         <a href="/privacy"><strong>개인정보</strong><span>위치·삭제·export 상태</span></a>
-        <a href="/account"><strong>계정</strong><span>guest와 로그인 준비 상태</span></a>
+        <a href="/account"><strong>계정</strong><span>로그인·회원가입·세션 관리</span></a>
       </div>
     </PageFrame>
   );
@@ -512,6 +586,7 @@ export function PrivacyPage() {
   }, [deletionJob, exportJob, status]);
 
   const consentLabels: Readonly<Record<ConsentType, string>> = {
+    SERVICE_PRIVACY: "개인정보 처리와 데이터 권리 안내",
     SEARCH_HISTORY: "검색 기록 저장",
     PRECISE_LOCATION: "정확한 저장 장소",
     PRODUCT_ANALYTICS: "제품 개선 분석",
@@ -526,13 +601,13 @@ export function PrivacyPage() {
         <article><h2>오프라인 캐시</h2><p>앱 shell과 정적 자산만 캐시합니다. `/api/` 응답과 계정 데이터는 Service Worker가 캐시하지 않습니다.</p></article>
       </div>
       <section className="privacy-section" aria-labelledby="consent-title">
-        <h2 id="consent-title">선택 동의</h2>
+        <h2 id="consent-title">동의 관리</h2>
         {documentVersion === undefined || documentVersion.trim().length === 0 ? (
           <p className="degraded-notice">배포 환경의 개인정보 문서 version이 설정되지 않아 동의 변경을 잠갔습니다.</p>
         ) : consents === null ? <p role="status">동의 상태를 불러오는 중…</p> : (
           <ul className="consent-list">{(Object.keys(consentLabels) as ConsentType[]).map((type) => {
             const record = consents.find((item) => item.consentType === type);
-            return <li key={type}><span><strong>{consentLabels[type]}</strong><small>{record === undefined ? "기록 없음" : `${record.documentVersion} · ${record.accepted ? "동의" : "거절"}`}</small></span><button className="secondary-button" type="button" disabled={status === "SENDING"} onClick={() => void setConsent(type, record?.accepted !== true)}>{record?.accepted === true ? "동의 철회" : "동의"}</button></li>;
+            return <li key={type}><span><strong>{consentLabels[type]}</strong><small>{record === undefined ? "기록 없음" : `${record.documentVersion} · ${record.accepted ? "동의" : "거절"}`}</small></span>{type === "SERVICE_PRIVACY" ? <small>필수 · 계정 삭제로 종료</small> : <button className="secondary-button" type="button" disabled={status === "SENDING"} onClick={() => void setConsent(type, record?.accepted !== true)}>{record?.accepted === true ? "동의 철회" : "동의"}</button>}</li>;
           })}</ul>
         )}
       </section>

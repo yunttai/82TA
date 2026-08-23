@@ -130,15 +130,33 @@ class ServiceContract11Tests(unittest.TestCase):
             ["properties"]["contractVersion"]["const"],
             "1.0",
         )
-        self.assertEqual(self.public["info"]["version"], "1.1.0")
+        self.assertEqual(self.public["info"]["version"], "1.3.0")
         self.assertEqual(self.private["info"]["version"], "1.1.0")
+        manifest = json.loads(
+            (ROOT / "src/contracts/CONTEXT_MANIFEST.json").read_text(encoding="utf-8")
+        )
         versions = json.loads(
             (ROOT / "src/contracts/versions/platform-versions.json").read_text(
                 encoding="utf-8"
             )
         )
-        self.assertEqual(versions["contractVersion"], "1.1.0")
+        self.assertEqual(manifest["contextVersion"], "1.3.0")
+        self.assertEqual(manifest["contractVersion"], "1.3.0")
+        self.assertEqual(versions["contextVersion"], "1.3.0")
+        self.assertEqual(versions["contractVersion"], "1.3.0")
+        self.assertEqual(versions["databaseContractVersion"], "1.2.0")
+        self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
         self.assertEqual(versions["rankingPolicyVersion"], "rank-0.1.1")
+
+    def test_registration_inline_example_matches_its_schema(self) -> None:
+        example = self.public["paths"]["/api/v1/auth/register"]["post"]["requestBody"][
+            "content"
+        ]["application/json"]["example"]
+        schema = self.public["components"]["schemas"]["EmailRegistrationInput"]
+        errors = list(
+            Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(example)
+        )
+        self.assertEqual(errors, [])
 
     def test_new_problem_codes_have_expected_status(self) -> None:
         errors = self.codes["errorCodes"]

@@ -18,6 +18,8 @@ if ENVIRONMENT == "production" and len(_configured_secret or "") < 32:
     raise RuntimeError("SERVICE_SECRET_KEY must contain at least 32 characters in production")
 SECRET_KEY = _configured_secret or "unsafe-development-only"
 DEBUG = os.environ.get("SERVICE_DEBUG", "true" if ENVIRONMENT == "development" else "false").lower() == "true"
+if ENVIRONMENT == "production" and DEBUG:
+    raise RuntimeError("SERVICE_DEBUG must be false in production")
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("SERVICE_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",")
@@ -56,27 +58,36 @@ def _https_origins(raw: str) -> list[str]:
 CSRF_TRUSTED_ORIGINS = _https_origins(os.environ.get("SERVICE_CSRF_TRUSTED_ORIGINS", ""))
 
 CONSENT_PURPOSES = (
+    "SERVICE_PRIVACY",
     "SEARCH_HISTORY",
     "PRECISE_LOCATION",
     "PRODUCT_ANALYTICS",
     "ROUTING_FEEDBACK",
 )
 _consent_version_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-_default_consent_document_version = os.environ.get("SERVICE_CONSENT_DOCUMENT_VERSION", "").strip()
-CONSENT_DOCUMENT_VERSIONS: dict[str, str] = {}
-for _consent_purpose in CONSENT_PURPOSES:
-    _purpose_env_name = f"SERVICE_CONSENT_{_consent_purpose}_DOCUMENT_VERSION"
-    _purpose_version = os.environ.get(_purpose_env_name, _default_consent_document_version).strip()
-    if not _purpose_version and ENVIRONMENT != "production":
-        _purpose_version = "local-development"
-    if not _purpose_version:
-        raise RuntimeError(
-            "A current consent document version is required in production; configure "
-            "SERVICE_CONSENT_DOCUMENT_VERSION or every purpose-specific variable"
-        )
-    if _consent_version_pattern.fullmatch(_purpose_version) is None:
-        raise RuntimeError(f"{_purpose_env_name} contains an invalid consent document version")
-    CONSENT_DOCUMENT_VERSIONS[_consent_purpose] = _purpose_version
+_consent_document_version = os.environ.get("SERVICE_CONSENT_DOCUMENT_VERSION", "").strip()
+if not _consent_document_version and ENVIRONMENT != "production":
+    _consent_document_version = "local-development"
+if not _consent_document_version:
+    raise RuntimeError(
+        "A current consent document version is required in production; configure "
+        "SERVICE_CONSENT_DOCUMENT_VERSION"
+    )
+if _consent_version_pattern.fullmatch(_consent_document_version) is None:
+    raise RuntimeError("SERVICE_CONSENT_DOCUMENT_VERSION contains an invalid consent document version")
+_purpose_specific_consent_variables = tuple(
+    name
+    for name in (f"SERVICE_CONSENT_{purpose}_DOCUMENT_VERSION" for purpose in CONSENT_PURPOSES)
+    if os.environ.get(name, "").strip()
+)
+if _purpose_specific_consent_variables:
+    raise RuntimeError(
+        "Purpose-specific consent document versions are unsupported; use one "
+        "SERVICE_CONSENT_DOCUMENT_VERSION registration bundle"
+    )
+CONSENT_DOCUMENT_VERSIONS = {
+    purpose: _consent_document_version for purpose in CONSENT_PURPOSES
+}
 
 TRUST_PROXY_HEADERS = os.environ.get("SERVICE_TRUST_PROXY_HEADERS", "false").lower() == "true"
 TRUSTED_PROXY_IPS = tuple(
@@ -211,6 +222,10 @@ PUBLIC_RATE_LIMIT_PER_MINUTE = int(os.environ.get("SERVICE_RATE_LIMIT_PER_MINUTE
 GUEST_SESSION_RATE_LIMIT_PER_MINUTE = int(
     os.environ.get("SERVICE_GUEST_SESSION_RATE_LIMIT_PER_MINUTE", "10")
 )
+AUTH_RATE_LIMIT_PER_MINUTE = int(os.environ.get("SERVICE_AUTH_RATE_LIMIT_PER_MINUTE", "10"))
+AUTH_SESSION_TTL_SECONDS = int(os.environ.get("SERVICE_AUTH_SESSION_TTL_SECONDS", "1209600"))
+if not 300 <= AUTH_SESSION_TTL_SECONDS <= 2_592_000:
+    raise RuntimeError("SERVICE_AUTH_SESSION_TTL_SECONDS must be between 300 and 2592000")
 PLACE_RATE_LIMIT_PER_MINUTE = int(os.environ.get("SERVICE_PLACE_RATE_LIMIT_PER_MINUTE", "60"))
 PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS = int(
     os.environ.get("SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS", "7000")
@@ -252,6 +267,7 @@ if ENVIRONMENT == "production" and any(
     for limit in (
         PUBLIC_RATE_LIMIT_PER_MINUTE,
         GUEST_SESSION_RATE_LIMIT_PER_MINUTE,
+        AUTH_RATE_LIMIT_PER_MINUTE,
         PLACE_RATE_LIMIT_PER_MINUTE,
     )
 ):
