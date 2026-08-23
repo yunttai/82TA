@@ -726,6 +726,9 @@ class _LegacyIntegratedFixtureOptimizeRouteUseCase:
     ) -> Mapping[str, object]:
         transit = provider_leg.transit
         assert transit is not None
+        duration_origin = "MODEL_PREDICTED" if bus_projection is not None else "PROVIDER_ESTIMATE"
+        wait_duration = evaluated.wait_duration
+        travel_duration = evaluated.travel_duration
         return {
             "legId": evaluated.leg_id,
             "sequence": evaluated.sequence,
@@ -761,7 +764,19 @@ class _LegacyIntegratedFixtureOptimizeRouteUseCase:
                 evaluated.duration.p50_seconds,
                 evaluated.duration.p90_seconds,
                 evaluated.reliability_score,
-                "MODEL_PREDICTED" if bus_projection is not None else "PROVIDER_ESTIMATE",
+                duration_origin,
+            ),
+            "waitDuration": self._time_estimate(
+                wait_duration.p50_seconds,
+                wait_duration.p90_seconds,
+                evaluated.reliability_score,
+                duration_origin,
+            ),
+            "travelDuration": self._time_estimate(
+                travel_duration.p50_seconds,
+                travel_duration.p90_seconds,
+                evaluated.reliability_score,
+                duration_origin,
             ),
             "distanceMeters": evaluated.distance_meters,
             "fare": self._money(evaluated.fare, "PROVIDER_ESTIMATE"),

@@ -867,8 +867,14 @@ h2 {
 }
 
 .route-leg-summary li[data-mode="WALK"]::before,
+.route-leg-summary li[data-mode="WAIT"]::before,
 .route-leg-summary li[data-mode="TRANSFER"]::before {
   background: #879892;
+}
+
+.route-leg-summary li[data-mode="WAIT"] {
+  border-style: dashed;
+  background: #f3f6f4;
 }
 
 .route-leg-summary-label {

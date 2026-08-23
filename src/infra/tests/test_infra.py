@@ -25,6 +25,7 @@ class InfrastructureContractTests(unittest.TestCase):
             "**/.terraform/",
             "**/terraform.tfstate",
             "**/*.py[cod]",
+            "**/*.sqlite3",
             "**/.env.*",
         ):
             self.assertIn(excluded, dockerignore)
@@ -409,27 +410,58 @@ class InfrastructureContractTests(unittest.TestCase):
             "src/infra/docker/web/Dockerfile",
             "src/infra/docker/service-api/Dockerfile",
             "src/infra/docker/routing-api/Dockerfile",
+            "src/infra/docker/provider-egress-proxy/Dockerfile",
         ):
             self.assertIn(dockerfile, workflow)
-        self.assertIn('branches: ["main"]', workflow)
+        self.assertIn('branches: ["main", "feature/realtime-multimodal-e2e"]', workflow)
         self.assertIn('tags: ["v*.*.*"]', workflow)
+        self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("StrictHostKeyChecking=yes", workflow)
         self.assertNotIn("StrictHostKeyChecking=no", workflow)
         self.assertNotIn("ssh-keyscan", workflow)
+        self.assertIn("VITE_PRIVACY_DOCUMENT_VERSION=privacy-v1", workflow)
+        self.assertNotIn("vars.PRIVACY_DOCUMENT_VERSION", workflow)
+        self.assertIn("Bootstrap the blank server", workflow)
+        self.assertIn("bootstrap-host.sh", workflow)
+        self.assertIn("KAKAO_REST_API_KEY", workflow)
+        self.assertIn("GBIS_SERVICE_KEY", workflow)
+        self.assertIn("GITS_API_KEY", workflow)
+        self.assertIn("TMAP_APP_KEY", workflow)
+        self.assertIn("ODSAY_API_KEY", workflow)
+        self.assertIn("82ta-refresh-provider-evidence", workflow)
+        self.assertIn("82ta-certificate-renew.timer", workflow)
+        self.assertNotIn("pre-provision REMOTE_APP_DIR/.env", workflow)
+        self.assertNotIn("service-migrate", workflow)
+        self.assertNotIn("routing-migrate", workflow)
         self.assertIn("HTTP health check timed out", workflow)
         self.assertIn("HTTPS health check timed out", workflow)
-        self.assertLess(workflow.index("Start HTTP-only stack"), workflow.index("Issue / Renew SSL"))
-        self.assertLess(workflow.index("Issue / Renew SSL"), workflow.index("Upload HTTPS Nginx template"))
-        self.assertLess(workflow.index("service-migrate"), workflow.index("up -d --remove-orphans"))
+        self.assertLess(workflow.index("Bootstrap the blank server"), workflow.index("Start HTTP and Provider proxy"))
+        self.assertLess(workflow.index("Start HTTP and Provider proxy"), workflow.index("Issue or renew the public certificate"))
+        self.assertLess(workflow.index("Issue or renew the public certificate"), workflow.index("Probe Providers and start Routing"))
+        self.assertLess(workflow.index("Probe Providers and start Routing"), workflow.index("Deploy the complete stack"))
 
     def test_gce_compose_preserves_private_routing_and_canonical_provider_names(self) -> None:
         compose = self.read("gce/docker-compose.prod.yml")
-        routing = compose.split("  routing-api:", 1)[1].split("  service-migrate:", 1)[0]
+        routing = compose.split("\n  routing-api:\n", 1)[1].split(
+            "\n  provider-evidence:\n", 1
+        )[0]
         self.assertNotIn("ports:", routing)
         self.assertIn("routing-private:\n    internal: true", compose)
-        self.assertIn("SERVICE_ROUTING_API_BASE_URL: https://routing.internal:8443", compose)
-        self.assertIn('SERVICE_ROUTING_VERIFY_SSL: "true"', compose)
+        self.assertIn("SERVICE_ROUTING_API_BASE_URL: http://routing-api:8000", compose)
+        self.assertIn('SERVICE_ROUTING_VERIFY_SSL: "false"', compose)
+        self.assertIn("ROUTING_RUNTIME_ENVIRONMENT: DEVELOPMENT", compose)
+        self.assertIn('ROUTING_LOCAL_LIVE_E2E: "true"', compose)
         self.assertIn('ROUTING_ALLOW_FIXTURE_BACKEND: "false"', compose)
+        self.assertIn("./service-data/service-api.sqlite3:/app/src/services/service-api/service-api.sqlite3", compose)
+        self.assertIn("routing-egress-proxy:", compose)
+        self.assertIn("provider-evidence:", compose)
+        self.assertIn("--approve-local-provider-use", compose)
+        self.assertIn("- provider-egress", compose)
+        self.assertNotIn("\n      - provider-egress", routing)
+        self.assertIn("routing-db:\n    image: postgis/postgis:16-3.4", compose)
+        self.assertIn("routing-redis:\n    image: redis:7.4-alpine", compose)
+        self.assertIn("ROUTING_DB_HOST: routing-db", compose)
+        self.assertIn("ROUTING_REDIS_URL: redis://routing-redis:6379/0", compose)
         for key in (
             "KAKAO_REST_API_KEY",
             "GBIS_SERVICE_KEY",
@@ -445,6 +477,43 @@ class InfrastructureContractTests(unittest.TestCase):
             "VITE_KAKAO_MAP_APP_KEY",
         ):
             self.assertNotIn(legacy, compose)
+
+        active = "\n".join(
+            line for line in compose.splitlines() if not line.lstrip().startswith("#")
+        )
+        for unused in (
+            "DATABASE_URL:",
+            "SERVICE_MIGRATION_DATABASE_URL:",
+            "SERVICE_REDIS_URL:",
+            "ROUTING_DB_MIGRATION_USER:",
+            "ROUTING_DB_MIGRATION_PASSWORD:",
+        ):
+            self.assertNotIn(unused, active)
+
+    def test_gce_blank_server_bootstrap_generates_runtime_and_refresh_jobs(self) -> None:
+        bootstrap = self.read("gce/bootstrap-host.sh")
+        refresh = self.read("gce/refresh-provider-evidence.sh")
+        example = self.read("gce/.env.example")
+        compose = self.read("gce/docker-compose.prod.yml")
+
+        self.assertIn("remote_dir=/opt/82ta", bootstrap)
+        self.assertIn("download.docker.com/linux/$ID", bootstrap)
+        self.assertIn("docker-compose-plugin", bootstrap)
+        self.assertIn("openssl rand -hex", bootstrap)
+        self.assertIn("service-data/service-api.sqlite3", bootstrap)
+        self.assertIn("disabled-not-used", bootstrap)
+        self.assertIn("82ta-provider-evidence-refresh.timer", bootstrap)
+        self.assertIn("82ta-certificate-renew.timer", bootstrap)
+        self.assertIn("remote_dir=/opt/82ta", refresh)
+        self.assertIn("--profile tools run --rm provider-evidence", refresh)
+        self.assertIn(".runtime/provider-evidence.env", refresh)
+        self.assertIn("--force-recreate routing-api", refresh)
+        self.assertIn("# DATABASE_URL=", example)
+        self.assertIn("# SERVICE_REDIS_URL=", example)
+        self.assertIn("ROUTING_DB_HOST=routing-db", example)
+        self.assertIn("ROUTING_REDIS_URL=redis://routing-redis:6379/0", example)
+        self.assertIn("# ROUTING_DB_MIGRATION_USER=", example)
+        self.assertNotIn("SERVICE_SINGLE_NODE_MODE", bootstrap + refresh + compose)
 
 
 if __name__ == "__main__":

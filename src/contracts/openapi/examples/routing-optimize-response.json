@@ -33,19 +33,19 @@
       "routeId": "route_6d206a95ed947d8a",
       "pattern": "TRANSIT_ONLY",
       "totalDuration": {
-        "p50Seconds": 3300,
-        "p90Seconds": 4200,
+        "p50Seconds": 3637,
+        "p90Seconds": 4717,
         "lowerSeconds": null,
         "upperSeconds": null,
         "confidence": {
-          "score": 0.9,
-          "grade": "HIGH"
+          "score": 0.72,
+          "grade": "MEDIUM"
         },
         "origin": "PROVIDER_ESTIMATE"
       },
       "arrivalAt": {
-        "p50": "2026-08-24T08:35:00+09:00",
-        "p90": "2026-08-24T08:50:00+09:00"
+        "p50": "2026-08-24T08:40:37+09:00",
+        "p90": "2026-08-24T08:58:37+09:00"
       },
       "taxiCost": {
         "currency": "KRW",
@@ -58,7 +58,7 @@
       "walkSeconds": 0,
       "transferCount": 0,
       "taxiLegCount": 0,
-      "reliabilityScore": 0.9,
+      "reliabilityScore": 0.72,
       "dominance": {
         "onParetoFrontier": true
       },
@@ -86,15 +86,37 @@
             "providerStopId": "sanitized-r1-stop-destination"
           },
           "expectedStartAt": "2026-08-24T07:40:00+09:00",
-          "expectedEndAt": "2026-08-24T08:35:00+09:00",
+          "expectedEndAt": "2026-08-24T08:40:37+09:00",
           "duration": {
+            "p50Seconds": 3637,
+            "p90Seconds": 4717,
+            "lowerSeconds": null,
+            "upperSeconds": null,
+            "confidence": {
+              "score": 0.72,
+              "grade": "MEDIUM"
+            },
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "waitDuration": {
+            "p50Seconds": 337,
+            "p90Seconds": 517,
+            "lowerSeconds": null,
+            "upperSeconds": null,
+            "confidence": {
+              "score": 0.72,
+              "grade": "MEDIUM"
+            },
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "travelDuration": {
             "p50Seconds": 3300,
             "p90Seconds": 4200,
             "lowerSeconds": null,
             "upperSeconds": null,
             "confidence": {
-              "score": 0.9,
-              "grade": "HIGH"
+              "score": 0.72,
+              "grade": "MEDIUM"
             },
             "origin": "PROVIDER_ESTIMATE"
           },
@@ -195,7 +217,8 @@
         "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET"
       ],
       "warningCodes": [
-        "BUS_DATA_UNAVAILABLE"
+        "BUS_DATA_UNAVAILABLE",
+        "HISTORICAL_PROXY_USED"
       ],
       "provenance": [
         {
@@ -249,7 +272,7 @@
         {
           "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
-          "observedAt": "2026-08-23T00:00:00+00:00",
+          "observedAt": null,
           "receivedAt": "2026-08-23T00:00:00+00:00",
           "ageSeconds": null,
           "confidence": {
@@ -261,7 +284,7 @@
         {
           "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
-          "observedAt": "2026-08-23T00:00:00+00:00",
+          "observedAt": null,
           "receivedAt": "2026-08-23T00:00:00+00:00",
           "ageSeconds": null,
           "confidence": {
@@ -273,7 +296,7 @@
         {
           "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
-          "observedAt": "2026-08-23T00:00:00+00:00",
+          "observedAt": null,
           "receivedAt": "2026-08-23T00:00:00+00:00",
           "ageSeconds": null,
           "confidence": {
@@ -285,7 +308,7 @@
         {
           "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
-          "observedAt": "2026-08-23T00:00:00+00:00",
+          "observedAt": null,
           "receivedAt": "2026-08-23T00:00:00+00:00",
           "ageSeconds": null,
           "confidence": {
@@ -297,7 +320,7 @@
         {
           "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
-          "observedAt": "2026-08-23T00:00:00+00:00",
+          "observedAt": null,
           "receivedAt": "2026-08-23T00:00:00+00:00",
           "ageSeconds": null,
           "confidence": {

@@ -10,6 +10,7 @@
 **/.terraform/
 **/terraform.tfstate
 **/terraform.tfstate.*
+**/*.sqlite3
 **/.env
 **/.env.*
 !**/.env.example

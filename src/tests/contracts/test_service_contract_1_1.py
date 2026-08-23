@@ -112,6 +112,39 @@ class ServiceContract11Tests(unittest.TestCase):
         self.assertIn("busIntelligenceCoverage", capabilities["properties"])
         self.assertNotIn("busIntelligenceCoverage", capabilities["required"])
 
+    def test_route_leg_wait_and_travel_components_are_additive_optional_fields(self) -> None:
+        route_leg = self.common["components"]["schemas"]["RouteLeg"]
+        self.assertEqual(
+            route_leg["properties"]["waitDuration"],
+            {"$ref": "#/components/schemas/TimeEstimate"},
+        )
+        self.assertEqual(
+            route_leg["properties"]["travelDuration"],
+            {"$ref": "#/components/schemas/TimeEstimate"},
+        )
+        self.assertNotIn("waitDuration", route_leg["required"])
+        self.assertNotIn("travelDuration", route_leg["required"])
+
+        for filename, route_path in (
+            ("routing-optimize-response.json", ("routes", 0)),
+            ("public-route-search-response.json", ("baseline",)),
+        ):
+            value = json.loads(
+                (ROOT / "src/contracts/openapi/examples" / filename).read_text(
+                    encoding="utf-8"
+                )
+            )
+            route = value
+            for part in route_path:
+                route = route[part]
+            leg = route["legs"][0]
+            self.assertEqual(
+                leg["waitDuration"]["p50Seconds"]
+                + leg["travelDuration"]["p50Seconds"],
+                leg["duration"]["p50Seconds"],
+                filename,
+            )
+
     def test_existing_request_required_sets_remain_compatible(self) -> None:
         request = self.public["components"]["schemas"]["PublicRouteSearchRequest"]
         self.assertEqual(
@@ -130,8 +163,8 @@ class ServiceContract11Tests(unittest.TestCase):
             ["properties"]["contractVersion"]["const"],
             "1.0",
         )
-        self.assertEqual(self.public["info"]["version"], "1.3.0")
-        self.assertEqual(self.private["info"]["version"], "1.1.0")
+        self.assertEqual(self.public["info"]["version"], "1.4.0")
+        self.assertEqual(self.private["info"]["version"], "1.2.0")
         manifest = json.loads(
             (ROOT / "src/contracts/CONTEXT_MANIFEST.json").read_text(encoding="utf-8")
         )
@@ -140,10 +173,10 @@ class ServiceContract11Tests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["contextVersion"], "1.3.0")
-        self.assertEqual(manifest["contractVersion"], "1.3.0")
-        self.assertEqual(versions["contextVersion"], "1.3.0")
-        self.assertEqual(versions["contractVersion"], "1.3.0")
+        self.assertEqual(manifest["contextVersion"], "1.4.0")
+        self.assertEqual(manifest["contractVersion"], "1.4.0")
+        self.assertEqual(versions["contextVersion"], "1.4.0")
+        self.assertEqual(versions["contractVersion"], "1.4.0")
         self.assertEqual(versions["databaseContractVersion"], "1.2.0")
         self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
         self.assertEqual(versions["rankingPolicyVersion"], "rank-0.2.0")

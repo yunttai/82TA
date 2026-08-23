@@ -269,6 +269,12 @@ class ProductionProviderHttpE2ETests(unittest.TestCase):
         cls.service_environment.update(
             {
                 "PYTHONUNBUFFERED": "1",
+                "PYTHONPATH": os.pathsep.join(
+                    (
+                        str(SERVICE_ROOT),
+                        str(REPOSITORY_ROOT / "src/generated/routing-client-python"),
+                    )
+                ),
                 "SERVICE_ENVIRONMENT": "development",
                 "SERVICE_ROUTING_GATEWAY": "http",
                 "SERVICE_ROUTING_API_BASE_URL": cls.routing_url,
@@ -378,6 +384,18 @@ class ProductionProviderHttpE2ETests(unittest.TestCase):
             )
             self.assertEqual(route["taxiCost"]["upper"], taxi_upper)
             self.assertLessEqual(taxi_upper, budget)
+            for leg in route["legs"]:
+                self.assertGreaterEqual(
+                    leg["waitDuration"]["p90Seconds"],
+                    leg["waitDuration"]["p50Seconds"],
+                )
+                self.assertGreaterEqual(
+                    leg["travelDuration"]["p90Seconds"],
+                    leg["travelDuration"]["p50Seconds"],
+                )
+                if leg["mode"] == "TAXI":
+                    self.assertGreater(leg["waitDuration"]["p50Seconds"], 0)
+                    self.assertGreater(leg["travelDuration"]["p50Seconds"], 0)
 
         provider_records = _json_lines(self.provider_record)
         self.assertTrue(provider_records)

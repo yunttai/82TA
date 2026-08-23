@@ -4673,6 +4673,9 @@ class CanonicalFanInOptimizeRouteUseCase:
             self._bus_projection(snapshot, evaluation)
             if snapshot is not None and evaluation is not None else None
         )
+        duration_origin = "MODEL_PREDICTED" if bus is not None else "PROVIDER_ESTIMATE"
+        wait_duration = evaluated.wait_duration
+        travel_duration = evaluated.travel_duration
         return {
             "legId": evaluated.leg_id,
             "sequence": evaluated.sequence,
@@ -4691,7 +4694,9 @@ class CanonicalFanInOptimizeRouteUseCase:
             },
             "expectedStartAt": (evaluated.end_at_p50 - timedelta(seconds=evaluated.duration.p50_seconds)).isoformat(),
             "expectedEndAt": evaluated.end_at_p50.isoformat(),
-            "duration": self._time(evaluated.duration.p50_seconds, evaluated.duration.p90_seconds, evaluated.reliability_score, "MODEL_PREDICTED" if bus is not None else "PROVIDER_ESTIMATE"),
+            "duration": self._time(evaluated.duration.p50_seconds, evaluated.duration.p90_seconds, evaluated.reliability_score, duration_origin),
+            "waitDuration": self._time(wait_duration.p50_seconds, wait_duration.p90_seconds, evaluated.reliability_score, duration_origin),
+            "travelDuration": self._time(travel_duration.p50_seconds, travel_duration.p90_seconds, evaluated.reliability_score, duration_origin),
             "distanceMeters": evaluated.distance_meters,
             "fare": self._money(evaluated.fare, "PROVIDER_ESTIMATE"),
             "geometry": {"encoding": "GEOJSON", "value": {"type": "LineString", "coordinates": [[p[0], p[1]] for p in projection.geometry]}},

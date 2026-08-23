@@ -62,6 +62,18 @@ class PublicProjectionRedactionTests(SimpleTestCase):
                         "confidence": {"score": 0.8, "grade": "MEDIUM"},
                         "origin": "PROVIDER_ESTIMATE",
                     },
+                    "waitDuration": {
+                        "p50Seconds": 120,
+                        "p90Seconds": 180,
+                        "confidence": {"score": 0.8, "grade": "MEDIUM"},
+                        "origin": "PROVIDER_ESTIMATE",
+                    },
+                    "travelDuration": {
+                        "p50Seconds": 480,
+                        "p90Seconds": 540,
+                        "confidence": {"score": 0.8, "grade": "MEDIUM"},
+                        "origin": "PROVIDER_ESTIMATE",
+                    },
                     "distanceMeters": 10_000,
                     "fare": {
                         "currency": "KRW",
@@ -116,6 +128,8 @@ class PublicProjectionRedactionTests(SimpleTestCase):
             {"routeLabel": "100", "routeType": None, "direction": "OUTBOUND"},
         )
         self.assertEqual(public_leg["geometry"], {"encoding": "NONE"})
+        self.assertEqual(public_leg["waitDuration"]["p50Seconds"], 120)
+        self.assertEqual(public_leg["travelDuration"]["p50Seconds"], 480)
         public_route = projected["recommendations"]["fastest"]
         self.assertEqual(
             public_route["arrivalAt"],

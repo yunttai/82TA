@@ -732,6 +732,8 @@ export interface components {
             /** Format: date-time */
             expectedEndAt?: string | null;
             duration: components["schemas"]["TimeEstimate"];
+            waitDuration?: components["schemas"]["TimeEstimate"];
+            travelDuration?: components["schemas"]["TimeEstimate"];
             distanceMeters: number;
             fare: components["schemas"]["MoneyRange"];
             geometry: components["schemas"]["Geometry"];

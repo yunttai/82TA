@@ -1150,6 +1150,13 @@ def test_r1_r4_runs_full_fixture_fan_in_with_contract_valid_projection(
     end = datetime.fromisoformat(first_leg["expectedEndAt"])
     assert start <= end
     assert int((end - start).total_seconds()) == first_leg["duration"]["p50Seconds"]
+    assert first_leg["waitDuration"]["p90Seconds"] >= first_leg["waitDuration"]["p50Seconds"]
+    assert first_leg["travelDuration"]["p90Seconds"] >= first_leg["travelDuration"]["p50Seconds"]
+    assert (
+        first_leg["waitDuration"]["p50Seconds"]
+        + first_leg["travelDuration"]["p50Seconds"]
+        == first_leg["duration"]["p50Seconds"]
+    )
 
     # The provider-core named GBIS fixture is for a different route/time.  The
     # request-scoped join rejects it instead of replaying it as future evidence.
@@ -1651,7 +1658,7 @@ def test_container_default_is_503_without_source_activation_and_r1_is_integrated
             HTTP_AUTHORIZATION=headers["HTTP_AUTHORIZATION"],
         )
         assert version.status_code == 200
-        assert version.json()["contractVersion"] == "1.1.0"
+        assert version.json()["contractVersion"] == "1.2.0"
         assert version.json()["rankingPolicyVersion"] == "rank-0.2.0"
         assert (
             version.json()["rankingPolicyVersion"]
@@ -2802,8 +2809,12 @@ def test_canonical_walk_bus_walk_bus_is_preserved_and_bus_plans_are_per_leg() ->
     )
     first_bus, second_bus = preserved["legs"][1], preserved["legs"][3]
     assert first_bus["busIntelligence"] is not None
+    assert first_bus["waitDuration"]["p50Seconds"] == first_bus["busIntelligence"]["expectedWaitSeconds"]
+    assert first_bus["travelDuration"]["p50Seconds"] > 0
     assert first_bus["busIntelligence"]["userArrivalTime"] > payload["departureTime"]
     assert second_bus["busIntelligence"] is None
+    assert second_bus["waitDuration"]["p50Seconds"] >= 0
+    assert second_bus["travelDuration"]["p50Seconds"] > 0
     first_providers = {item["provider"] for item in first_bus["provenance"]}
     second_providers = {item["provider"] for item in second_bus["provenance"]}
     assert any(item.startswith("TRANSPORT_MAPPING/") for item in first_providers)

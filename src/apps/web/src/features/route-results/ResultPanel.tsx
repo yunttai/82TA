@@ -183,9 +183,9 @@ function transitText(leg: RouteLeg, key: "routeLabel" | "direction"): string | n
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-function routeLegLabel(leg: RouteLeg): string {
+function routeLegLabel(leg: RouteLeg, taxiIncludesWait = false): string {
   const routeLabel = transitText(leg, "routeLabel");
-  if (leg.mode === "TAXI") return "택시 (호출+주행)";
+  if (leg.mode === "TAXI") return taxiIncludesWait ? "택시 (호출+주행)" : "택시";
   if (routeLabel === null) return modeMessages[leg.mode];
   if (leg.mode === "BUS") {
     return `버스 ${routeLabel.endsWith("번") ? routeLabel : `${routeLabel}번`}`;
@@ -194,6 +194,66 @@ function routeLegLabel(leg: RouteLeg): string {
   if (leg.mode === "GTX") return `GTX ${routeLabel}`;
   if (leg.mode === "TRAIN") return `기차 ${routeLabel}`;
   return modeMessages[leg.mode];
+}
+
+const waitSeparatedModes = new Set<RouteLeg["mode"]>(["TAXI", "BUS", "SUBWAY", "GTX", "TRAIN"]);
+
+function waitLegLabel(mode: RouteLeg["mode"]): string {
+  if (mode === "TAXI") return "택시 예상 대기";
+  if (mode === "BUS") return "버스 대기";
+  if (mode === "SUBWAY") return "지하철 대기";
+  if (mode === "GTX") return "GTX 대기";
+  if (mode === "TRAIN") return "기차 대기";
+  return "대기";
+}
+
+interface RouteLegSummaryItem {
+  key: string;
+  mode: RouteLeg["mode"];
+  label: string;
+  p50Seconds: number;
+  p90Seconds: number;
+  title: string;
+  screenReaderText: string;
+}
+
+function routeLegSummaryItems(route: RouteCandidate): RouteLegSummaryItem[] {
+  return route.legs.flatMap((leg) => {
+    const wait = leg.waitDuration;
+    const travel = leg.travelDuration;
+    if (waitSeparatedModes.has(leg.mode) && wait !== undefined && travel !== undefined) {
+      const waitLabel = waitLegLabel(leg.mode);
+      return [
+        {
+          key: `${leg.legId}:wait`,
+          mode: "WAIT" as const,
+          label: waitLabel,
+          p50Seconds: wait.p50Seconds,
+          p90Seconds: wait.p90Seconds,
+          title: `${waitLabel} P50 ${formatLegMinutes(wait.p50Seconds)} · P90 ${formatLegMinutes(wait.p90Seconds)}`,
+          screenReaderText: `${waitLabel}, 예상 ${formatLegMinutes(wait.p50Seconds)}, 여유 기준 ${formatLegMinutes(wait.p90Seconds)}`,
+        },
+        {
+          key: leg.legId,
+          mode: leg.mode,
+          label: routeLegLabel(leg),
+          p50Seconds: travel.p50Seconds,
+          p90Seconds: travel.p90Seconds,
+          title: `${leg.from.name} → ${leg.to.name} · P90 ${formatLegMinutes(travel.p90Seconds)}`,
+          screenReaderText: `${leg.from.name}에서 ${leg.to.name}까지`,
+        },
+      ];
+    }
+    return [{
+      key: leg.legId,
+      mode: leg.mode,
+      label: routeLegLabel(leg, leg.mode === "TAXI"),
+      p50Seconds: leg.duration.p50Seconds,
+      p90Seconds: leg.duration.p90Seconds,
+      title: `${leg.from.name} → ${leg.to.name} · P90 ${formatLegMinutes(leg.duration.p90Seconds)}`,
+      screenReaderText: `${leg.from.name}에서 ${leg.to.name}까지`,
+    }];
+  });
 }
 
 function formatMoney(amount: number): string {
@@ -221,7 +281,13 @@ function isRouteUsable(route: RouteCandidate, strictTaxiBudgetKrw?: number): boo
   if (route.totalDuration.p50Seconds < 0 || route.totalDuration.p90Seconds < route.totalDuration.p50Seconds) return false;
   if (route.taxiCost.lower < 0 || route.taxiCost.expected < route.taxiCost.lower || route.taxiCost.upper < route.taxiCost.expected) return false;
   if (strictTaxiBudgetKrw !== undefined && route.taxiCost.upper > strictTaxiBudgetKrw) return false;
-  if (route.legs.some((leg) => leg.duration.p50Seconds < 0 || leg.duration.p90Seconds < leg.duration.p50Seconds || leg.distanceMeters < 0)) return false;
+  if (route.legs.some((leg) => {
+    if (leg.duration.p50Seconds < 0 || leg.duration.p90Seconds < leg.duration.p50Seconds || leg.distanceMeters < 0) return true;
+    const components = [leg.waitDuration, leg.travelDuration].filter((item) => item !== undefined);
+    if (components.some((item) => item.p50Seconds < 0 || item.p90Seconds < item.p50Seconds)) return true;
+    return components.length === 2
+      && components.reduce((total, item) => total + item.p50Seconds, 0) > leg.duration.p50Seconds;
+  })) return false;
   if (new Set(route.legs.map((leg) => leg.legId)).size !== route.legs.length) return false;
   return route.legs.every((leg, index) => {
     const previous = route.legs[index - 1];
@@ -374,6 +440,8 @@ function RouteCard({
     );
   }
 
+  const summaryItems = routeLegSummaryItems(route);
+
   return (
     <article className={`route-card${selected ? " route-card-selected" : ""}`}>
       <div className="card-heading">
@@ -387,16 +455,16 @@ function RouteCard({
       </div>
       <p className="route-pattern">{patternMessages[route.pattern]}</p>
       <ol className="route-leg-summary" aria-label="이동 구간 요약">
-        {route.legs.map((leg) => (
-          <li data-mode={leg.mode} title={`${leg.from.name} → ${leg.to.name}`} key={leg.legId}>
-            <span className="route-leg-summary-label">{routeLegLabel(leg)}</span>
-            <strong>{formatLegMinutes(leg.duration.p50Seconds)}</strong>
-            <span className="sr-only">{leg.from.name}에서 {leg.to.name}까지</span>
+        {summaryItems.map((item) => (
+          <li data-mode={item.mode} title={item.title} key={item.key}>
+            <span className="route-leg-summary-label">{item.label}</span>
+            <strong>{formatLegMinutes(item.p50Seconds)}</strong>
+            <span className="sr-only">{item.screenReaderText}</span>
           </li>
         ))}
       </ol>
       {route.taxiLegCount > 0 && (
-        <p className="taxi-duration-note">택시 시간은 호출 대기와 해당 시각의 도로 주행을 합친 값입니다.</p>
+        <p className="taxi-duration-note">택시 예상 대기와 해당 시각의 도로 주행시간을 분리해 표시합니다.</p>
       )}
       <dl className="metric-grid metric-grid-primary">
         <div><dt>안정 도착 P90</dt><dd>{formatDuration(route.totalDuration.p90Seconds)}</dd></div>
@@ -428,9 +496,12 @@ function RouteCard({
         <ol>
           {route.legs.map((leg) => (
             <li className={leg.legId === selectedLegId ? "selected-leg" : undefined} aria-current={leg.legId === selectedLegId ? "step" : undefined} key={leg.legId}>
-              <strong>{routeLegLabel(leg)}</strong>
+              <strong>{routeLegLabel(leg, leg.mode === "TAXI" && (leg.waitDuration === undefined || leg.travelDuration === undefined))}</strong>
               <span>{leg.from.name} → {leg.to.name}</span>
               <span>P50 {formatDuration(leg.duration.p50Seconds)} · P90 {formatDuration(leg.duration.p90Seconds)} · {leg.distanceMeters}m</span>
+              {leg.waitDuration !== undefined && leg.travelDuration !== undefined && (
+                <span>대기 P50 {formatDuration(leg.waitDuration.p50Seconds)} · P90 {formatDuration(leg.waitDuration.p90Seconds)} / 이동 P50 {formatDuration(leg.travelDuration.p50Seconds)} · P90 {formatDuration(leg.travelDuration.p90Seconds)}</span>
+              )}
               <span>요금 {formatMoney(leg.fare.expected)}~{formatMoney(leg.fare.upper)} · {originLabel(leg.duration.origin)}</span>
               {(leg.expectedStartAt != null || leg.expectedEndAt != null) && <span>예상 시각 {formatArrival(leg.expectedStartAt)} → {formatArrival(leg.expectedEndAt)}</span>}
               <ProvenanceList items={leg.provenance} />
