@@ -8,7 +8,7 @@ copying any of its secrets, then supplies Routing-owned result persistence.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from math import ceil
 import os
@@ -37,6 +37,7 @@ LOCAL_LIVE_E2E_ENV = "ROUTING_LOCAL_LIVE_E2E"
 DEFAULT_PROVIDER_CONFIG_FACTORY = (
     "provider_core.production:build_kakao_baseline_config"
 )
+SEOUL_TIMEZONE = timezone(timedelta(hours=9))
 
 
 class LazyDjangoOptimizationResultRepository:
@@ -51,12 +52,13 @@ class LazyDjangoOptimizationResultRepository:
 
 
 class ConservativeTaxiDispatchEstimator:
-    """Documented initial Taxi dispatch prior for the live baseline.
+    """Time-dependent Taxi dispatch prior for the live baseline.
 
     Kakao directions supplies drive time and fare, not pickup time.  Until a
-    verified dispatch model is deployed, keep that missing component explicit as
-    a conservative 3--7 minute historical proxy instead of silently rejecting
-    every Taxi-dependent candidate or substituting zero wait.
+    verified supply model is deployed, keep that missing component explicit as
+    a bounded 2--8 minute historical proxy.  The candidate entry time selects
+    the bucket, so Taxi access after a preceding leg is not evaluated with a
+    request-start constant.
     """
 
     def estimate(
@@ -65,11 +67,23 @@ class ConservativeTaxiDispatchEstimator:
         *,
         evaluated_at: datetime,
     ) -> TaxiDispatchEstimate:
-        del request, evaluated_at
+        del request
+        if evaluated_at.tzinfo is None or evaluated_at.utcoffset() is None:
+            raise ValueError("evaluated_at must be timezone-aware")
+        local = evaluated_at.astimezone(SEOUL_TIMEZONE)
+        hour = local.hour
+        if 0 <= hour < 5:
+            wait = TimeEstimate(240, 480)
+        elif local.weekday() < 5 and (7 <= hour < 10 or 17 <= hour < 21):
+            wait = TimeEstimate(180, 360)
+        elif local.weekday() >= 5 and 20 <= hour < 24:
+            wait = TimeEstimate(180, 360)
+        else:
+            wait = TimeEstimate(120, 240)
         return TaxiDispatchEstimate(
-            wait=TimeEstimate(180, 420),
-            source="CONSERVATIVE_BASELINE_POLICY",
-            version="taxi-dispatch-historical-proxy-1.0.0",
+            wait=wait,
+            source="TIME_BUCKET_HISTORICAL_PROXY",
+            version="taxi-dispatch-historical-proxy-1.1.0",
             origin="HISTORICAL_PROXY",
         )
 

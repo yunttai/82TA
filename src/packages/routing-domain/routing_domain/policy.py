@@ -67,6 +67,10 @@ class RankingPolicy:
     reliability_floor: float = 0.5
     low_transfer_margin_seconds: int = 180
     budget_near_limit_ratio: float = 0.9
+    comfortable_walk_seconds: int = 600
+    walk_time_weight: float = 1.25
+    taxi_activation_penalty_seconds: int = 120
+    minimum_efficient_gain_seconds: int = 60
 
     def __post_init__(self) -> None:
         if not self.version:
@@ -77,6 +81,14 @@ class RankingPolicy:
             raise ValueError("low transfer margin must be non-negative")
         if not 0.0 <= self.budget_near_limit_ratio <= 1.0:
             raise ValueError("budget_near_limit_ratio must be between 0 and 1")
+        if self.comfortable_walk_seconds < 0:
+            raise ValueError("comfortable_walk_seconds must be non-negative")
+        if self.walk_time_weight < 1.0:
+            raise ValueError("walk_time_weight must be at least one")
+        if self.taxi_activation_penalty_seconds < 0:
+            raise ValueError("taxi activation penalty must be non-negative")
+        if self.minimum_efficient_gain_seconds < 0:
+            raise ValueError("minimum efficient gain must be non-negative")
 
 
 @dataclass(frozen=True, slots=True)

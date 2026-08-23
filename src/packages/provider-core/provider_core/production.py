@@ -23,11 +23,6 @@ from .capabilities import (
     ProductionState,
 )
 from .http import SensitiveValue
-from .kakao_raw import (
-    KAKAO_DIRECTIONS_SCHEMA_VERSION,
-    KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
-    KAKAO_WALK_SCHEMA_VERSION,
-)
 from .named import (
     ENDPOINT_SPECS,
     ProviderAdapterSuiteConfig,
@@ -68,11 +63,14 @@ KAKAO_BASELINE_KEY_ENV: Mapping[tuple[str, str], str] = {
     operation: PROVIDER_OPERATION_KEY_ENV[operation]
     for operation in KAKAO_BASELINE_OPERATIONS
 }
-KAKAO_BASELINE_SCHEMA_VERSIONS = {
-    ("KAKAO_PUBLIC_TRANSIT", "search_current"): KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
-    ("KAKAO_WALK", "route"): KAKAO_WALK_SCHEMA_VERSION,
-    ("KAKAO_DIRECTIONS", "route_current"): KAKAO_DIRECTIONS_SCHEMA_VERSION,
+KAKAO_BASELINE_SCHEMA_VERSIONS: Mapping[tuple[str, str], str] = {
+    (spec.provider, spec.operation): spec.response_schema_version
+    for spec in ENDPOINT_SPECS
+    if (spec.provider, spec.operation) in KAKAO_BASELINE_OPERATIONS
+    and spec.response_schema_version is not None
 }
+if set(KAKAO_BASELINE_SCHEMA_VERSIONS) != set(KAKAO_BASELINE_OPERATIONS):
+    raise RuntimeError("Kakao baseline response schema mapping is incomplete")
 EVIDENCE_ENV = "ROUTING_PROVIDER_EVIDENCE_JSON"
 PROVIDER_HTTPS_PROXY_ENV = "ROUTING_PROVIDER_HTTPS_PROXY_URL"
 

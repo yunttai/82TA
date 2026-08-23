@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,6 +96,7 @@ function busResponse(mappingGrade: "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN"): Publi
       distanceMeters: 8000,
       fare: { currency: "KRW", lower: 2800, expected: 2800, upper: 2800, origin: "PROVIDER_ESTIMATE" },
       geometry: { encoding: "NONE" },
+      transit: { routeLabel: "9241", routeType: "SEAT_BUS", direction: "판교 방면" } as unknown as NonNullable<RouteCandidate["legs"][number]["transit"]>,
       busIntelligence: {
         mapping: { grade: mappingGrade, score: mappingGrade === "HIGH" ? 0.99 : 0.8 },
         candidateVehicles: [{
@@ -533,6 +534,82 @@ describe("terminal route-search states", () => {
 });
 
 describe("Bus Intelligence mapping gate", () => {
+  it("keeps the ordered walk, route-number and Taxi durations visible on the card", () => {
+    const response = busResponse("HIGH");
+    const base = response.recommendations.fastest;
+    if (base == null || base.legs[0] === undefined) throw new Error("Expected route");
+    const template = base.legs[0];
+    const multimodal: RouteCandidate = {
+      ...base,
+      pattern: "TRANSIT_TAXI",
+      totalDuration: { ...base.totalDuration, p50Seconds: 2_880, p90Seconds: 3_600 },
+      taxiCost: { currency: "KRW", lower: 4_000, expected: 5_000, upper: 6_000, origin: "PROVIDER_ESTIMATE" },
+      totalFareExpected: 7_800,
+      walkSeconds: 120,
+      taxiLegCount: 1,
+      legs: [
+        {
+          ...template,
+          legId: "walk-leg",
+          sequence: 0,
+          mode: "WALK",
+          to: { name: "판교제2테크노밸리 승차", coordinate: { lon: 127.11, lat: 37.31 } },
+          duration: { ...template.duration, p50Seconds: 120, p90Seconds: 150 },
+          distanceMeters: 124,
+          fare: { currency: "KRW", lower: 0, expected: 0, upper: 0, origin: "PROVIDER_ESTIMATE" },
+          transit: null,
+          busIntelligence: null,
+        },
+        {
+          ...template,
+          legId: "bus-leg",
+          sequence: 1,
+          from: { name: "판교제2테크노밸리 승차", coordinate: { lon: 127.11, lat: 37.31 } },
+          to: { name: "삼가역·두산위브 하차", coordinate: { lon: 127.18, lat: 37.24 } },
+          duration: { ...template.duration, p50Seconds: 2_460, p90Seconds: 2_900 },
+          transit: { routeLabel: "9241", routeType: "SEAT_BUS", direction: "용인 방면" } as unknown as NonNullable<RouteCandidate["legs"][number]["transit"]>,
+          busIntelligence: null,
+        },
+        {
+          ...template,
+          legId: "taxi-leg",
+          sequence: 2,
+          mode: "TAXI",
+          from: { name: "삼가역·두산위브 하차", coordinate: { lon: 127.18, lat: 37.24 } },
+          duration: { ...template.duration, p50Seconds: 300, p90Seconds: 550 },
+          distanceMeters: 2_100,
+          fare: { currency: "KRW", lower: 4_000, expected: 5_000, upper: 6_000, origin: "PROVIDER_ESTIMATE" },
+          transit: null,
+          busIntelligence: null,
+        },
+      ],
+    };
+    render(
+      <ResultPanel
+        phase="COMPLETE"
+        response={{
+          ...response,
+          recommendations: {
+            fastest: multimodal,
+            stable: multimodal,
+            efficient: multimodal,
+            publicTransitOnly: null,
+          },
+        }}
+        problem={null}
+      />,
+    );
+
+    const summary = screen.getByRole("list", { name: "이동 구간 요약" });
+    expect(within(summary).getByText("도보")).toBeVisible();
+    expect(within(summary).getByText("2분")).toBeVisible();
+    expect(within(summary).getByText("버스 9241번")).toBeVisible();
+    expect(within(summary).getByText("41분")).toBeVisible();
+    expect(within(summary).getByText("택시 (호출+주행)")).toBeVisible();
+    expect(within(summary).getByText("5분")).toBeVisible();
+    expect(screen.getByText(/택시 시간은 호출 대기와 해당 시각의 도로 주행을 합친 값/)).toBeVisible();
+  });
+
   it.each(["MEDIUM", "LOW", "UNKNOWN"] as const)("hides vehicle values for %s mapping", async (grade) => {
     const user = userEvent.setup();
     render(<ResultPanel phase="COMPLETE" response={busResponse(grade)} problem={null} />);

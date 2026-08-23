@@ -11,6 +11,7 @@ from provider_core import (
     Coordinate,
     ENDPOINT_SPECS,
     KAKAO_BASELINE_OPERATIONS,
+    KAKAO_BASELINE_SCHEMA_VERSIONS,
     PROVIDER_OPERATION_KEY_ENV,
     ProviderAdapterSuite,
     ProviderFixtureScenario,
@@ -21,12 +22,8 @@ from provider_core import (
 )
 from provider_core.http import HttpResponse
 from provider_core.capabilities import FOUNDATION_DOCUMENTED_OPERATIONS
-from provider_core.kakao_raw import (
-    KAKAO_DIRECTIONS_SCHEMA_VERSION,
-    KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
-    KAKAO_WALK_SCHEMA_VERSION,
-    parse_kakao_public_transit,
-)
+from provider_core.kakao_mobility import KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION
+from provider_core.kakao_raw import parse_kakao_public_transit
 from provider_core.named import (
     KakaoMobilityDirectionsAdapter,
     KakaoTransitAdapter,
@@ -42,11 +39,7 @@ DIGEST = "a" * 64
 
 
 def evidence_document(*, approved: bool = True) -> dict[str, object]:
-    versions = {
-        ("KAKAO_PUBLIC_TRANSIT", "search_current"): KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
-        ("KAKAO_WALK", "route"): KAKAO_WALK_SCHEMA_VERSION,
-        ("KAKAO_DIRECTIONS", "route_current"): KAKAO_DIRECTIONS_SCHEMA_VERSION,
-    }
+    versions = KAKAO_BASELINE_SCHEMA_VERSIONS
     capabilities = [
         {
             "provider": provider,
@@ -255,6 +248,44 @@ class KakaoVendorRawTests(unittest.TestCase):
         )
         self.assertIs(drift.state, ProbeState.INDETERMINATE)
         self.assertEqual(drift.message_code, "RESPONSE_SCHEMA_MISMATCH")
+
+    def test_directions_probe_matches_the_executable_current_route_contract(self) -> None:
+        raw = success_body("named_kakao_mobility.json", "route_current")
+        transport = FakeTransport(
+            HttpResponse(200, "application/json", json.dumps(raw).encode())
+        )
+
+        result = probe_kakao_operation(
+            "directions",
+            transport=transport,
+            credential=SensitiveValue("secret"),
+            clock=lambda: NOW,
+        )
+
+        self.assertIs(result.state, ProbeState.KEY_VERIFIED)
+        self.assertEqual(
+            result.schema_version, KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION
+        )
+        spec = next(
+            item
+            for item in ENDPOINT_SPECS
+            if (item.provider, item.operation)
+            == ("KAKAO_DIRECTIONS", "route_current")
+        )
+        self.assertEqual(result.schema_version, spec.response_schema_version)
+        self.assertEqual(
+            dict(transport.requests[0].query),
+            {
+                "origin": "127.11119217,37.39477123",
+                "destination": "127.12628814,37.41993056",
+                "priority": "TIME",
+                "car_fuel": "GASOLINE",
+                "car_hipass": "false",
+                "alternatives": "false",
+                "road_details": "false",
+                "summary": "false",
+            },
+        )
 
 
 class KakaoProductionFactoryTests(unittest.TestCase):

@@ -104,9 +104,9 @@ def normalize_current_directions(body: Any) -> tuple[CanonicalItinerary, ...]:
             "Kakao Directions current route must not contain unrequested waypoints"
         )
     priority = summary["priority"]
-    if priority != "RECOMMEND" or priority not in _PRIORITIES:
+    if priority != "TIME" or priority not in _PRIORITIES:
         raise SchemaValidationError(
-            "Kakao Directions response priority does not match RECOMMEND request"
+            "Kakao Directions response priority does not match TIME request"
         )
     _bound(summary["bound"], "Kakao Directions summary bound")
 

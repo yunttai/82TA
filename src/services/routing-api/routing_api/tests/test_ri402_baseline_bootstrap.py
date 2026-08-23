@@ -159,9 +159,42 @@ def test_concrete_baseline_factory_consumes_exact_provider_config_without_keys()
         SimpleNamespace(),
         evaluated_at=datetime(2026, 8, 23, 20, 0, tzinfo=timezone.utc),
     )
-    assert (dispatch.wait.p50_seconds, dispatch.wait.p90_seconds) == (180, 420)
+    assert (dispatch.wait.p50_seconds, dispatch.wait.p90_seconds) == (120, 240)
     assert dispatch.origin == "HISTORICAL_PROXY"
-    assert dispatch.source == "CONSERVATIVE_BASELINE_POLICY"
+    assert dispatch.source == "TIME_BUCKET_HISTORICAL_PROXY"
+
+
+def test_taxi_dispatch_prior_is_entry_time_dependent_and_hard_bounded() -> None:
+    estimator = ConservativeTaxiDispatchEstimator()
+    seoul = timezone(timedelta(hours=9))
+    observed = {
+        "off_peak": estimator.estimate(
+            SimpleNamespace(),
+            evaluated_at=datetime(2026, 8, 24, 14, 0, tzinfo=seoul),
+        ).wait,
+        "weekday_peak": estimator.estimate(
+            SimpleNamespace(),
+            evaluated_at=datetime(2026, 8, 24, 8, 0, tzinfo=seoul),
+        ).wait,
+        "late_night": estimator.estimate(
+            SimpleNamespace(),
+            evaluated_at=datetime(2026, 8, 25, 2, 0, tzinfo=seoul),
+        ).wait,
+    }
+
+    assert observed["off_peak"] == TimeEstimate(120, 240)
+    assert observed["weekday_peak"] == TimeEstimate(180, 360)
+    assert observed["late_night"] == TimeEstimate(240, 480)
+    assert all(
+        0 < value.p50_seconds <= value.p90_seconds <= 480
+        for value in observed.values()
+    )
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        estimator.estimate(
+            SimpleNamespace(),
+            evaluated_at=datetime(2026, 8, 24, 14, 0),
+        )
 
 
 def test_bus_wait_uses_prior_service_days_at_the_candidate_arrival_time() -> None:

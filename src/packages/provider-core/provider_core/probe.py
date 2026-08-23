@@ -11,11 +11,8 @@ from typing import Callable, Mapping
 
 from .canonical import Coordinate
 from .http import BoundedHttpTransport, HttpRequest, SensitiveValue
+from .kakao_mobility import normalize_current_directions
 from .kakao_raw import (
-    KAKAO_DIRECTIONS_SCHEMA_VERSION,
-    KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
-    KAKAO_WALK_SCHEMA_VERSION,
-    parse_kakao_directions,
     parse_kakao_public_transit,
     parse_kakao_walk,
 )
@@ -56,11 +53,13 @@ class ProviderProbeResult:
 
 
 _ProbeParser = Callable[[object], tuple[object, ...]]
-_PROBE_SCOPES: Mapping[str, tuple[str, str, str, tuple[tuple[str, object], ...], _ProbeParser]] = {
+_PROBE_SCOPES: Mapping[
+    str,
+    tuple[str, str, tuple[tuple[str, object], ...], _ProbeParser],
+] = {
     "transit": (
         "KAKAO_PUBLIC_TRANSIT",
         "search_current",
-        KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
         (
             ("start_x", 127.11119217), ("start_y", 37.39477123),
             ("end_x", 127.12628814), ("end_y", 37.41993056),
@@ -76,7 +75,6 @@ _PROBE_SCOPES: Mapping[str, tuple[str, str, str, tuple[tuple[str, object], ...],
     "walk": (
         "KAKAO_WALK",
         "route",
-        KAKAO_WALK_SCHEMA_VERSION,
         (
             ("start_x", 127.11119669891646), ("start_y", 37.394776627382875),
             ("end_x", 127.12629039752096), ("end_y", 37.4199323570413),
@@ -88,13 +86,17 @@ _PROBE_SCOPES: Mapping[str, tuple[str, str, str, tuple[tuple[str, object], ...],
     "directions": (
         "KAKAO_DIRECTIONS",
         "route_current",
-        KAKAO_DIRECTIONS_SCHEMA_VERSION,
         (
             ("origin", "127.11119217,37.39477123"),
             ("destination", "127.12628814,37.41993056"),
-            ("priority", "TIME"), ("alternatives", True), ("summary", False),
+            ("priority", "TIME"),
+            ("car_fuel", "GASOLINE"),
+            ("car_hipass", "false"),
+            ("alternatives", "false"),
+            ("road_details", "false"),
+            ("summary", "false"),
         ),
-        lambda body: parse_kakao_directions(body, effective_at=None),
+        normalize_current_directions,
     ),
 }
 
@@ -110,13 +112,19 @@ def probe_kakao_operation(
 
     if name not in _PROBE_SCOPES:
         raise ValueError("unknown Kakao probe operation")
-    provider, operation, schema_version, query, parser = _PROBE_SCOPES[name]
+    provider, operation, query, parser = _PROBE_SCOPES[name]
     spec = next(
         item for item in ENDPOINT_SPECS
         if item.provider == provider and item.operation == operation
     )
-    if spec.url is None or spec.auth is None:
+    if (
+        spec.url is None
+        or spec.auth is None
+        or not spec.response_schema_verified
+        or spec.response_schema_version is None
+    ):
         raise ValueError("Kakao probe endpoint is not executable")
+    schema_version = spec.response_schema_version
     now = (clock or (lambda: datetime.now(timezone.utc)))()
     request = HttpRequest(
         method=spec.method,
