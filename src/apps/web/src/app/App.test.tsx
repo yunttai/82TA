@@ -148,27 +148,19 @@ describe("route search vertical slice", () => {
     expect(mapDetails).not.toHaveAttribute("open");
   });
 
-  it("renders canonical defaults and validates coordinates before the API call", async () => {
+  it("renders canonical defaults without exposing raw coordinate inputs", () => {
     const fetchMock = successfulFetch();
     vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
 
     render(<App />);
 
     expect(screen.getByRole("combobox", { name: "출발지" })).toHaveValue("명지대학교 자연캠퍼스");
     expect(screen.getByRole("combobox", { name: "목적지" })).toHaveValue("판교역");
     expect(screen.getByRole("textbox", { name: /택시비 상한/ })).toHaveValue("10000");
-
-    const longitude = screen.getByRole("textbox", { name: "출발 경도" });
-    await user.clear(longitude);
-    await user.type(longitude, "0");
-    await user.click(screen.getByRole("button", { name: "내 예산으로 경로 찾기" }));
-
-    expect(await screen.findByText("출발 좌표가 지원 범위를 벗어났습니다.")).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => {
-      const url = input instanceof Request ? input.url : input.toString();
-      return url.endsWith("/api/v1/route-searches");
-    })).toBe(false);
+    expect(screen.queryByRole("textbox", { name: "출발 경도" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "출발 위도" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "도착 경도" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "도착 위도" })).not.toBeInTheDocument();
   });
 
   it("posts only to the public route-search endpoint and preserves a partial null result", async () => {
