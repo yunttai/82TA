@@ -5,13 +5,17 @@ from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from consent.repository import ConsentRepository
 from identity.data_rights import DataRightsJobConflict, DataRightsRepository
+from identity.repository import IdentityRepository
 from identity.sessions import SessionRepository
 from preferences.repository import PreferenceRepository, PreferenceVersionConflict
 
@@ -31,7 +35,11 @@ from .models import (
     DataRightsJob,
     FavoriteJourney,
     SavedPlace,
+    AccountAuditEvent,
+    ServiceUser,
 )
+
+_DUMMY_PASSWORD_HASH = make_password("82ta-dummy-password-that-is-never-valid")
 
 def _iso(value) -> str | None:
     return value.isoformat() if value else None
@@ -102,6 +110,126 @@ def _job(value: DataRightsJob) -> dict[str, Any]:
     }
 
 
+def _normalized_email(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ApiProblem(400, "CONSTRAINT_OUT_OF_RANGE", "Invalid email or password")
+    email = value.strip().casefold()
+    try:
+        validate_email(email)
+    except ValidationError:
+        raise ApiProblem(400, "CONSTRAINT_OUT_OF_RANGE", "Invalid email or password") from None
+    return email
+
+
+def _credential_payload(request: HttpRequest) -> tuple[str, str]:
+    payload = json_body(request)
+    validate_schema("public", "EmailCredentialInput", payload)
+    password = payload.get("password")
+    if not isinstance(password, str):
+        raise ApiProblem(400, "CONSTRAINT_OUT_OF_RANGE", "Invalid email or password")
+    return _normalized_email(payload.get("email")), password
+
+
+def _registration_payload(request: HttpRequest) -> tuple[str, str, str, str, dict[str, bool]]:
+    payload = json_body(request)
+    validate_schema("public", "EmailRegistrationInput", payload)
+    nickname = payload["nickname"].strip()
+    if len(nickname) < 2 or len(nickname) > 20:
+        raise ApiProblem(400, "CONSTRAINT_OUT_OF_RANGE", "Nickname must contain 2 to 20 characters")
+    document_version = payload["documentVersion"]
+    validate_document_version("SERVICE_PRIVACY", document_version)
+    if payload["requiredPrivacyAccepted"] is not True:
+        raise ApiProblem(400, "CONSTRAINT_OUT_OF_RANGE", "Privacy notice acceptance is required")
+    optional_consents = payload["optionalConsents"]
+    for consent_type in optional_consents:
+        validate_document_version(consent_type, document_version)
+    return _normalized_email(payload["email"]), payload["password"], nickname, document_version, optional_consents
+
+
+def _start_user_session(request: HttpRequest, user: ServiceUser) -> dict[str, Any]:
+    guest_id = request.session.get("service_guest_id")
+    if guest_id:
+        SessionRepository.revoke_guest(session_id=guest_id)
+    previous_user_id = request.session.get("service_user_id")
+    previous_session_id = request.session.get("service_authenticated_session_id")
+    if previous_user_id and previous_session_id:
+        SessionRepository.revoke_authenticated(
+            user_id=previous_user_id,
+            session_id=previous_session_id,
+        )
+    request.session.flush()
+    request.session["service_user_id"] = str(user.id)
+    request.session.set_expiry(settings.AUTH_SESSION_TTL_SECONDS)
+    request.session.save()
+    assert request.session.session_key is not None
+    expires_at = timezone.now() + timedelta(seconds=settings.AUTH_SESSION_TTL_SECONDS)
+    authenticated = SessionRepository.create_authenticated(
+        user_id=user.id,
+        token_hash=token_digest(request.session.session_key),
+        expires_at=expires_at,
+    )
+    request.session["service_authenticated_session_id"] = str(authenticated.id)
+    return {
+        "subjectType": "USER",
+        "authenticated": True,
+        "expiresAt": _iso(expires_at),
+        "email": user.email,
+        "nickname": user.profile.nickname,
+    }
+
+
+@require_http_methods(["POST"])
+def register_with_email(request: HttpRequest) -> JsonResponse:
+    try:
+        enforce_rate_limit(
+            request,
+            scope="auth-register",
+            limit=settings.AUTH_RATE_LIMIT_PER_MINUTE,
+            title="Too many registration attempts",
+        )
+        email, password, nickname, document_version, optional_consents = _registration_payload(request)
+        try:
+            with transaction.atomic():
+                user = IdentityRepository.create_user(
+                    email=email, password_hash=make_password(password), nickname=nickname
+                )
+                ConsentRepository.record(
+                    user_id=user.id, consent_type="SERVICE_PRIVACY",
+                    document_version=document_version, accepted=True,
+                )
+                for consent_type, accepted in optional_consents.items():
+                    ConsentRepository.record(
+                        user_id=user.id, consent_type=consent_type,
+                        document_version=document_version, accepted=accepted,
+                    )
+                AccountAuditEvent.objects.create(user=user, event_type="ACCOUNT_REGISTERED", safe_metadata={})
+        except IntegrityError:
+            raise ApiProblem(409, "ACCOUNT_ALREADY_EXISTS", "An account already exists") from None
+        return no_store(JsonResponse(_start_user_session(request, user), status=201))
+    except ApiProblem as problem:
+        return problem_response(problem, request)
+
+
+@require_http_methods(["POST"])
+def login_with_email(request: HttpRequest) -> JsonResponse:
+    try:
+        enforce_rate_limit(
+            request,
+            scope="auth-login",
+            limit=settings.AUTH_RATE_LIMIT_PER_MINUTE,
+            title="Too many login attempts",
+        )
+        email, password = _credential_payload(request)
+        user = ServiceUser.objects.filter(email=email, is_active=True, deleted_at__isnull=True).first()
+        password_hash = user.password_hash if user is not None and user.password_hash else _DUMMY_PASSWORD_HASH
+        if not check_password(password, password_hash) or user is None:
+            raise ApiProblem(401, "INVALID_CREDENTIALS", "Email or password is incorrect")
+        AccountAuditEvent.objects.create(user=user, event_type="ACCOUNT_LOGIN", safe_metadata={})
+        return no_store(JsonResponse(_start_user_session(request, user)))
+    except ApiProblem as problem:
+        return problem_response(problem, request)
+
+
 @require_http_methods(["POST"])
 def create_guest_session(request: HttpRequest) -> JsonResponse:
     try:
@@ -129,6 +257,17 @@ def current_session(request: HttpRequest) -> JsonResponse:
             if subject.guest is not None:
                 SessionRepository.revoke_guest(session_id=subject.guest.id)
             if subject.user is not None:
+                authenticated_session_id = request.session.get("service_authenticated_session_id")
+                if authenticated_session_id:
+                    SessionRepository.revoke_authenticated(
+                        user_id=subject.user.id,
+                        session_id=authenticated_session_id,
+                    )
+                AccountAuditEvent.objects.create(
+                    user=subject.user,
+                    event_type="ACCOUNT_LOGOUT",
+                    safe_metadata={},
+                )
                 request.session.flush()
             return HttpResponse(status=204)
         expires_at = subject.guest.expires_at if subject.guest else request.session.get_expiry_date()
@@ -138,6 +277,10 @@ def current_session(request: HttpRequest) -> JsonResponse:
                     "subjectType": subject.kind,
                     "authenticated": subject.kind == "USER",
                     "expiresAt": _iso(expires_at),
+                    **(
+                        {"email": subject.user.email, "nickname": subject.user.profile.nickname}
+                        if subject.user is not None else {}
+                    ),
                 }
             )
         )
@@ -347,6 +490,11 @@ def consent_detail(request: HttpRequest, consent_type: str) -> JsonResponse:
         payload = json_body(request)
         validate_schema("public", "ConsentInput", payload)
         validate_document_version(consent_type, payload["documentVersion"])
+        if consent_type == "SERVICE_PRIVACY" and payload["accepted"] is not True:
+            raise ApiProblem(
+                400, "CONSTRAINT_OUT_OF_RANGE",
+                "Required privacy acceptance can only end through account deletion",
+            )
         value = ConsentRepository.record(
             user_id=subject.user.id,
             consent_type=consent_type,

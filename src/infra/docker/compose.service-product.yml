@@ -9,7 +9,8 @@ services:
       SERVICE_ENVIRONMENT: development
       SERVICE_DEBUG: "false"
       SERVICE_SECRET_KEY: local-compose-development-only
-      SERVICE_ALLOWED_HOSTS: service-api,localhost,127.0.0.1
+      SERVICE_ALLOWED_HOSTS: service-api,localhost,127.0.0.1,${SERVICE_PUBLIC_HOST:-}
+      SERVICE_CSRF_TRUSTED_ORIGINS: ${SERVICE_CSRF_TRUSTED_ORIGINS:-}
       SERVICE_ROUTING_GATEWAY: stub
       DATABASE_URL: sqlite:////tmp/service-api.sqlite3
       KAKAO_LOCAL_REST_KEY: ${KAKAO_LOCAL_REST_KEY:-}

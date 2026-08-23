@@ -19,6 +19,13 @@ export function rememberGuestSession(token: string, context: SessionContext) {
   inspected = true;
 }
 
+export function rememberUserSession(context: SessionContext) {
+  guestToken = undefined;
+  sessionContext = context;
+  inspected = true;
+  inspection = null;
+}
+
 export function clearSessionMemory() {
   guestToken = undefined;
   sessionContext = null;

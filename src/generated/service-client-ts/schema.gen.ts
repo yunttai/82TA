@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Creates an account and starts an authenticated HttpOnly cookie session. CSRF protection is required. */
+        post: operations["registerWithEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Verifies an email credential and starts an authenticated HttpOnly cookie session. Failure does not reveal whether the account exists. CSRF protection is required. */
+        post: operations["loginWithEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/guest-sessions": {
         parameters: {
             query?: never;
@@ -425,6 +459,33 @@ export interface components {
             authenticated: boolean;
             /** Format: date-time */
             expiresAt: string;
+            /**
+             * Format: email
+             * @description Present only for the current authenticated USER session.
+             */
+            email?: string;
+            /** @description Present only for the current authenticated USER session. */
+            nickname?: string;
+        };
+        EmailRegistrationInput: {
+            /** Format: email */
+            email: string;
+            password: string;
+            nickname: string;
+            documentVersion: string;
+            /** @constant */
+            requiredPrivacyAccepted: true;
+            optionalConsents: {
+                SEARCH_HISTORY: boolean;
+                PRECISE_LOCATION: boolean;
+                PRODUCT_ANALYTICS: boolean;
+                ROUTING_FEEDBACK: boolean;
+            };
+        };
+        EmailCredentialInput: {
+            /** Format: email */
+            email: string;
+            password: string;
         };
         RouteFeedbackInput: {
             selectedRouteId: string;
@@ -501,7 +562,7 @@ export interface components {
             defaultConstraints?: Record<string, never>;
         };
         /** @enum {string} */
-        ConsentType: "SEARCH_HISTORY" | "PRECISE_LOCATION" | "PRODUCT_ANALYTICS" | "ROUTING_FEEDBACK";
+        ConsentType: "SERVICE_PRIVACY" | "SEARCH_HISTORY" | "PRECISE_LOCATION" | "PRODUCT_ANALYTICS" | "ROUTING_FEEDBACK";
         ConsentInput: {
             documentVersion: string;
             accepted: boolean;
@@ -739,6 +800,80 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    registerWithEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {
+                 *       "email": "user@example.com",
+                 *       "password": "correct-horse-battery-staple"
+                 *     } */
+                "application/json": components["schemas"]["EmailRegistrationInput"];
+            };
+        };
+        responses: {
+            /** @description Registered USER session */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /** @example {
+                     *       "subjectType": "USER",
+                     *       "authenticated": true,
+                     *       "expiresAt": "2026-09-06T12:00:00+09:00",
+                     *       "email": "user@example.com"
+                     *     } */
+                    "application/json": components["schemas"]["SessionContext"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
+    loginWithEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {
+                 *       "email": "user@example.com",
+                 *       "password": "correct-horse-battery-staple"
+                 *     } */
+                "application/json": components["schemas"]["EmailCredentialInput"];
+            };
+        };
+        responses: {
+            /** @description Authenticated USER session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /** @example {
+                     *       "subjectType": "USER",
+                     *       "authenticated": true,
+                     *       "expiresAt": "2026-09-06T12:00:00+09:00",
+                     *       "email": "user@example.com"
+                     *     } */
+                    "application/json": components["schemas"]["SessionContext"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
     createGuestSession: {
         parameters: {
             query?: never;

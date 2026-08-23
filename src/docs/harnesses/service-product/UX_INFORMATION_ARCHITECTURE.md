@@ -2,7 +2,7 @@
 
 ## 1. 목적과 경계
 
-이 문서는 React 모바일 웹앱/PWA가 Public Service API `1.1.0`을 오인 없이 표시하기 위한 정보 구조, 상태, 문구, 접근성 acceptance를 정의한다. 화면은 Routing이 반환한 시간·비용·순위·확률을 재계산하지 않는다. Provider 호출, Kakao↔GBIS 매핑, Bus ETA·Seat Risk 추론, 후보 생성, strict-budget 판정, Pareto/ranking은 이 작업흐름의 구현 대상이 아니다.
+이 문서는 React 모바일 웹앱/PWA가 Public Service API `1.2.0`을 오인 없이 표시하기 위한 정보 구조, 상태, 문구, 접근성 acceptance를 정의한다. 화면은 Routing이 반환한 시간·비용·순위·확률을 재계산하지 않는다. Provider 호출, Kakao↔GBIS 매핑, Bus ETA·Seat Risk 추론, 후보 생성, strict-budget 판정, Pareto/ranking은 이 작업흐름의 구현 대상이 아니다.
 
 적용 원칙:
 
@@ -626,11 +626,11 @@ fixture coverage:
 - each consent type accepted/declined and stale document version failure
 - export/deletion PENDING/RUNNING/COMPLETE/FAILED, conflict, owner-hidden not-found, expired download URL
 
-## 20. Public 1.1.0 지원 범위와 남은 계약 gap
+## 20. Public 1.2.0 지원 범위와 남은 계약 gap
 
 ### 20.1 contract-backed 구현 범위
 
-다음은 Public 1.1.0 generated client를 통해 구현한다.
+다음은 Public 1.2.0 generated client를 통해 구현한다.
 
 - guest credential create, GUEST/USER session inspection, current session revoke
 - `history.saved`, owner kind, retained-until 표시와 로그인+SEARCH_HISTORY opt-in
@@ -647,7 +647,7 @@ fixture coverage:
 
 | gap | 필요한 계약 결정 | 현재 안전한 UX |
 |---|---|---|
-| 로그인/가입/계정 복구 | USER session 생성 방식, identity provider, callback/error, 재인증 | guest 검색 유지; 로그인 CTA 비활성 또는 배포 구성에서 숨김 |
+| 계정 복구·이메일 확인 | recovery token, email delivery, verification state, 재인증 | 이메일 가입·로그인은 제공하고 복구 CTA는 제공하지 않음 |
 | guest→USER 병합 | 검색·feedback ownership 이전과 conflict policy | 자동 병합을 약속하지 않음 |
 | 개별 history 삭제·보존기간 설정 | delete endpoint, retention preference | save opt-in과 list/get/metadata만 사용 |
 | 동의 문서 배포 | 현재 document URL/version, required/optional policy, version 갱신 UX | 배포가 고정한 법적 문서 version만 전송; 임의 version 생성 금지 |
@@ -670,7 +670,7 @@ Service UX 구현 완료는 다음을 모두 만족할 때만 주장한다.
 - 카드·timeline·지도는 동일 routeId/legId/sequence를 사용한다.
 - PWA install/update/offline이 iOS·Android에서 검증되고 민감 API 데이터가 cache되지 않는다.
 - guest route search가 계정 기능 없이도 끝까지 동작한다.
-- guest/session revoke, history consent, CRUD, preference conflict, consent, export/deletion job의 Public 1.1.0 상태가 end-to-end로 검증된다.
+- 이메일 가입·로그인·session revoke, guest session, history consent, CRUD, preference conflict, consent, export/deletion job의 Public 1.2.0 상태가 end-to-end로 검증된다.
 - exact coordinate·token·민감 label이 URL, persistent browser storage, telemetry, Service Worker cache에 없다.
 - WCAG 2.2 AA 기본 자동 검사와 VoiceOver/TalkBack smoke가 통과한다.
 - contract gap 기능은 구현 완료로 세지 않고 `BLOCKED` 또는 `UNVERIFIED`로 보고한다.

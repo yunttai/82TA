@@ -75,7 +75,7 @@
 
 ## Contract-gap Gate
 
-Public 1.1.0 resolves guest/session inspection and revoke, saved-place/favorite CRUD, preference ETag conflict, consent CRUD, and asynchronous export/deletion jobs. The following remain `BLOCKED` rather than being simulated with local API shapes: USER login/registration/recovery and guest merge, individual history delete/retention setting, consent-document distribution, typed favorite constraints/privacy preferences/feedback bus outcome/transit details, canonical baseline saved-time, public degraded/failure copy registries, and a server-owned freshness threshold.
+Public 1.2.0 resolves email registration/login, guest/session inspection and revoke, saved-place/favorite CRUD, preference ETag conflict, consent CRUD, and asynchronous export/deletion jobs. The following remain `BLOCKED` rather than being simulated with local API shapes: account recovery/email verification and guest merge, individual history delete/retention setting, consent-document distribution, typed favorite constraints/privacy preferences/feedback bus outcome/transit details, canonical baseline saved-time, public degraded/failure copy registries, and a server-owned freshness threshold.
 
 ## Security
 

@@ -18,6 +18,8 @@ export type FavoriteJourneyInput = components["schemas"]["FavoriteJourneyInput"]
 export type RouteFeedbackInput = components["schemas"]["RouteFeedbackInput"];
 export type GuestSessionCredential = components["schemas"]["GuestSessionCredential"];
 export type SessionContext = components["schemas"]["SessionContext"];
+export type EmailCredentialInput = components["schemas"]["EmailCredentialInput"];
+export type EmailRegistrationInput = components["schemas"]["EmailRegistrationInput"];
 export type SavedPlaceUpdate = components["schemas"]["SavedPlaceUpdate"];
 export type FavoriteJourneyUpdate = components["schemas"]["FavoriteJourneyUpdate"];
 export type ConsentType = components["schemas"]["ConsentType"];
@@ -80,6 +82,22 @@ export async function createGuestSession() {
   return client().POST("/api/v1/guest-sessions", {
     credentials: "same-origin",
     headers: await mutationHeaders(),
+  });
+}
+
+export async function registerWithEmail(body: EmailRegistrationInput) {
+  return client().POST("/api/v1/auth/register", {
+    credentials: "same-origin",
+    headers: await mutationHeaders(),
+    body,
+  });
+}
+
+export async function loginWithEmail(body: EmailCredentialInput) {
+  return client().POST("/api/v1/auth/login", {
+    credentials: "same-origin",
+    headers: await mutationHeaders(),
+    body,
   });
 }
 

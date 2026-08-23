@@ -47,3 +47,20 @@ major URL 또는 compatibility adapter가 필요하다.
 - Private request `contractVersion: "1.0"`은 1.x wire compatibility family로 유지한다. OpenAPI metadata와 repository contract version은 `1.1.0`이다.
 - DBML은 마지막 target state다. migration은 새 table을 추가하고, 새 `NOT NULL` column은 nullable 또는 safe default로 expand→backfill→constraint 순서를 따른다. old Service binary가 새 schema와 함께 동작하는 overlap 뒤 write/read를 전환한다.
 - domain event payload와 event version은 변경하지 않는다. data-rights job은 Service DB 내부 lifecycle이며 cross-workstream event를 새로 요구하지 않는다.
+
+## 1.2.0 compatibility decision
+
+- 분류: backward-compatible Public API minor.
+- 이메일 가입·로그인 endpoint는 additive이며 기존 guest/session consumer 동작을 바꾸지 않는다.
+- `SessionContext.email`은 optional이고 USER 본인 session 응답에만 포함한다. 1.1 consumer는 이를 무시할 수 있다.
+
+## 1.3.0 compatibility decision
+
+- 회원가입 요청은 전용 `EmailRegistrationInput`으로 확장한다. 로그인 요청의 `EmailCredentialInput`은 유지한다.
+- `SessionContext.nickname`은 optional additive field이며 USER 본인 session에만 포함한다.
+- 기존 profile은 migration에서 비식별 기본 닉네임 `82TA 사용자`로 채운다.
+- 필수 개인정보 처리 동의는 가입 시 true여야 하고, 네 선택 목적은 독립 boolean으로 명시한다.
+- Routing Private API와 Routing DB에는 영향이 없다.
+- Service DBML의 기존 `auth_user.email`과 `password_hash`, `authenticated_session`을 사용하므로 shared DB target shape와 Routing boundary에는 변화가 없다.
+- 로그인 실패는 `INVALID_CREDENTIALS`, 중복 가입은 `ACCOUNT_ALREADY_EXISTS`로 표현하며 기존 오류 코드는 유지한다.
+- Routing OpenAPI, domain event payload와 event version은 변경하지 않는다.

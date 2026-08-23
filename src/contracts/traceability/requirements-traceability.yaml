@@ -1,4 +1,4 @@
-schemaVersion: '1.1'
+schemaVersion: '1.2'
 project: budget-route-platform
 sourceOfTruth: src/docs/shared/PRD.md
 requirements:
@@ -84,6 +84,19 @@ requirements:
       - src/apps/web
     tests: [CT-SVC-GUEST-001, SEC-GUEST-TOKEN-001, SEC-IDOR-SEARCH-001]
     releaseGate: guest-token-expiry-ownership-and-redaction
+  FR-IAM-002:
+    title: 선택적 이메일 가입·로그인과 USER session
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1auth~1register
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1auth~1login
+      - src/contracts/database/service-db.dbml
+      - src/contracts/codes/reason-warning-error-codes.yaml
+    implementationPaths:
+      - src/services/service-api
+      - src/apps/web
+    tests: [CT-SVC-IAM-REGISTER-001, CT-SVC-IAM-CONSENT-001, CT-SVC-IAM-LOGIN-001, SEC-IAM-BRUTEFORCE-001, SEC-IAM-SESSION-001]
+    releaseGate: password-hashing-profile-consent-generic-failure-csrf-and-session-revocation
   FR-IAM-003:
     title: 검색 기록·저장 장소·즐겨찾기
     owner: service-product

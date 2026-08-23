@@ -14,6 +14,7 @@ Table auth_user {
 
 Table user_profile {
   user_id uuid [pk, ref: - auth_user.id]
+  nickname varchar [not null, default: '82TA 사용자', note: '2..20 trimmed characters for user-facing profile']
   locale varchar [not null, default: 'ko-KR']
   timezone varchar [not null, default: 'Asia/Seoul']
   updated_at timestamptz [not null]

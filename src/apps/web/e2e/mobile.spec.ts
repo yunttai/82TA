@@ -6,6 +6,7 @@ import canonicalResponse from "../../../contracts/openapi/examples/public-route-
 const guestToken = "guest_e2e_0123456789abcdef0123456789abcdef";
 
 async function mockPublicApi(page: Page) {
+  let authenticated = false;
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -29,11 +30,22 @@ async function mockPublicApi(page: Page) {
       return;
     }
     if (path === "/api/v1/session" && request.method() === "GET") {
-      if (request.headers()["x-guest-token"] === guestToken) {
+      if (authenticated) {
+        await route.fulfill({ json: { subjectType: "USER", authenticated: true, expiresAt: "2099-08-24T07:40:00+09:00", email: "user@example.com", nickname: "팔이타" } });
+      } else if (request.headers()["x-guest-token"] === guestToken) {
         await route.fulfill({ json: { subjectType: "GUEST", authenticated: false, expiresAt: "2099-08-24T07:40:00+09:00" } });
       } else {
         await route.fulfill({ status: 401, contentType: "application/problem+json", body: "{}" });
       }
+      return;
+    }
+    if ((path === "/api/v1/auth/register" || path === "/api/v1/auth/login") && request.method() === "POST") {
+      authenticated = true;
+      await route.fulfill({ status: path.endsWith("register") ? 201 : 200, json: { subjectType: "USER", authenticated: true, expiresAt: "2099-08-24T07:40:00+09:00", email: "user@example.com", nickname: "팔이타" } });
+      return;
+    }
+    if (path === "/api/v1/route-searches" && request.method() === "GET" && authenticated) {
+      await route.fulfill({ json: { items: [] } });
       return;
     }
     if (path === "/api/v1/route-searches" && request.method() === "POST") {
@@ -53,6 +65,54 @@ async function mockPublicApi(page: Page) {
 test.beforeEach(async ({ context, page }) => {
   await context.addCookies([{ name: "csrftoken", value: "e2e-csrf", domain: "127.0.0.1", path: "/", sameSite: "Lax" }]);
   await mockPublicApi(page);
+});
+
+test("guest can register and then open authenticated history", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/history");
+  await expect(page.getByText("로그인이 필요한 기능이에요")).toBeVisible();
+  await page.getByRole("link", { name: "로그인하기" }).click();
+  const [authCard, guestButton, privacyLink] = await Promise.all([
+    page.locator(".auth-card").boundingBox(),
+    page.getByRole("button", { name: "게스트 세션 시작" }).boundingBox(),
+    page.getByRole("link", { name: "개인정보와 데이터 권리 확인" }).boundingBox(),
+  ]);
+  expect(authCard).not.toBeNull();
+  expect(guestButton).not.toBeNull();
+  expect(privacyLink).not.toBeNull();
+  expect(guestButton!.y - (authCard!.y + authCard!.height)).toBeGreaterThanOrEqual(20);
+  expect(privacyLink!.y - (guestButton!.y + guestButton!.height)).toBeGreaterThanOrEqual(12);
+  await page.getByRole("tab", { name: "회원가입" }).click();
+  await page.getByLabel("닉네임").fill("팔이타");
+  await page.getByLabel("이메일").fill("user@example.com");
+  await page.getByLabel("비밀번호").fill("correct-horse-battery-staple");
+  await page.getByLabel("[필수] 개인정보 처리와 데이터 권리 안내 동의").check();
+  await page.getByRole("button", { name: "계정 만들기" }).click();
+  await expect(page).toHaveURL(/\/history$/);
+  await expect(page.getByText("아직 표시할 항목이 없습니다.")).toBeVisible();
+});
+
+test("iPhone account actions keep comfortable vertical spacing", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/account");
+  const authCard = page.locator(".auth-card");
+  const guestButton = page.getByRole("button", { name: "게스트 세션 시작" });
+  const privacyLink = page.getByRole("link", { name: "개인정보와 데이터 권리 확인" });
+  await expect(authCard).toBeVisible();
+  await expect(guestButton).toBeVisible();
+  await expect(privacyLink).toBeVisible();
+  const [authBox, guestBox, privacyBox] = await Promise.all([
+    authCard.boundingBox(),
+    guestButton.boundingBox(),
+    privacyLink.boundingBox(),
+  ]);
+  expect(authBox).not.toBeNull();
+  expect(guestBox).not.toBeNull();
+  expect(privacyBox).not.toBeNull();
+  expect(guestBox!.y - (authBox!.y + authBox!.height)).toBeGreaterThanOrEqual(20);
+  expect(privacyBox!.y - (guestBox!.y + guestBox!.height)).toBeGreaterThanOrEqual(12);
+  expect(guestBox!.height).toBeGreaterThanOrEqual(48);
+  expect(privacyBox!.height).toBeGreaterThanOrEqual(48);
 });
 
 test("mobile route search stays within the Public Service boundary", async ({ page }) => {

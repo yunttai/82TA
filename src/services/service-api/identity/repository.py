@@ -10,9 +10,11 @@ from journeys.models import ServiceUser, UserProfile
 class IdentityRepository:
     @staticmethod
     @transaction.atomic
-    def create_user(*, email: str, password_hash: str | None = None) -> ServiceUser:
+    def create_user(
+        *, email: str, password_hash: str | None = None, nickname: str = "82TA 사용자"
+    ) -> ServiceUser:
         user = ServiceUser.objects.create(email=email.strip().casefold(), password_hash=password_hash)
-        UserProfile.objects.create(user=user)
+        UserProfile.objects.create(user=user, nickname=nickname.strip())
         return user
 
     @staticmethod
