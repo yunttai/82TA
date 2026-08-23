@@ -1,4 +1,4 @@
-const CACHE_NAME = "82ta-shell-v2";
+const CACHE_NAME = "82ta-shell-v5";
 const SHELL = [
   "/",
   "/manifest.webmanifest",

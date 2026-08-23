@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import canonicalResponse from "../../../../contracts/openapi/examples/public-route-search-response.json";
 import { ResultPanel } from "../features/route-results/ResultPanel";
@@ -136,7 +136,36 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("map-first home", () => {
+  it("opens with the branded map surface and exactly five primary destinations", async () => {
+    vi.stubGlobal("fetch", successfulFetch());
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.queryByRole("heading", { name: /예산은 지키고.*도착은 빠르게/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /길찾기 카드/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /경기 남부와 서울 이동 지도/ })).toBeInTheDocument();
+    const mobileNavigation = screen.getByRole("navigation", { name: "모바일 주요 메뉴" });
+    expect(mobileNavigation.querySelectorAll("a")).toHaveLength(5);
+    expect(screen.getAllByRole("link", { name: "홈" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "길찾기" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "기록" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "즐겨찾기" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "내 정보" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "홈" })[1]).toHaveAttribute("aria-current", "page");
+
+    await user.click(screen.getByRole("link", { name: /어디로 갈까요/ }));
+    expect(window.location.pathname).toBe("/search");
+    expect(screen.getByRole("heading", { name: "어디로 갈까요?" })).toBeInTheDocument();
+  });
+
+});
+
 describe("route search vertical slice", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/search");
+  });
+
   it("renders an app-like mobile shell with labelled icon navigation and progressive map controls", () => {
     vi.stubGlobal("fetch", successfulFetch());
     render(<App />);
@@ -146,21 +175,29 @@ describe("route search vertical slice", () => {
     expect(screen.getAllByRole("link", { name: "길찾기" })).toHaveLength(2);
     const mapDetails = screen.getByText("지도에서 직접 위치 선택").closest("details");
     expect(mapDetails).not.toHaveAttribute("open");
+    expect(screen.getByText("예산 안에서 더 빠르고 안정적인 이동을 찾아드려요.")).toBeInTheDocument();
+    expect(screen.queryByText("택시 예산 안에서 더 빠르고 안정적인 이동을 찾아드려요.")).not.toBeInTheDocument();
   });
 
-  it("renders canonical defaults without exposing raw coordinate inputs", () => {
+  it("renders canonical defaults without exposing raw coordinate inputs", async () => {
     const fetchMock = successfulFetch();
     vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
 
     render(<App />);
 
     expect(screen.getByRole("combobox", { name: "출발지" })).toHaveValue("명지대학교 자연캠퍼스");
     expect(screen.getByRole("combobox", { name: "목적지" })).toHaveValue("판교역");
-    expect(screen.getByRole("textbox", { name: /택시비 상한/ })).toHaveValue("10000");
+    expect(screen.getByRole("textbox", { name: /직접 입력/ })).toHaveValue("10000");
+    expect(screen.getByRole("button", { name: "무관" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "출발 경도" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "출발 위도" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "도착 경도" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "도착 위도" })).not.toBeInTheDocument();
+    const selectedPreset = screen.getByRole("button", { name: "1만원" });
+    expect(selectedPreset).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("textbox", { name: /직접 입력/ }));
+    expect(selectedPreset).toHaveAttribute("aria-pressed", "false");
   });
 
   it("posts only to the public route-search endpoint and preserves a partial null result", async () => {
@@ -329,7 +366,7 @@ describe("route search vertical slice", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
-    await waitFor(() => expect(screen.getByRole("textbox", { name: /택시비 상한/ })).toHaveValue("20000"));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /직접 입력/ })).toHaveValue("20000"));
     expect(screen.getByRole("textbox", { name: /최대 도보/ })).toHaveValue("30");
     expect(screen.getByRole("combobox", { name: "최대 환승" })).toHaveValue("6");
     expect(screen.getByRole("combobox", { name: "최대 택시 구간" })).toHaveValue("1");

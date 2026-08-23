@@ -58,14 +58,14 @@ test.beforeEach(async ({ context, page }) => {
 test("mobile route search stays within the Public Service boundary", async ({ page }) => {
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
-  await page.goto("/");
+  await page.goto("/search");
 
   expect(await page.locator("body").innerText()).toContain("어디로 갈까요?");
   await expect(page.getByRole("navigation", { name: "모바일 주요 메뉴" })).toBeVisible();
   await expect(page.getByRole("link", { name: "길찾기" })).toHaveAttribute("aria-current", "page");
   await page.getByText("지도에서 직접 위치 선택").click();
   await expect(page.getByText("지도 선택을 사용할 수 없습니다.")).toBeVisible();
-  await expect(page.getByText(/좌표를 직접 입력해 주세요/)).toBeVisible();
+  await expect(page.getByText(/출발지와 목적지 장소 검색을 이용해 주세요/)).toBeVisible();
   await page.getByRole("button", { name: "내 예산으로 경로 찾기" }).click();
   await expect(page.getByText("일부 정보 없이 계산한 결과입니다.")).toBeVisible();
   await expect(page.getByText("추천 경로 없음")).toHaveCount(4);
@@ -79,15 +79,55 @@ test("320px layout has no horizontal page overflow and no serious accessibility 
   await page.goto("/");
   const bottomNav = page.getByRole("navigation", { name: "모바일 주요 메뉴" });
   await expect(bottomNav).toHaveCSS("position", "fixed");
-  await expect(page.getByRole("heading", { name: "어디로 갈까요?" })).toBeVisible();
-  await expect(page.getByText("지도에서 직접 위치 선택")).toBeVisible();
-  await expect(page.getByText("지도 선택을 사용할 수 없습니다.")).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: /예산은 지키고.*도착은 빠르게/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /길찾기 카드/ })).toHaveCount(0);
+  await expect(bottomNav.getByRole("link", { name: "홈", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: /어디로 갈까요/ })).toBeVisible();
+  await expect(page.getByText("지도를 불러오지 못했어요")).toBeVisible();
   const sizes = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
+
+  await bottomNav.getByRole("link", { name: "길찾기", exact: true }).click();
+  await page.getByText("세부 조건", { exact: true }).click();
+  const deadline = page.getByLabel(/^도착 마감 시각/);
+  const details = page.locator(".details-panel");
+  const [deadlineBox, detailsBox] = await Promise.all([deadline.boundingBox(), details.boundingBox()]);
+  expect(deadlineBox).not.toBeNull();
+  expect(detailsBox).not.toBeNull();
+  expect(deadlineBox!.x + deadlineBox!.width).toBeLessThanOrEqual(detailsBox!.x + detailsBox!.width);
+  const searchSizes = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
+  expect(searchSizes.content).toBeLessThanOrEqual(searchSizes.viewport);
 
   const results = await new AxeBuilder({ page }).analyze();
   const serious = results.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
   expect(serious).toEqual([]);
+});
+
+test("returning home keeps the current-location control above the bottom navigation without a focus border", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+  const initialLocateBox = await page.getByRole("button", { name: "현재 위치로 지도 이동" }).boundingBox();
+  expect(initialLocateBox).not.toBeNull();
+  await page.getByRole("link", { name: "길찾기", exact: true }).click();
+  await page.getByRole("link", { name: "홈", exact: true }).click();
+
+  const locateButton = page.getByRole("button", { name: "현재 위치로 지도 이동" });
+  const bottomNavigation = page.getByRole("navigation", { name: "모바일 주요 메뉴" });
+  await expect(locateButton).toBeVisible();
+  const [locateBox, navigationBox] = await Promise.all([locateButton.boundingBox(), bottomNavigation.boundingBox()]);
+  expect(locateBox).not.toBeNull();
+  expect(navigationBox).not.toBeNull();
+  expect(Math.abs(locateBox!.y - initialLocateBox!.y)).toBeLessThanOrEqual(1);
+  const navigationGap = navigationBox!.y - (locateBox!.y + locateBox!.height);
+  expect(navigationGap).toBeGreaterThanOrEqual(30);
+  expect(navigationGap).toBeLessThanOrEqual(70);
+  await page.setViewportSize({ width: 390, height: 720 });
+  const [resizedLocateBox, resizedNavigationBox] = await Promise.all([locateButton.boundingBox(), bottomNavigation.boundingBox()]);
+  expect(resizedLocateBox).not.toBeNull();
+  expect(resizedNavigationBox).not.toBeNull();
+  const resizedGap = resizedNavigationBox!.y - (resizedLocateBox!.y + resizedLocateBox!.height);
+  expect(Math.abs(resizedGap - navigationGap)).toBeLessThanOrEqual(1);
+  await expect(page.locator("#main-content")).toHaveCSS("outline-style", "none");
 });
 
 test("offline state is explicit and does not pretend API data is available", async ({ context, page }) => {
@@ -95,7 +135,7 @@ test("offline state is explicit and does not pretend API data is available", asy
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
   const cachedPaths = await page.evaluate(async () => {
-    const requests = await (await caches.open("82ta-shell-v2")).keys();
+    const requests = await (await caches.open("82ta-shell-v5")).keys();
     return requests.map((request) => new URL(request.url).pathname);
   });
   expect(cachedPaths).toContain("/");
