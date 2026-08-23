@@ -56,37 +56,3 @@ server {
   }
 }
 
-# Private Service -> Routing boundary. Port 8443 is exposed only inside the
-# routing-private Docker network; no host port maps to this server.
-server {
-  listen 8443 ssl;
-  server_name routing.internal;
-  access_log off;
-
-  ssl_certificate /run/82ta-certs/routing.crt;
-  ssl_certificate_key /run/82ta-certs/routing.key;
-  ssl_protocols TLSv1.2 TLSv1.3;
-
-  location = /v1/routes/optimize {
-    resolver 127.0.0.11 ipv6=off valid=10s;
-    set $routing_upstream http://routing-api:8000;
-    proxy_pass $routing_upstream;
-    proxy_http_version 1.1;
-    proxy_set_header Host routing-api;
-    proxy_set_header X-Forwarded-Proto https;
-    proxy_read_timeout 7s;
-  }
-
-  location ~ ^/v1/(capabilities|health/live|health/ready|version)$ {
-    resolver 127.0.0.11 ipv6=off valid=10s;
-    set $routing_upstream http://routing-api:8000;
-    proxy_pass $routing_upstream;
-    proxy_http_version 1.1;
-    proxy_set_header Host routing-api;
-    proxy_set_header X-Forwarded-Proto https;
-  }
-
-  location / {
-    return 404;
-  }
-}

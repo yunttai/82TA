@@ -57,18 +57,9 @@ class RouteSearchApiTests(TestCase):
         }
         self.assertEqual(route_ids, {"route_6d206a95ed947d8a"})
         self.assertEqual(body["baseline"]["routeId"], "route_6d206a95ed947d8a")
-        self.assertEqual(
-            body["paretoFrontier"],
-            [
-                {
-                    "routeId": "route_6d206a95ed947d8a",
-                    "taxiCostUpper": 0,
-                    "p50Seconds": 3300,
-                    "p90Seconds": 4200,
-                }
-            ],
-        )
-        self.assertEqual(body["warnings"], ["BUS_DATA_UNAVAILABLE"])
+        canonical_public = self.fixtures.get("public_response")
+        self.assertEqual(body["paretoFrontier"], canonical_public["paretoFrontier"])
+        self.assertEqual(body["warnings"], canonical_public["warnings"])
         self.assertNotIn("providerStatus", body)
         self.assertNotIn("modelVersions", body)
         self.assertNotIn("computation", body)

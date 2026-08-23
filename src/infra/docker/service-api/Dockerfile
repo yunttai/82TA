@@ -35,6 +35,7 @@ COPY --from=builder --chown=service:service /build/services/service-api/ /app/sr
 COPY --chown=service:service contracts/ /app/src/contracts/
 COPY --chown=service:service infra/docker/service-api/service_wsgi.py /app/src/services/service-api/service_wsgi.py
 COPY --chown=service:service infra/docker/service-api/runtime_entrypoint.py /opt/service/runtime_entrypoint.py
+RUN chown service:service /app/src/services/service-api
 
 USER 10001:10001
 EXPOSE 8000

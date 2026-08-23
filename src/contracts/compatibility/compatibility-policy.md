@@ -78,6 +78,18 @@ major URL 또는 compatibility adapter가 필요하다.
 - 로그인 실패는 `INVALID_CREDENTIALS`, 중복 가입은 `ACCOUNT_ALREADY_EXISTS`로 표현하며 기존 오류 코드는 유지한다.
 - Routing OpenAPI, domain event payload와 event version은 변경하지 않는다.
 
+## 1.4.0 compatibility decision
+
+- 분류: backward-compatible Public/Private API minor.
+- 공통 `RouteLeg`에 optional `waitDuration`과 `travelDuration`을 추가한다.
+  기존 `duration`, route 총시간, 순위, 비용과 ID의 의미는 바뀌지 않는다.
+- 필드 부재는 구 producer 또는 미지원 상태이며 알려진 0과 구분한다. 새 Routing
+  producer는 평가된 모든 leg에 두 필드를 제공하고 Service는 재계산 없이 전달한다.
+- component P90은 각각 보수적인 marginal estimate이므로 합산해 전체 P90을
+  재계산하지 않는다. 기존 `duration`이 authoritative total이다.
+- DBML, migration, event, code registry와 optimize request wire family `1.0`은
+  변경하지 않는다.
+
 ## `rank-0.2.0` / `strategy-2.0.0` policy decision
 
 - 분류: wire-compatible executable-policy revision. Existing request/response keys,

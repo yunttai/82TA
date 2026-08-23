@@ -171,6 +171,11 @@ class FixtureOptimizeRouteUseCase:
             "confidence": confidence,
             "origin": "UNKNOWN",
         }
+        zero_time_estimate = {
+            **time_estimate,
+            "p50Seconds": 0,
+            "p90Seconds": 0,
+        }
         zero_cost = {
             "currency": "KRW",
             "expected": 0,
@@ -212,6 +217,8 @@ class FixtureOptimizeRouteUseCase:
                     "expectedStartAt": now.isoformat(),
                     "expectedEndAt": (now + timedelta(seconds=3600)).isoformat(),
                     "duration": time_estimate,
+                    "waitDuration": zero_time_estimate,
+                    "travelDuration": time_estimate,
                     "distanceMeters": 0,
                     "fare": zero_cost,
                     "geometry": {"encoding": "NONE"},
@@ -473,6 +480,25 @@ def _semantic_response_is_valid(response: Mapping[str, object], request: Mapping
                 return False
             duration = leg["duration"]
             if duration.get("p90Seconds", -1) < duration.get("p50Seconds", 0):
+                return False
+            components = []
+            for field_name in ("waitDuration", "travelDuration"):
+                component = leg.get(field_name)
+                if component is None:
+                    continue
+                if not isinstance(component, dict):
+                    return False
+                p50_seconds = component.get("p50Seconds")
+                p90_seconds = component.get("p90Seconds")
+                if (
+                    not isinstance(p50_seconds, int)
+                    or not isinstance(p90_seconds, int)
+                    or p50_seconds < 0
+                    or p90_seconds < p50_seconds
+                ):
+                    return False
+                components.append(p50_seconds)
+            if len(components) == 2 and sum(components) > duration.get("p50Seconds", -1):
                 return False
             if leg.get("mode") == "TAXI":
                 fare = leg.get("fare")

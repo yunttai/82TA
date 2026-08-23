@@ -105,6 +105,31 @@ class TimeDependentEvaluationTests(unittest.TestCase):
         self.assertEqual(result.total_duration, TimeEstimate(900, 1800))
         self.assertEqual(result.legs[0].start_at_p50, departure + timedelta(seconds=300))
         self.assertEqual(result.legs[0].start_at_p90, departure + timedelta(seconds=900))
+        self.assertEqual(result.legs[0].wait_duration, TimeEstimate(300, 900))
+        self.assertEqual(result.legs[0].travel_duration, TimeEstimate(600, 900))
+
+    def test_taxi_dispatch_wait_and_drive_are_exposed_as_separate_components(self) -> None:
+        departure = datetime(2026, 8, 23, 7, 0, tzinfo=KST)
+        taxi = LegSpec("taxi", "TAXI", "a", "b", "taxi")
+        seed = CandidateSeed("taxi-wait", "TAXI_ONLY", (taxi,), 0, 1_000, 10_000)
+
+        result = CandidateEvaluator(
+            StaticLegEvaluator(
+                {
+                    "taxi": cost(
+                        720,
+                        900,
+                        fare=MoneyRange(5_000, 4_000, 6_000),
+                        wait50=120,
+                        wait90=240,
+                    )
+                }
+            )
+        ).evaluate(seed, departure)
+
+        self.assertEqual(result.legs[0].wait_duration, TimeEstimate(120, 240))
+        self.assertEqual(result.legs[0].travel_duration, TimeEstimate(720, 900))
+        self.assertEqual(result.legs[0].duration, TimeEstimate(840, 1_140))
 
     def test_shared_bus_movement_is_re_evaluated_at_each_candidate_entry_time(self) -> None:
         departure = datetime(2026, 8, 23, 7, 0, tzinfo=KST)

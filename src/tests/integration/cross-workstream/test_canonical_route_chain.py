@@ -198,13 +198,13 @@ class CanonicalRouteChainTests(unittest.TestCase):
             versions["contextVersion"],
             versions["contractVersion"],
         }
-        self.assertEqual(public_metadata_versions, {"1.3.0"})
+        self.assertEqual(public_metadata_versions, {"1.4.0"})
         private_metadata_versions = {
             private_spec["info"]["version"],
             validator.contract_version,
             canonical_application().version()["contractVersion"],
         }
-        self.assertEqual(private_metadata_versions, {"1.1.0"})
+        self.assertEqual(private_metadata_versions, {"1.2.0"})
         self.assertEqual(versions["databaseContractVersion"], "1.2.0")
         self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
         self.assertEqual(self.private_request["contractVersion"], "1.0")

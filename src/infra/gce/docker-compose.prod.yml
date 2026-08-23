@@ -1,70 +1,72 @@
 name: 82ta-gce
 
+# This is the one blank-server deployment path. Service keeps the same
+# SQLite/no-Redis shape that is used locally. Routing keeps the locally tested
+# PostGIS + Redis shape and starts both containers on this server.
 x-service-environment: &service-environment
-  SERVICE_ENVIRONMENT: production
+  SERVICE_ENVIRONMENT: development
   SERVICE_DEBUG: "false"
   SERVICE_SECRET_KEY: ${SERVICE_SECRET_KEY:?set SERVICE_SECRET_KEY}
-  SERVICE_ALLOWED_HOSTS: service-api,${DOMAIN:?set DOMAIN}
+  SERVICE_ALLOWED_HOSTS: 127.0.0.1,localhost,service-api,${DOMAIN:?set DOMAIN}
   SERVICE_CSRF_TRUSTED_ORIGINS: https://${DOMAIN}
   SERVICE_TRUST_PROXY_HEADERS: "true"
   SERVICE_TRUSTED_PROXY_IPS: 172.30.10.0/24
-  SERVICE_CONSENT_DOCUMENT_VERSION: ${PRIVACY_DOCUMENT_VERSION:?set PRIVACY_DOCUMENT_VERSION}
-  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
-  SERVICE_REDIS_URL: ${SERVICE_REDIS_URL:?set SERVICE_REDIS_URL}
+  SERVICE_CONSENT_DOCUMENT_VERSION: privacy-v1
+  # DATABASE_URL: intentionally unset; Django uses the persisted SQLite file below.
+  # SERVICE_MIGRATION_DATABASE_URL: intentionally unset; startup runs SQLite migrations.
+  # SERVICE_REDIS_URL: intentionally unset; Service uses its local coordination backend.
   SERVICE_REDIS_KEY_DERIVATION_SECRET: ${SERVICE_REDIS_KEY_DERIVATION_SECRET:?set SERVICE_REDIS_KEY_DERIVATION_SECRET}
   SERVICE_ROUTING_GATEWAY: http
-  SERVICE_ROUTING_API_BASE_URL: https://routing.internal:8443
-  SERVICE_ROUTING_API_ALLOWED_HOSTS: routing.internal
-  SERVICE_ROUTING_VERIFY_SSL: "true"
+  SERVICE_ROUTING_API_BASE_URL: http://routing-api:8000
+  SERVICE_ROUTING_API_ALLOWED_HOSTS: routing-api
+  SERVICE_ROUTING_VERIFY_SSL: "false"
   SERVICE_ROUTING_JWT_SECRET: ${SERVICE_ROUTING_JWT_SECRET:?set SERVICE_ROUTING_JWT_SECRET}
   SERVICE_ROUTING_JWT_ISSUER: service-api
   SERVICE_ROUTING_JWT_AUDIENCE: routing-api
   SERVICE_ROUTING_JWT_TTL_SECONDS: "60"
   SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS: "7000"
   SERVICE_ROUTING_DEADLINE_MILLISECONDS: "6500"
-  SERVICE_DATA_RIGHTS_ARTIFACT_BACKEND: ${SERVICE_DATA_RIGHTS_ARTIFACT_BACKEND:-disabled}
-  SERVICE_DATA_RIGHTS_ARTIFACT_DIRECTORY: ${SERVICE_DATA_RIGHTS_ARTIFACT_DIRECTORY:-}
-  SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY: ${SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY:-}
+  SERVICE_DATA_RIGHTS_ARTIFACT_BACKEND: disabled
+  # SERVICE_DATA_RIGHTS_ARTIFACT_DIRECTORY: intentionally unset while backend is disabled.
+  # SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY: intentionally unset while backend is disabled.
   KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:?set KAKAO_REST_API_KEY}
-  SSL_CERT_FILE: /run/82ta-certs/routing-ca-bundle.pem
 
 x-routing-environment: &routing-environment
-  ROUTING_RUNTIME_ENVIRONMENT: PRODUCTION
+  ROUTING_RUNTIME_ENVIRONMENT: DEVELOPMENT
+  ROUTING_LOCAL_LIVE_E2E: "true"
   ROUTING_DJANGO_SECRET_KEY: ${ROUTING_DJANGO_SECRET_KEY:?set ROUTING_DJANGO_SECRET_KEY}
-  ROUTING_ALLOWED_HOSTS: routing-api
-  ROUTING_SECURE_SSL_REDIRECT: "true"
-  ROUTING_TRUST_X_FORWARDED_PROTO: "true"
   ROUTING_SERVICE_JWT_SECRET: ${SERVICE_ROUTING_JWT_SECRET:?set SERVICE_ROUTING_JWT_SECRET}
   ROUTING_SERVICE_JWT_ISSUER: service-api
   ROUTING_SERVICE_JWT_AUDIENCE: routing-api
   ROUTING_DB_NAME: ${ROUTING_DB_NAME:?set ROUTING_DB_NAME}
   ROUTING_DB_USER: ${ROUTING_DB_USER:?set ROUTING_DB_USER}
   ROUTING_DB_PASSWORD: ${ROUTING_DB_PASSWORD:?set ROUTING_DB_PASSWORD}
-  ROUTING_DB_HOST: ${ROUTING_DB_HOST:?set ROUTING_DB_HOST}
-  ROUTING_DB_PORT: ${ROUTING_DB_PORT:-5432}
-  ROUTING_DB_SSLMODE: verify-full
-  ROUTING_REDIS_URL: ${ROUTING_REDIS_URL:?set ROUTING_REDIS_URL}
+  # ROUTING_DB_MIGRATION_USER: intentionally unset.
+  # ROUTING_DB_MIGRATION_PASSWORD: intentionally unset.
+  ROUTING_DB_HOST: routing-db
+  ROUTING_DB_PORT: "5432"
+  ROUTING_DB_SSLMODE: disable
+  ROUTING_REDIS_URL: redis://routing-redis:6379/0
   ROUTING_ALLOW_FIXTURE_BACKEND: "false"
-  ROUTING_PRODUCTION_DEPENDENCIES_FACTORY: ${ROUTING_PRODUCTION_DEPENDENCIES_FACTORY:-routing_deployment.baseline:build_dependencies}
-  ROUTING_PROVIDER_CONFIG_FACTORY: ${ROUTING_PROVIDER_CONFIG_FACTORY:-provider_core.production:build_kakao_baseline_config}
-  ROUTING_PROVIDER_EVIDENCE_JSON: ${ROUTING_PROVIDER_EVIDENCE_JSON:?set ROUTING_PROVIDER_EVIDENCE_JSON}
-  ROUTING_PROVIDER_HTTPS_PROXY_URL: ${ROUTING_PROVIDER_HTTPS_PROXY_URL:-}
+  ROUTING_PRODUCTION_DEPENDENCIES_FACTORY: routing_deployment.baseline:build_dependencies
+  ROUTING_PROVIDER_CONFIG_FACTORY: provider_core.production:build_kakao_baseline_config
+  ROUTING_PROVIDER_EVIDENCE_JSON: ${ROUTING_PROVIDER_EVIDENCE_JSON:-}
+  ROUTING_PROVIDER_HTTPS_PROXY_URL: http://routing-egress-proxy:3128
   KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:?set KAKAO_REST_API_KEY}
-  GBIS_SERVICE_KEY: ${GBIS_SERVICE_KEY:-}
-  GITS_API_KEY: ${GITS_API_KEY:-}
-  TMAP_APP_KEY: ${TMAP_APP_KEY:-}
-  ODSAY_API_KEY: ${ODSAY_API_KEY:-}
+  GBIS_SERVICE_KEY: ${GBIS_SERVICE_KEY:?set GBIS_SERVICE_KEY}
+  GITS_API_KEY: ${GITS_API_KEY:?set GITS_API_KEY}
+  TMAP_APP_KEY: ${TMAP_APP_KEY:?set TMAP_APP_KEY}
+  ODSAY_API_KEY: ${ODSAY_API_KEY:?set ODSAY_API_KEY}
 
 services:
   nginx:
     image: nginx:1.27.5-alpine
     environment:
-      DOMAIN: ${DOMAIN}
+      DOMAIN: ${DOMAIN:?set DOMAIN}
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ./certbot/config:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
-      - ./certbot/internal:/run/82ta-certs:ro
     ports:
       - "80:80"
       - "443:443"
@@ -72,10 +74,7 @@ services:
       web:
         condition: service_healthy
     networks:
-      service-front: {}
-      routing-private:
-        aliases:
-          - routing.internal
+      - service-front
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
@@ -109,24 +108,89 @@ services:
       - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
 
   service-api:
-    image: ${DOCKERHUB_USERNAME}/82ta-service-api:${IMAGE_TAG}
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/82ta-service-api:${IMAGE_TAG:?set IMAGE_TAG}
     environment: *service-environment
     volumes:
-      - ./certbot/internal/routing-ca-bundle.pem:/run/82ta-certs/routing-ca-bundle.pem:ro
+      - ./service-data/service-api.sqlite3:/app/src/services/service-api/service-api.sqlite3
     networks:
       - service-front
       - routing-private
     depends_on:
       routing-api:
         condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >-
+        python manage.py migrate --noinput &&
+        exec python -m gunicorn service_wsgi:application
+        --bind=0.0.0.0:8000 --workers=1 --threads=4 --timeout=10
+        --graceful-timeout=10 --access-logfile /dev/null --error-logfile=-
     restart: unless-stopped
 
-  routing-api:
-    image: ${DOCKERHUB_USERNAME}/82ta-routing-api:${IMAGE_TAG}
-    environment: *routing-environment
+  routing-egress-proxy:
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/82ta-provider-egress-proxy:${IMAGE_TAG:?set IMAGE_TAG}
+    environment:
+      PROVIDER_EGRESS_ALLOWLIST: dapi.kakao.com,apis-navi.kakaomobility.com,apis.data.go.kr,apis.openapi.sk.com,api.odsay.com
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp
     networks:
       - routing-private
       - provider-egress
+    restart: unless-stopped
+
+  routing-db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${ROUTING_DB_NAME:?set ROUTING_DB_NAME}
+      POSTGRES_USER: ${ROUTING_DB_USER:?set ROUTING_DB_USER}
+      POSTGRES_PASSWORD: ${ROUTING_DB_PASSWORD:?set ROUTING_DB_PASSWORD}
+    volumes:
+      - routing-db-data:/var/lib/postgresql/data
+    networks:
+      - routing-private
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ROUTING_DB_USER:?set ROUTING_DB_USER} -d ${ROUTING_DB_NAME:?set ROUTING_DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  routing-redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks:
+      - routing-private
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  routing-api:
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/82ta-routing-api:${IMAGE_TAG:?set IMAGE_TAG}
+    environment: *routing-environment
+    networks:
+      - routing-private
+    depends_on:
+      routing-egress-proxy:
+        condition: service_healthy
+      routing-db:
+        condition: service_healthy
+      routing-redis:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >-
+        python manage.py migrate --noinput &&
+        exec python -m gunicorn routing_deployment.wsgi:application
+        --bind=0.0.0.0:8000 --workers=2 --threads=4 --timeout=10
+        --graceful-timeout=10 --access-logfile /dev/null --error-logfile=-
     restart: unless-stopped
     healthcheck:
       test:
@@ -135,35 +199,35 @@ services:
         - -c
         - >-
           import urllib.request;
-          request=urllib.request.Request('http://127.0.0.1:8000/v1/health/live',headers={'Host':'routing-api','X-Forwarded-Proto':'https'});
-          urllib.request.urlopen(request,timeout=2).read()
+          urllib.request.urlopen('http://127.0.0.1:8000/v1/health/live',timeout=2).read()
       interval: 10s
       timeout: 3s
       retries: 18
 
-  service-migrate:
+  provider-evidence:
     profiles: ["tools"]
-    image: ${DOCKERHUB_USERNAME}/82ta-service-api:${IMAGE_TAG}
-    environment:
-      <<: *service-environment
-      DATABASE_URL: ${SERVICE_MIGRATION_DATABASE_URL:?set SERVICE_MIGRATION_DATABASE_URL}
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/82ta-routing-api:${IMAGE_TAG:?set IMAGE_TAG}
+    entrypoint: ["python", "/app/src/scripts/prepare_routing_docker_live.py"]
+    command:
+      - --env-file
+      - /run/provider/provider.env
+      - --output-env-file
+      - /run/provider-evidence/provider-evidence.env
+      - --approval-artifact
+      - /run/provider-evidence/provider-approval.json
+      - --proxy-url
+      - http://routing-egress-proxy:3128
+      - --ttl-minutes
+      - "240"
+      - --approve-local-provider-use
     volumes:
-      - ./certbot/internal/routing-ca-bundle.pem:/run/82ta-certs/routing-ca-bundle.pem:ro
+      - ./.provider.env:/run/provider/provider.env:ro
+      - ./.runtime:/run/provider-evidence
     networks:
-      - service-front
-    command: ["python", "manage.py", "migrate", "--noinput"]
-
-  routing-migrate:
-    profiles: ["tools"]
-    image: ${DOCKERHUB_USERNAME}/82ta-routing-api:${IMAGE_TAG}
-    environment:
-      <<: *routing-environment
-      ROUTING_TASK_MODE: migration
-      ROUTING_DB_USER: ${ROUTING_DB_MIGRATION_USER:?set ROUTING_DB_MIGRATION_USER}
-      ROUTING_DB_PASSWORD: ${ROUTING_DB_MIGRATION_PASSWORD:?set ROUTING_DB_MIGRATION_PASSWORD}
-    networks:
-      - provider-egress
-    command: ["python", "manage.py", "migrate", "--noinput"]
+      - routing-private
+    depends_on:
+      routing-egress-proxy:
+        condition: service_healthy
 
 networks:
   service-front:
@@ -173,3 +237,6 @@ networks:
   routing-private:
     internal: true
   provider-egress: {}
+
+volumes:
+  routing-db-data:

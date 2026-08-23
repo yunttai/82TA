@@ -260,6 +260,22 @@ class EvaluatedLeg:
         if self.end_at_p90 < self.end_at_p50:
             raise ValueError("P90 leg arrival must not precede P50 leg arrival")
 
+    @property
+    def wait_duration(self) -> TimeEstimate:
+        """Boarding/dispatch wait after the traveller is ready for this leg."""
+
+        p50_seconds = int((self.start_at_p50 - self.ready_at_p50).total_seconds())
+        p90_seconds = int((self.start_at_p90 - self.ready_at_p90).total_seconds())
+        return TimeEstimate(p50_seconds, max(p50_seconds, p90_seconds))
+
+    @property
+    def travel_duration(self) -> TimeEstimate:
+        """In-vehicle or movement time after boarding/dispatch wait completes."""
+
+        p50_seconds = int((self.end_at_p50 - self.start_at_p50).total_seconds())
+        p90_seconds = int((self.end_at_p90 - self.start_at_p90).total_seconds())
+        return TimeEstimate(p50_seconds, max(p50_seconds, p90_seconds))
+
 
 @dataclass(frozen=True, slots=True)
 class EvaluatedCandidate:

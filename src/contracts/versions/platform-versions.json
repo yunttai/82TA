@@ -1,7 +1,7 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.3.0",
-  "contractVersion": "1.3.0",
+  "contextVersion": "1.4.0",
+  "contractVersion": "1.4.0",
   "publicApiMajor": 1,
   "routingApiMajor": 1,
   "databaseContractVersion": "1.2.0",
@@ -10,5 +10,5 @@
   "strategyPolicyVersion": "strategy-2.0.0",
   "mappingPolicyVersion": "0.1.0-planned",
   "featureSchemaVersion": "0.1.0-planned",
-  "status": "SERVICE_CONTRACT_MINOR_1_3"
+  "status": "LEG_DURATION_COMPONENTS_1_4"
 }

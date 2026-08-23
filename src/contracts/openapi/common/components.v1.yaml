@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Budget Route Common Components
-  version: 1.1.0
+  version: 1.2.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 paths: {}
 components:
@@ -186,6 +186,8 @@ components:
         expectedStartAt: {type: [string, 'null'], format: date-time}
         expectedEndAt: {type: [string, 'null'], format: date-time}
         duration: {$ref: '#/components/schemas/TimeEstimate'}
+        waitDuration: {$ref: '#/components/schemas/TimeEstimate'}
+        travelDuration: {$ref: '#/components/schemas/TimeEstimate'}
         distanceMeters: {type: integer, minimum: 0}
         fare: {$ref: '#/components/schemas/MoneyRange'}
         geometry: {$ref: '#/components/schemas/Geometry'}

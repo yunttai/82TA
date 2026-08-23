@@ -38,6 +38,8 @@ class RouteLeg:
         provenance (list[Provenance]):
         expected_start_at (datetime.datetime | None | Unset):
         expected_end_at (datetime.datetime | None | Unset):
+        wait_duration (TimeEstimate | Unset):
+        travel_duration (TimeEstimate | Unset):
         transit (None | RouteLegTransitType0 | Unset):
         bus_intelligence (BusLegIntelligence | None | Unset):
     """
@@ -54,6 +56,8 @@ class RouteLeg:
     provenance: list[Provenance]
     expected_start_at: datetime.datetime | None | Unset = UNSET
     expected_end_at: datetime.datetime | None | Unset = UNSET
+    wait_duration: TimeEstimate | Unset = UNSET
+    travel_duration: TimeEstimate | Unset = UNSET
     transit: None | RouteLegTransitType0 | Unset = UNSET
     bus_intelligence: BusLegIntelligence | None | Unset = UNSET
 
@@ -100,6 +104,14 @@ class RouteLeg:
         else:
             expected_end_at = self.expected_end_at
 
+        wait_duration: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.wait_duration, Unset):
+            wait_duration = self.wait_duration.to_dict()
+
+        travel_duration: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.travel_duration, Unset):
+            travel_duration = self.travel_duration.to_dict()
+
         transit: dict[str, Any] | None | Unset
         if isinstance(self.transit, Unset):
             transit = UNSET
@@ -136,6 +148,10 @@ class RouteLeg:
             field_dict["expectedStartAt"] = expected_start_at
         if expected_end_at is not UNSET:
             field_dict["expectedEndAt"] = expected_end_at
+        if wait_duration is not UNSET:
+            field_dict["waitDuration"] = wait_duration
+        if travel_duration is not UNSET:
+            field_dict["travelDuration"] = travel_duration
         if transit is not UNSET:
             field_dict["transit"] = transit
         if bus_intelligence is not UNSET:
@@ -213,6 +229,20 @@ class RouteLeg:
 
         expected_end_at = _parse_expected_end_at(d.pop("expectedEndAt", UNSET))
 
+        _wait_duration = d.pop("waitDuration", UNSET)
+        wait_duration: TimeEstimate | Unset
+        if isinstance(_wait_duration, Unset):
+            wait_duration = UNSET
+        else:
+            wait_duration = TimeEstimate.from_dict(_wait_duration)
+
+        _travel_duration = d.pop("travelDuration", UNSET)
+        travel_duration: TimeEstimate | Unset
+        if isinstance(_travel_duration, Unset):
+            travel_duration = UNSET
+        else:
+            travel_duration = TimeEstimate.from_dict(_travel_duration)
+
         def _parse_transit(data: object) -> None | RouteLegTransitType0 | Unset:
             if data is None:
                 return data
@@ -260,6 +290,8 @@ class RouteLeg:
             provenance=provenance,
             expected_start_at=expected_start_at,
             expected_end_at=expected_end_at,
+            wait_duration=wait_duration,
+            travel_duration=travel_duration,
             transit=transit,
             bus_intelligence=bus_intelligence,
         )

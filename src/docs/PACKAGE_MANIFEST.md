@@ -2,7 +2,7 @@
 
 이 파일은 `python src/scripts/generate_package_manifest.py`로 생성한다.
 
-총 파일 수(이 manifest 제외): **1175**
+총 파일 수(이 manifest 제외): **1193**
 
 ```text
 .agents/skills/adr-management/SKILL.md
@@ -59,6 +59,7 @@
 .codex/agents/service-ux-engineer.toml
 .codex/agents/transport-mapping-engineer.toml
 .codex/config.toml
+.github/workflows/cd-gce.yml
 .gitignore
 _workspace/integration/.gitkeep
 _workspace/integration/00_context_parity_report.md
@@ -655,6 +656,13 @@ src/infra/docker/service-api/runtime_entrypoint.py
 src/infra/docker/service-api/service_wsgi.py
 src/infra/docker/web/default.conf.template
 src/infra/docker/web/Dockerfile
+src/infra/gce/.env.example
+src/infra/gce/bootstrap-host.sh
+src/infra/gce/docker-compose.prod.yml
+src/infra/gce/nginx/default.http.conf.template
+src/infra/gce/nginx/default.https.conf.template
+src/infra/gce/README.md
+src/infra/gce/refresh-provider-evidence.sh
 src/infra/README.md
 src/infra/scripts/validate_infra.py
 src/infra/terraform/environments/staging/.terraform.lock.hcl
@@ -727,6 +735,7 @@ src/packages/provider-core/provider_core/fixtures/transit_schema_drift.json
 src/packages/provider-core/provider_core/fixtures/transit_success.json
 src/packages/provider-core/provider_core/fixtures/transit_timeout.json
 src/packages/provider-core/provider_core/http.py
+src/packages/provider-core/provider_core/kakao_mobility.py
 src/packages/provider-core/provider_core/kakao_raw.py
 src/packages/provider-core/provider_core/named.py
 src/packages/provider-core/provider_core/probe.py
@@ -745,6 +754,7 @@ src/packages/provider-core/tests/test_canonical.py
 src/packages/provider-core/tests/test_capabilities_validation.py
 src/packages/provider-core/tests/test_context_queries.py
 src/packages/provider-core/tests/test_kakao_live_foundation.py
+src/packages/provider-core/tests/test_kakao_mobility_directions.py
 src/packages/provider-core/tests/test_named_adapters.py
 src/packages/provider-core/tests/test_production_assembly.py
 src/packages/provider-core/tests/test_resilience_cache.py
@@ -863,6 +873,9 @@ src/services/routing-api/routing_api/contract.py
 src/services/routing-api/routing_api/fanin_integration.py
 src/services/routing-api/routing_api/fixture_integration.py
 src/services/routing-api/routing_api/fixture_scenarios.py
+src/services/routing-api/routing_api/management/__init__.py
+src/services/routing-api/routing_api/management/commands/__init__.py
+src/services/routing-api/routing_api/management/commands/probe_kakao_mobility.py
 src/services/routing-api/routing_api/migrations/0001_initial.py
 src/services/routing-api/routing_api/migrations/0002_modeldeployment_uq_deployment_current.py
 src/services/routing-api/routing_api/migrations/0003_canonical_model_deployment_states.py
@@ -874,6 +887,8 @@ src/services/routing-api/routing_api/persistence/ports.py
 src/services/routing-api/routing_api/persistence/records.py
 src/services/routing-api/routing_api/persistence/repositories.py
 src/services/routing-api/routing_api/production_composition.py
+src/services/routing-api/routing_api/provider_configuration.py
+src/services/routing-api/routing_api/provider_probe.py
 src/services/routing-api/routing_api/settings.py
 src/services/routing-api/routing_api/tests/__init__.py
 src/services/routing-api/routing_api/tests/conftest.py
@@ -885,6 +900,8 @@ src/services/routing-api/routing_api/tests/test_model_inference_budget.py
 src/services/routing-api/routing_api/tests/test_packaging.py
 src/services/routing-api/routing_api/tests/test_persistence.py
 src/services/routing-api/routing_api/tests/test_process_composition.py
+src/services/routing-api/routing_api/tests/test_provider_configuration.py
+src/services/routing-api/routing_api/tests/test_provider_probe.py
 src/services/routing-api/routing_api/tests/test_ri392_multi_itinerary_fanin.py
 src/services/routing-api/routing_api/tests/test_ri402_baseline_bootstrap.py
 src/services/routing-api/routing_api/tests/test_ri402b_opaque_topology.py
@@ -896,6 +913,7 @@ src/services/routing-api/routing_api/wsgi.py
 src/services/routing-api/routing_deployment/__init__.py
 src/services/routing-api/routing_deployment/baseline.py
 src/services/routing-api/routing_deployment/bootstrap.py
+src/services/routing-api/routing_deployment/gbis_live.py
 src/services/routing-api/routing_deployment/wsgi.py
 src/services/routing-api/transport_mapping/__init__.py
 src/services/routing-api/transport_mapping/catalog.py

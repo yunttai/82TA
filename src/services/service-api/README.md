@@ -2,7 +2,7 @@
 
 사용자 인증, 장소 검색 proxy, 사용자 입력 검증, Routing Gateway, 검색 기록, 즐겨찾기, 설정, 개인정보 권리를 구현한다. 교통 Provider와 모델을 직접 호출하지 않는다.
 
-## Public Service API 1.3.0
+## Public Service API 1.4.0
 
 ```bash
 uv sync
@@ -10,7 +10,7 @@ uv run python manage.py test
 uv run python manage.py runserver
 ```
 
-The backend implements the Public 1.3.0 endpoint set for guest/session lifecycle,
+The backend implements the Public 1.4.0 endpoint set for guest/session lifecycle,
 place suggestion/reverse geocoding, route search/history/detail/feedback,
 preferences, saved places, favorite journeys, consents, data export/deletion
 jobs, capabilities, and health. Requests and Routing responses are validated
@@ -50,7 +50,7 @@ responses are schema-normalized before returning to the browser.
 Kakao responses use the same identity-encoding rule and a separate
 `SERVICE_KAKAO_LOCAL_MAX_RESPONSE_BYTES` bound (default 512 KiB).
 
-Public 1.3.0 provides CSRF-protected email registration and login backed by
+Public 1.4.0 provides CSRF-protected email registration and login backed by
 Django adaptive password hashing and an HttpOnly/SameSite session cookie.
 Authentication attempts are rate limited and login failure does not reveal
 whether an email exists. A route POST without a credential gets an ephemeral browser guest session;
@@ -94,7 +94,7 @@ that account's export artifacts are physically removed. Deletion jobs remain
 removes the owner-bound job with the account and leaves a de-identified
 `DATA_DELETION_COMPLETED` audit event.
 
-Public 1.3.0 currently has no authenticated artifact-download operation, so
+Public 1.4.0 currently has no authenticated artifact-download operation, so
 `downloadUrl` intentionally remains `null`. Infrastructure wires the encrypted
 filesystem backend to private EFS and schedules both lifecycle commands, but a
 short-lived owner-bound delivery contract plus live worker, backup/analytics

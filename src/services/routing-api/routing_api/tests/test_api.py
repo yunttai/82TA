@@ -454,7 +454,7 @@ class RoutingApiTests(SimpleTestCase):
         ready = self.client.get("/v1/health/ready", **auth)
         self.assertEqual(version.status_code, 200)
         self.assertEqual(version.json()["models"], [])
-        self.assertEqual(version.json()["contractVersion"], "1.1.0")
+        self.assertEqual(version.json()["contractVersion"], "1.2.0")
         self.assertEqual(version.json()["contractVersion"], self.contract.contract_version)
         self.assertEqual(ready.status_code, 200)
         self.assertEqual(ready.json()["status"], "degraded")

@@ -143,6 +143,12 @@ class RealHttpCrossWorkstreamTests(unittest.TestCase):
         cls.service_environment.update(
             {
                 "PYTHONUNBUFFERED": "1",
+                "PYTHONPATH": os.pathsep.join(
+                    (
+                        str(SERVICE_ROOT),
+                        str(REPOSITORY_ROOT / "src/generated/routing-client-python"),
+                    )
+                ),
                 "SERVICE_ENVIRONMENT": "development",
                 "SERVICE_ROUTING_GATEWAY": "http",
                 "SERVICE_ROUTING_API_BASE_URL": cls.routing_url,

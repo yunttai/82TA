@@ -93,6 +93,8 @@ function busResponse(mappingGrade: "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN"): Publi
       from: { name: "승차 정류장", coordinate: { lon: 127.1, lat: 37.3 } },
       to: { name: "하차 정류장", coordinate: { lon: 127.2, lat: 37.4 } },
       duration: { p50Seconds: 900, p90Seconds: 1100, confidence, origin: "PROVIDER_ESTIMATE" },
+      waitDuration: { p50Seconds: 180, p90Seconds: 360, confidence, origin: "PROVIDER_ESTIMATE" },
+      travelDuration: { p50Seconds: 720, p90Seconds: 740, confidence, origin: "PROVIDER_ESTIMATE" },
       distanceMeters: 8000,
       fare: { currency: "KRW", lower: 2800, expected: 2800, upper: 2800, origin: "PROVIDER_ESTIMATE" },
       geometry: { encoding: "NONE" },
@@ -534,7 +536,7 @@ describe("terminal route-search states", () => {
 });
 
 describe("Bus Intelligence mapping gate", () => {
-  it("keeps the ordered walk, route-number and Taxi durations visible on the card", () => {
+  it("renders walk, each bus wait, each bus ride, Taxi wait, Taxi ride and final walk in order", () => {
     const response = busResponse("HIGH");
     const base = response.recommendations.fastest;
     if (base == null || base.legs[0] === undefined) throw new Error("Expected route");
@@ -542,10 +544,11 @@ describe("Bus Intelligence mapping gate", () => {
     const multimodal: RouteCandidate = {
       ...base,
       pattern: "TRANSIT_TAXI",
-      totalDuration: { ...base.totalDuration, p50Seconds: 2_880, p90Seconds: 3_600 },
+      totalDuration: { ...base.totalDuration, p50Seconds: 3_660, p90Seconds: 4_620 },
       taxiCost: { currency: "KRW", lower: 4_000, expected: 5_000, upper: 6_000, origin: "PROVIDER_ESTIMATE" },
       totalFareExpected: 7_800,
-      walkSeconds: 120,
+      walkSeconds: 300,
+      transferCount: 2,
       taxiLegCount: 1,
       legs: [
         {
@@ -555,6 +558,8 @@ describe("Bus Intelligence mapping gate", () => {
           mode: "WALK",
           to: { name: "판교제2테크노밸리 승차", coordinate: { lon: 127.11, lat: 37.31 } },
           duration: { ...template.duration, p50Seconds: 120, p90Seconds: 150 },
+          waitDuration: { ...template.duration, p50Seconds: 0, p90Seconds: 0 },
+          travelDuration: { ...template.duration, p50Seconds: 120, p90Seconds: 150 },
           distanceMeters: 124,
           fare: { currency: "KRW", lower: 0, expected: 0, upper: 0, origin: "PROVIDER_ESTIMATE" },
           transit: null,
@@ -567,18 +572,49 @@ describe("Bus Intelligence mapping gate", () => {
           from: { name: "판교제2테크노밸리 승차", coordinate: { lon: 127.11, lat: 37.31 } },
           to: { name: "삼가역·두산위브 하차", coordinate: { lon: 127.18, lat: 37.24 } },
           duration: { ...template.duration, p50Seconds: 2_460, p90Seconds: 2_900 },
+          waitDuration: { ...template.duration, p50Seconds: 300, p90Seconds: 500 },
+          travelDuration: { ...template.duration, p50Seconds: 2_160, p90Seconds: 2_400 },
           transit: { routeLabel: "9241", routeType: "SEAT_BUS", direction: "용인 방면" } as unknown as NonNullable<RouteCandidate["legs"][number]["transit"]>,
           busIntelligence: null,
         },
         {
           ...template,
-          legId: "taxi-leg",
+          legId: "second-bus-leg",
           sequence: 2,
+          from: { name: "삼가역·두산위브 환승", coordinate: { lon: 127.18, lat: 37.24 } },
+          to: { name: "목적지 인근 정류장", coordinate: { lon: 127.19, lat: 37.23 } },
+          duration: { ...template.duration, p50Seconds: 600, p90Seconds: 800 },
+          waitDuration: { ...template.duration, p50Seconds: 120, p90Seconds: 200 },
+          travelDuration: { ...template.duration, p50Seconds: 480, p90Seconds: 600 },
+          transit: { routeLabel: "5000", routeType: "SEAT_BUS", direction: "목적지 방면" } as unknown as NonNullable<RouteCandidate["legs"][number]["transit"]>,
+          busIntelligence: null,
+        },
+        {
+          ...template,
+          legId: "taxi-leg",
+          sequence: 3,
           mode: "TAXI",
-          from: { name: "삼가역·두산위브 하차", coordinate: { lon: 127.18, lat: 37.24 } },
+          from: { name: "목적지 인근 정류장", coordinate: { lon: 127.19, lat: 37.23 } },
+          to: { name: "목적지 앞", coordinate: { lon: 127.2, lat: 37.22 } },
           duration: { ...template.duration, p50Seconds: 300, p90Seconds: 550 },
+          waitDuration: { ...template.duration, p50Seconds: 60, p90Seconds: 120 },
+          travelDuration: { ...template.duration, p50Seconds: 240, p90Seconds: 430 },
           distanceMeters: 2_100,
           fare: { currency: "KRW", lower: 4_000, expected: 5_000, upper: 6_000, origin: "PROVIDER_ESTIMATE" },
+          transit: null,
+          busIntelligence: null,
+        },
+        {
+          ...template,
+          legId: "final-walk-leg",
+          sequence: 4,
+          mode: "WALK",
+          from: { name: "목적지 앞", coordinate: { lon: 127.2, lat: 37.22 } },
+          duration: { ...template.duration, p50Seconds: 180, p90Seconds: 220 },
+          waitDuration: { ...template.duration, p50Seconds: 0, p90Seconds: 0 },
+          travelDuration: { ...template.duration, p50Seconds: 180, p90Seconds: 220 },
+          distanceMeters: 210,
+          fare: { currency: "KRW", lower: 0, expected: 0, upper: 0, origin: "PROVIDER_ESTIMATE" },
           transit: null,
           busIntelligence: null,
         },
@@ -601,13 +637,17 @@ describe("Bus Intelligence mapping gate", () => {
     );
 
     const summary = screen.getByRole("list", { name: "이동 구간 요약" });
-    expect(within(summary).getByText("도보")).toBeVisible();
-    expect(within(summary).getByText("2분")).toBeVisible();
-    expect(within(summary).getByText("버스 9241번")).toBeVisible();
-    expect(within(summary).getByText("41분")).toBeVisible();
-    expect(within(summary).getByText("택시 (호출+주행)")).toBeVisible();
-    expect(within(summary).getByText("5분")).toBeVisible();
-    expect(screen.getByText(/택시 시간은 호출 대기와 해당 시각의 도로 주행을 합친 값/)).toBeVisible();
+    const items = within(summary).getAllByRole("listitem");
+    expect(items).toHaveLength(8);
+    expect(items[0]).toHaveTextContent(/도보.*2분/);
+    expect(items[1]).toHaveTextContent(/버스 대기.*5분/);
+    expect(items[2]).toHaveTextContent(/버스 9241번.*36분/);
+    expect(items[3]).toHaveTextContent(/버스 대기.*2분/);
+    expect(items[4]).toHaveTextContent(/버스 5000번.*8분/);
+    expect(items[5]).toHaveTextContent(/택시 예상 대기.*1분/);
+    expect(items[6]).toHaveTextContent(/택시.*4분/);
+    expect(items[7]).toHaveTextContent(/도보.*3분/);
+    expect(screen.getByText(/택시 예상 대기와 해당 시각의 도로 주행시간을 분리/)).toBeVisible();
   });
 
   it.each(["MEDIUM", "LOW", "UNKNOWN"] as const)("hides vehicle values for %s mapping", async (grade) => {

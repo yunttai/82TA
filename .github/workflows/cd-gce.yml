@@ -1,9 +1,10 @@
-name: CD - Build, Push & Deploy to GCE
+name: CD - Blank GCE Server
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/realtime-multimodal-e2e"]
     tags: ["v*.*.*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,10 +17,30 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment:
+      name: gce
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Check image-build inputs
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          KAKAO_JS_API_KEY: ${{ secrets.KAKAO_JS_API_KEY }}
+        run: |
+          set -euo pipefail
+          for name in DOCKERHUB_USERNAME DOCKERHUB_TOKEN KAKAO_JS_API_KEY; do
+            if [[ -z ${!name:-} ]]; then
+              echo "Missing required GCE secret: $name" >&2
+              exit 1
+            fi
+          done
+          [[ $DOCKERHUB_USERNAME =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "DOCKERHUB_USERNAME has an invalid format" >&2
+            exit 1
+          }
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
@@ -37,7 +58,7 @@ jobs:
           push: true
           build-args: |
             KAKAO_JS_API_KEY=${{ secrets.KAKAO_JS_API_KEY }}
-            VITE_PRIVACY_DOCUMENT_VERSION=${{ vars.PRIVACY_DOCUMENT_VERSION }}
+            VITE_PRIVACY_DOCUMENT_VERSION=privacy-v1
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/82ta-web:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/82ta-web:latest
@@ -68,25 +89,86 @@ jobs:
           cache-from: type=gha,scope=82ta-routing-api
           cache-to: type=gha,mode=max,scope=82ta-routing-api
 
+      - name: Build & Push Provider Egress Proxy
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: src
+          file: src/infra/docker/provider-egress-proxy/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/82ta-provider-egress-proxy:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/82ta-provider-egress-proxy:latest
+          cache-from: type=gha,scope=82ta-provider-egress-proxy
+          cache-to: type=gha,mode=max,scope=82ta-provider-egress-proxy
+
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     environment:
       name: gce
     env:
-      REMOTE_DIR: ${{ secrets.REMOTE_APP_DIR }}
+      REMOTE_DIR: /opt/82ta
       DOMAIN: ${{ secrets.DOMAIN }}
       LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
       IMAGE_TAG: ${{ github.sha }}
-      PRIVACY_DOCUMENT_VERSION: ${{ vars.PRIVACY_DOCUMENT_VERSION }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # 0. SSH
+      - name: Check blank-server deployment inputs
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          HOST: ${{ secrets.HOST }}
+          HOST_KEY: ${{ secrets.HOST_KEY }}
+          USER: ${{ secrets.USER }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          GBIS_SERVICE_KEY: ${{ secrets.GBIS_SERVICE_KEY }}
+          GITS_API_KEY: ${{ secrets.GITS_API_KEY }}
+          TMAP_APP_KEY: ${{ secrets.TMAP_APP_KEY }}
+          ODSAY_API_KEY: ${{ secrets.ODSAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          required=(
+            SSH_KEY HOST HOST_KEY USER DOMAIN LETSENCRYPT_EMAIL
+            DOCKERHUB_USERNAME DOCKERHUB_TOKEN KAKAO_REST_API_KEY
+            GBIS_SERVICE_KEY GITS_API_KEY TMAP_APP_KEY ODSAY_API_KEY
+          )
+          for name in "${required[@]}"; do
+            if [[ -z ${!name:-} ]]; then
+              echo "Missing required GCE secret: $name" >&2
+              exit 1
+            fi
+          done
+          [[ $DOCKERHUB_USERNAME =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "DOCKERHUB_USERNAME has an invalid format" >&2
+            exit 1
+          }
+          [[ $USER =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || {
+            echo "USER has an invalid format" >&2
+            exit 1
+          }
+          [[ $DOMAIN =~ ^([A-Za-z0-9-]+\.)+[A-Za-z]{2,63}$ ]] || {
+            echo "DOMAIN has an invalid format" >&2
+            exit 1
+          }
+          [[ $LETSENCRYPT_EMAIL =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]] || {
+            echo "LETSENCRYPT_EMAIL has an invalid format" >&2
+            exit 1
+          }
+          for name in KAKAO_REST_API_KEY GBIS_SERVICE_KEY GITS_API_KEY TMAP_APP_KEY ODSAY_API_KEY; do
+            value=${!name}
+            if [[ ! $value =~ ^[[:graph:]]+$ || $value == *"'"* ]]; then
+              echo "$name must be a single printable API-key value" >&2
+              exit 1
+            fi
+          done
+
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
@@ -97,78 +179,104 @@ jobs:
           HOST_KEY: ${{ secrets.HOST_KEY }}
         run: |
           set -euo pipefail
-          test -n "$HOST_KEY"
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$HOST_KEY" >> ~/.ssh/known_hosts
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Test SSH
+      - name: Check SSH and passwordless sudo
+        env:
+          SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: >-
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10
-          "${{ secrets.USER }}@${{ secrets.HOST }}" "echo OK"
+          "$SSH_TARGET" "sudo -n true && command -v apt-get >/dev/null"
 
-      # 1. Remote directory and deploy-only env
-      - name: Prepare remote directory & .deploy.env
+      - name: Bootstrap the blank server
+        env:
+          SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
+        run: |
+          set -euo pipefail
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            src/infra/gce/bootstrap-host.sh \
+            "$SSH_TARGET:/tmp/bootstrap-host.sh"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            src/infra/gce/refresh-provider-evidence.sh \
+            "$SSH_TARGET:/tmp/refresh-provider-evidence.sh"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
+            "sudo -n bash /tmp/bootstrap-host.sh"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
+            "rm -f /tmp/bootstrap-host.sh /tmp/refresh-provider-evidence.sh"
+
+      - name: Login the server to Docker Hub
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
-            REMOTE_DIR="'$REMOTE_DIR'" \
-            DOMAIN="'$DOMAIN'" \
-            LETSENCRYPT_EMAIL="'$LETSENCRYPT_EMAIL'" \
-            IMAGE_TAG="'$IMAGE_TAG'" \
-            DOCKERHUB_USERNAME="'$DOCKERHUB_USERNAME'" \
-            PRIVACY_DOCUMENT_VERSION="'$PRIVACY_DOCUMENT_VERSION'" \
-            bash -s <<'EOF'
-          set -euo pipefail
-          : "${REMOTE_DIR:?}"; : "${DOMAIN:?}"; : "${LETSENCRYPT_EMAIL:?}"
-          : "${IMAGE_TAG:?}"; : "${DOCKERHUB_USERNAME:?}"; : "${PRIVACY_DOCUMENT_VERSION:?}"
-          case "$REMOTE_DIR" in /*) ;; *) echo 'REMOTE_APP_DIR must be absolute' >&2; exit 1;; esac
-          test "$REMOTE_DIR" != "/"
-          mkdir -p "$REMOTE_DIR"/nginx "$REMOTE_DIR"/certbot/{config,www,logs,internal}
-          test -s "$REMOTE_DIR/.env" || {
-            echo 'ERROR: pre-provision REMOTE_APP_DIR/.env from src/infra/gce/.env.example' >&2
-            exit 1
-          }
-          chmod 600 "$REMOTE_DIR/.env"
-          umask 077
-          printf 'DOMAIN=%s\nLETSENCRYPT_EMAIL=%s\nIMAGE_TAG=%s\nDOCKERHUB_USERNAME=%s\nPRIVACY_DOCUMENT_VERSION=%s\n' \
-            "$DOMAIN" "$LETSENCRYPT_EMAIL" "$IMAGE_TAG" "$DOCKERHUB_USERNAME" \
-            "$PRIVACY_DOCUMENT_VERSION" > "$REMOTE_DIR/.deploy.env"
-          EOF
+          printf '%s' "$DOCKERHUB_TOKEN" | \
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
+              "sudo -n docker login --username '$DOCKERHUB_USERNAME' --password-stdin"
 
-      # 2. HTTP-only Nginx and Compose
-      - name: Upload HTTP-only Nginx template and Compose
+      - name: Install deployment and Provider environment
+        env:
+          SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          GBIS_SERVICE_KEY: ${{ secrets.GBIS_SERVICE_KEY }}
+          GITS_API_KEY: ${{ secrets.GITS_API_KEY }}
+          TMAP_APP_KEY: ${{ secrets.TMAP_APP_KEY }}
+          ODSAY_API_KEY: ${{ secrets.ODSAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          provider_file=$(mktemp)
+          deploy_file=$(mktemp)
+          trap 'rm -f "$provider_file" "$deploy_file"' EXIT
+          printf '%s\n' \
+            "KAKAO_REST_API_KEY='$KAKAO_REST_API_KEY'" \
+            "GBIS_SERVICE_KEY='$GBIS_SERVICE_KEY'" \
+            "GITS_API_KEY='$GITS_API_KEY'" \
+            "TMAP_APP_KEY='$TMAP_APP_KEY'" \
+            "ODSAY_API_KEY='$ODSAY_API_KEY'" > "$provider_file"
+          printf '%s\n' \
+            "DOMAIN=$DOMAIN" \
+            "LETSENCRYPT_EMAIL=$LETSENCRYPT_EMAIL" \
+            "IMAGE_TAG=$IMAGE_TAG" \
+            "DOCKERHUB_USERNAME=$DOCKERHUB_USERNAME" > "$deploy_file"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$provider_file" "$SSH_TARGET:/tmp/82ta.provider.env"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$deploy_file" "$SSH_TARGET:/tmp/82ta.deploy.env"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
+            "sudo -n install -o 10002 -g 10002 -m 600 /tmp/82ta.provider.env '$REMOTE_DIR/.provider.env' && sudo -n install -o root -g root -m 600 /tmp/82ta.deploy.env '$REMOTE_DIR/.deploy.env' && rm -f /tmp/82ta.provider.env /tmp/82ta.deploy.env"
+
+      - name: Upload Compose and HTTP Nginx configuration
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: |
           set -euo pipefail
-          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            src/infra/gce/nginx/default.http.conf.template \
-            "$SSH_TARGET:$REMOTE_DIR/nginx/default.conf.template"
           scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
             src/infra/gce/docker-compose.prod.yml \
             "$SSH_TARGET:$REMOTE_DIR/docker-compose.prod.yml"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            src/infra/gce/nginx/default.http.conf.template \
+            "$SSH_TARGET:$REMOTE_DIR/nginx/default.conf.template"
 
-      # 3. Start HTTP stack
-      - name: Start HTTP-only stack
+      - name: Start HTTP and Provider proxy
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
-            REMOTE_DIR="'$REMOTE_DIR'" bash -s <<'EOF'
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
           set -euo pipefail
-          cd "$REMOTE_DIR"
-          docker compose --env-file .env --env-file .deploy.env \
-            -f docker-compose.prod.yml down --remove-orphans || true
-          docker compose --env-file .env --env-file .deploy.env \
-            -f docker-compose.prod.yml up -d nginx web
+          cd /opt/82ta
+          compose=(sudo -n docker compose --env-file .env --env-file .provider.env --env-file .deploy.env -f docker-compose.prod.yml)
+          "${compose[@]}" config --quiet
+          "${compose[@]}" pull web service-api routing-api routing-egress-proxy routing-db routing-redis
+          "${compose[@]}" down --remove-orphans || true
+          "${compose[@]}" up -d nginx web routing-egress-proxy
           EOF
 
-      # 4. HTTP health
       - name: Wait for HTTP
         run: |
           set -euo pipefail
@@ -183,77 +291,64 @@ jobs:
           echo 'HTTP health check timed out' >&2
           exit 1
 
-      # 5. Public certificate
-      - name: Issue / Renew SSL
+      - name: Issue or renew the public certificate
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
-            REMOTE_DIR="'$REMOTE_DIR'" DOMAIN="'$DOMAIN'" \
-            LETSENCRYPT_EMAIL="'$LETSENCRYPT_EMAIL'" bash -s <<'EOF'
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
           set -euo pipefail
-          cd "$REMOTE_DIR"
-          docker compose --env-file .env --env-file .deploy.env \
-            -f docker-compose.prod.yml run --rm certbot \
-            certonly --webroot -w /var/www/certbot \
-            --non-interactive --keep-until-expiring \
-            --email "$LETSENCRYPT_EMAIL" -d "$DOMAIN" \
+          cd /opt/82ta
+          domain=$(sed -n 's/^DOMAIN=//p' .deploy.env)
+          letsencrypt_email=$(sed -n 's/^LETSENCRYPT_EMAIL=//p' .deploy.env)
+          test -n "$domain"
+          test -n "$letsencrypt_email"
+          sudo -n docker compose --env-file .env --env-file .provider.env --env-file .deploy.env \
+            -f docker-compose.prod.yml --profile tools run --rm certbot \
+            certonly --webroot -w /var/www/certbot --non-interactive \
+            --keep-until-expiring --email "$letsencrypt_email" -d "$domain" \
             --agree-tos --no-eff-email --rsa-key-size 4096
           EOF
 
-      # 6. Private Service -> Routing TLS certificate
-      - name: Prepare private Routing TLS certificate
+      - name: Probe Providers and start Routing
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
-        run: |
-          set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
-            REMOTE_DIR="'$REMOTE_DIR'" bash -s <<'EOF'
-          set -euo pipefail
-          internal="$REMOTE_DIR/certbot/internal"
-          if [ ! -s "$internal/routing.crt" ] || [ ! -s "$internal/routing.key" ]; then
-            openssl req -x509 -nodes -newkey rsa:2048 -sha256 -days 825 \
-              -keyout "$internal/routing.key" -out "$internal/routing.crt" \
-              -subj '/CN=routing.internal' \
-              -addext 'subjectAltName=DNS:routing.internal'
-          fi
-          cat /etc/ssl/certs/ca-certificates.crt "$internal/routing.crt" \
-            > "$internal/routing-ca-bundle.pem"
-          chmod 600 "$internal/routing.key"
-          chmod 644 "$internal/routing.crt" "$internal/routing-ca-bundle.pem"
-          EOF
+        run: >-
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET"
+          "sudo -n /usr/local/sbin/82ta-refresh-provider-evidence"
 
-      # 7. HTTPS Nginx
-      - name: Upload HTTPS Nginx template
+      - name: Upload HTTPS Nginx configuration
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
-        run: |
-          set -euo pipefail
-          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            src/infra/gce/nginx/default.https.conf.template \
-            "$SSH_TARGET:$REMOTE_DIR/nginx/default.conf.template"
+        run: >-
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes
+          src/infra/gce/nginx/default.https.conf.template
+          "$SSH_TARGET:$REMOTE_DIR/nginx/default.conf.template"
 
-      # 8. Migrate and deploy all services
-      - name: Deploy latest stack
+      - name: Deploy the complete stack
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" \
-            REMOTE_DIR="'$REMOTE_DIR'" bash -s <<'EOF'
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
           set -euo pipefail
-          cd "$REMOTE_DIR"
-          compose=(docker compose --env-file .env --env-file .deploy.env -f docker-compose.prod.yml)
+          cd /opt/82ta
+          compose=(
+            sudo -n docker compose
+            --env-file .env
+            --env-file .provider.env
+            --env-file .deploy.env
+            --env-file .runtime/provider-evidence.env
+            -f docker-compose.prod.yml
+          )
           "${compose[@]}" config --quiet
           "${compose[@]}" pull
-          "${compose[@]}" --profile tools run --rm service-migrate
-          "${compose[@]}" --profile tools run --rm routing-migrate
           "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 180
           "${compose[@]}" up -d --force-recreate --no-deps --wait --wait-timeout 60 nginx
+          sudo -n systemctl enable --now 82ta-provider-evidence-refresh.timer
+          sudo -n systemctl enable --now 82ta-certificate-renew.timer
           EOF
 
-      # 9. HTTPS health
       - name: Verify HTTPS
         run: |
           set -euo pipefail
@@ -269,13 +364,12 @@ jobs:
           echo 'HTTPS health check timed out' >&2
           exit 1
 
-      # 10. Cleanup dangling images only
       - name: Prune dangling images
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: >-
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET"
-          "docker image prune -f --filter 'until=168h' || true"
+          "sudo -n docker image prune -f --filter 'until=168h' || true"
 
   notify:
     needs: [build-and-push, deploy]

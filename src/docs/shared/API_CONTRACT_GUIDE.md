@@ -62,6 +62,17 @@ Public API는 내부 provider status 전체, 원문 번호판, raw payload, arti
 - `baseline`은 Routing의 `publicTransitOnly` recommendation ID가 지시한 route다. Service가 새 baseline을 고르지 않는다.
 - Public `support`는 Routing capability를 축약하며 missing coverage는 `UNKNOWN`이다.
 
+### Route leg 시간 구성
+
+- `RouteLeg.duration`은 기존과 동일하게 해당 leg에 귀속된 전체 경과시간이다.
+- optional `waitDuration`은 사용자가 해당 leg를 탈 준비가 된 뒤 실제 이동이
+  시작되기까지의 버스·철도 승차 대기 또는 택시 배차 대기다.
+- optional `travelDuration`은 승차·배차 대기 이후 실제 이동시간이다.
+- 새 Routing producer는 두 component를 모두 제공한다. 필드 부재는 구 producer
+  응답이며 알려진 0분으로 해석하지 않는다.
+- 시간대별 재평가와 상관관계 때문에 component P90을 단순 합산해 전체 P90을
+  다시 계산하지 않는다. `duration`과 route `totalDuration`이 최종 권위값이다.
+
 ## 4. Private Routing API
 
 ```text
@@ -100,7 +111,7 @@ GET  /v1/version
 - deprecation 기간 뒤 제거
 - compatible minor는 OpenAPI/DB/code registry metadata의 minor를 올리되, Private request의 `contractVersion: "1.0"`은 1.x wire compatibility family로 유지한다.
 - `/v1/version.contractVersion`은 현재 로드된 Private OpenAPI의 repository
-  metadata(`1.1.0`)를 보고한다. optimize request/response body의 wire family
+  metadata(`1.2.0`)를 보고한다. optimize request/response body의 wire family
   `1.0`과 구분한다.
 - `rankingPolicyVersion`은 exact opaque provenance이며 Service가 의미를
   추론하거나 다시 계산하지 않는다.

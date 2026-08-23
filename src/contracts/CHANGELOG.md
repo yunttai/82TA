@@ -1,5 +1,14 @@
 # Contract Changelog
 
+## 1.4.0 — 2026-08-24
+
+- Added optional `RouteLeg.waitDuration` and `RouteLeg.travelDuration` to preserve
+  the optimizer's separate bus/rail boarding wait, Taxi dispatch wait and movement
+  time through Routing, Service and Web.
+- Kept `duration` and `totalDuration` authoritative and unchanged. Existing 1.x
+  consumers can ignore the additive fields; absence remains distinct from known zero.
+- No DBML, migration, event, code-registry, ranking, budget or route-ID change.
+
 ## Routing policy provenance activation — 2026-08-24
 
 - Accepted the implemented minimum-arrival correction only for the finite canonical

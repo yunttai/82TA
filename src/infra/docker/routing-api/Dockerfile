@@ -38,6 +38,10 @@ WORKDIR /app/src/services/routing-api
 COPY --from=builder /opt/routing-venv/ /opt/routing-venv/
 COPY --from=builder --chown=routing:routing /build/services/routing-api/ /app/src/services/routing-api/
 COPY --chown=routing:routing contracts/ /app/src/contracts/
+COPY --chown=routing:routing scripts/prepare_routing_docker_live.py /app/src/scripts/prepare_routing_docker_live.py
+COPY --chown=routing:routing infra/docker/compose.routing-live.yml /app/src/infra/docker/compose.routing-live.yml
+COPY --chown=routing:routing infra/docker/provider-egress-proxy/Dockerfile /app/src/infra/docker/provider-egress-proxy/Dockerfile
+COPY --chown=routing:routing infra/docker/provider-egress-proxy/egress_proxy.py /app/src/infra/docker/provider-egress-proxy/egress_proxy.py
 COPY --chown=routing:routing infra/docker/routing-api/runtime_entrypoint.py /opt/routing/runtime_entrypoint.py
 COPY --chown=routing:routing infra/docker/routing-api/database_bootstrap.py /opt/routing/database_bootstrap.py
 

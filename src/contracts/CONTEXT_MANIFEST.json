@@ -1,7 +1,7 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.3.0",
-  "contractVersion": "1.3.0",
+  "contextVersion": "1.4.0",
+  "contractVersion": "1.4.0",
   "canonicalFiles": [
     "src/docs/shared/PROJECT_CONTEXT.md",
     "src/docs/shared/PRD.md",
