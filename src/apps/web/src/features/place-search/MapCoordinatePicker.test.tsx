@@ -16,12 +16,12 @@ afterEach(() => {
 });
 
 describe("input map coordinate picker", () => {
-  it("keeps direct-coordinate fallback when the browser map key is absent", () => {
+  it("keeps place-search fallback when the browser map key is absent", () => {
     vi.stubEnv("VITE_KAKAO_MAP_APP_KEY", "");
     render(<MapCoordinatePicker origin={origin} destination={destination} onPlaceSelected={vi.fn()} />);
 
     expect(screen.getByText("지도 선택을 사용할 수 없습니다.")).toBeInTheDocument();
-    expect(screen.getByText(/좌표를 직접 입력해 주세요/)).toBeInTheDocument();
+    expect(screen.getByText(/출발지와 목적지 장소 검색을 이용해 주세요/)).toBeInTheDocument();
   });
 
   it("reverse-geocodes a map click through the Service API and returns canonical PlaceRef", async () => {

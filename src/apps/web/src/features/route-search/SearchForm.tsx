@@ -13,6 +13,7 @@ type Optimization = PublicRouteSearchRequest["preferences"]["optimization"];
 type AllowedMode = NonNullable<PublicRouteSearchRequest["preferences"]["allowedModes"]>[number];
 
 const canonicalModes: readonly AllowedMode[] = ["WALK", "WAIT", "TRANSFER", "TAXI", "BUS", "SUBWAY", "GTX", "TRAIN"];
+const budgetPresetAmounts = [0, 5000, 10000, 20000] as const;
 const modeLabels: Readonly<Record<AllowedMode, string>> = {
   WALK: "도보", WAIT: "대기", TRANSFER: "환승 이동", TAXI: "택시",
   BUS: "버스", SUBWAY: "지하철", GTX: "GTX", TRAIN: "기차",
@@ -48,6 +49,7 @@ interface SearchFormProps {
   errors: readonly string[];
   capabilities?: PublicCapabilities | null;
   initialPreferences?: UserPreferences | null;
+  initialTaxiBudget?: number;
   onSubmit: (draft: SearchDraft) => void;
 }
 
@@ -57,9 +59,11 @@ function localDateTimeDefault(): string {
   return koreaTime.toISOString().slice(0, 16);
 }
 
-export function SearchForm({ busy, offline = false, errors, capabilities, initialPreferences = null, onSubmit }: SearchFormProps) {
+export function SearchForm({ busy, offline = false, errors, capabilities, initialPreferences = null, initialTaxiBudget, onSubmit }: SearchFormProps) {
   const errorId = useId();
   const [userEdited, setUserEdited] = useState(false);
+  const startingTaxiBudget = initialTaxiBudget ?? 10000;
+  const [selectedBudgetPreset, setSelectedBudgetPreset] = useState<number | null>(budgetPresetAmounts.includes(startingTaxiBudget as (typeof budgetPresetAmounts)[number]) ? startingTaxiBudget : null);
   const [draft, setDraft] = useState<SearchDraft>({
     originName: "명지대학교 자연캠퍼스",
     originLongitude: "127.187456",
@@ -71,7 +75,7 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
     departureTime: localDateTimeDefault(),
     departureType: "DEPART_AT",
     arrivalDeadline: "",
-    taxiBudgetKrw: "10000",
+    taxiBudgetKrw: String(startingTaxiBudget),
     maxWalkMinutes: "15",
     maxTransfers: "3",
     maxTaxiLegs: "2",
@@ -85,7 +89,10 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
   });
 
   useEffect(() => {
-    if (initialPreferences === null || userEdited) return;
+    if (initialPreferences === null || userEdited || initialTaxiBudget !== undefined) return;
+    setSelectedBudgetPreset(budgetPresetAmounts.includes(initialPreferences.defaultTaxiBudget as (typeof budgetPresetAmounts)[number])
+      ? initialPreferences.defaultTaxiBudget
+      : null);
     setDraft((current) => ({
       ...current,
       taxiBudgetKrw: String(initialPreferences.defaultTaxiBudget),
@@ -96,7 +103,7 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
       avoidStairs: initialPreferences.accessibility?.avoidStairs ?? false,
       wheelchair: initialPreferences.accessibility?.wheelchair ?? false,
     }));
-  }, [initialPreferences, userEdited]);
+  }, [initialPreferences, initialTaxiBudget, userEdited]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -194,35 +201,45 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
               required={draft.departureTiming === "SCHEDULED"}
             />
           </label>
-          <label className="field budget-field">
-            <span>택시비 상한</span>
-            <span className="input-suffix">
-              <input
-                name="taxiBudgetKrw"
-                inputMode="numeric"
-                min={0}
-                max={500000}
-                step={1}
-                value={draft.taxiBudgetKrw}
-                onChange={(event) => setDraft({ ...draft, taxiBudgetKrw: event.currentTarget.value })}
-                required
-              />
-              <span>원</span>
-            </span>
-          </label>
-          <div className="budget-presets" role="group" aria-label="택시비 빠른 선택">
-            {([[0, "0원"], [5000, "5천원"], [10000, "1만원"], [20000, "2만원"]] as const).map(([amount, label]) => (
-              <button key={amount} type="button" aria-pressed={draft.taxiBudgetKrw === String(amount)} onClick={() => setDraft({ ...draft, taxiBudgetKrw: String(amount) })}>
-                {label}
-              </button>
-            ))}
+          <div className="budget-section field-wide">
+            <span className="budget-title">요금 상한</span>
+            <div className="budget-presets" role="group" aria-label="택시 요금 빠른 선택">
+              {([[0, "무관"], [5000, "5천원"], [10000, "1만원"], [20000, "2만원"]] as const).map(([amount, label]) => (
+                <button key={amount} type="button" aria-pressed={selectedBudgetPreset === amount} onClick={() => {
+                  setSelectedBudgetPreset(amount);
+                  setDraft({ ...draft, taxiBudgetKrw: String(amount) });
+                }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="field budget-field">
+              <span>직접 입력</span>
+              <span className="input-suffix">
+                <input
+                  name="taxiBudgetKrw"
+                  inputMode="numeric"
+                  min={0}
+                  max={500000}
+                  step={1}
+                  value={draft.taxiBudgetKrw}
+                  onFocus={() => setSelectedBudgetPreset(null)}
+                  onChange={(event) => {
+                    setSelectedBudgetPreset(null);
+                    setDraft({ ...draft, taxiBudgetKrw: event.currentTarget.value });
+                  }}
+                  required
+                />
+                <span>원</span>
+              </span>
+            </label>
           </div>
         </div>
 
         <details className="details-panel">
           <summary>세부 조건</summary>
           <div className="form-grid details-grid">
-            <label className="field field-wide">
+            <label className="field field-wide deadline-field">
               <span>도착 마감 시각(선택) · 한국 시간</span>
               <input
                 name="arrivalDeadline"

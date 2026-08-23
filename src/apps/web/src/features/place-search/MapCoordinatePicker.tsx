@@ -104,8 +104,8 @@ export function MapCoordinatePicker({ origin, destination, disabled = false, onP
       </div>
       <div className="coordinate-map" ref={container} role="group" aria-label={`${target === "ORIGIN" ? "출발지" : "목적지"} 좌표 선택 지도`} aria-describedby="coordinate-picker-instructions" aria-hidden={status === "NO_KEY" || status === "FAILED" ? true : undefined} />
       {status !== "NO_KEY" && status !== "FAILED" && <button className="secondary-button" type="button" disabled={disabled || pendingCoordinate === null || status === "GEOCODING"} onClick={() => void confirmCoordinate()}>{status === "GEOCODING" ? "주소 확인 중…" : "이 위치 선택"}</button>}
-      {status === "NO_KEY" && <p className="map-picker-fallback" role="status"><strong>지도 선택을 사용할 수 없습니다.</strong> Kakao 지도 키가 연결되지 않았습니다. 세부 조건에서 좌표를 직접 입력해 주세요.</p>}
-      {status === "FAILED" && <p className="map-picker-fallback" role="status"><strong>지도 SDK를 사용할 수 없습니다.</strong> 장소 검색 또는 좌표 직접 입력을 이용해 주세요.</p>}
+      {status === "NO_KEY" && <p className="map-picker-fallback" role="status"><strong>지도 선택을 사용할 수 없습니다.</strong> Kakao 지도 키가 연결되지 않았습니다. 출발지와 목적지 장소 검색을 이용해 주세요.</p>}
+      {status === "FAILED" && <p className="map-picker-fallback" role="status"><strong>지도 SDK를 사용할 수 없습니다.</strong> 출발지와 목적지 장소 검색을 이용해 주세요.</p>}
       {status === "GEOCODING" && <p className="place-status" role="status">선택한 좌표의 주소를 Service에서 확인하는 중…</p>}
     </section>
   );

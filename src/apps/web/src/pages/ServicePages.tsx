@@ -96,7 +96,7 @@ export function HistoryPage() {
               <span>{item.history === undefined ? "저장 정보 확인 불가" : `${item.history.saved ? "기록 저장됨" : "기록 저장 안 함"} · ${item.history.ownerKind === "USER" ? "로그인 사용자" : "게스트"}`}</span>
               {item.history?.retainedUntil != null && <span>보관 기한 {new Date(item.history.retainedUntil).toLocaleString("ko-KR")}</span>}
               {item.status === "EXPIRED" || new Date(item.expiresAt).getTime() <= Date.now()
-                ? <a href="/">만료됨 · 다시 검색</a>
+                ? <a href="/search">만료됨 · 다시 검색</a>
                 : <a href={`/searches/${encodeURIComponent(item.searchId)}`}>저장 결과 확인</a>}
             </li>
           ))}
@@ -123,7 +123,7 @@ export function StoredSearchPage({ searchId, routeId, legId }: { searchId: strin
 
   if (response === null) {
     const message = status === "LOADING" ? "저장 결과를 불러오는 중…" : status === "NOT_FOUND" ? "검색 결과를 찾을 수 없습니다." : status === "FORBIDDEN" ? "이 검색 결과에 접근할 수 없습니다." : "검색 결과를 불러오지 못했습니다.";
-    return <PageFrame eyebrow="저장 결과" title={message}><a href="/">새 경로 검색</a></PageFrame>;
+    return <PageFrame eyebrow="저장 결과" title={message}><a href="/search">새 경로 검색</a></PageFrame>;
   }
 
   const routes = Object.values(response.recommendations).filter((route): route is NonNullable<typeof route> => route != null);
