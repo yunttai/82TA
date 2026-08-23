@@ -4,6 +4,8 @@ from . import account_views, views
 
 urlpatterns = [
     path("api/v1/health", views.health, name="public-health"),
+    path("api/v1/auth/register", account_views.register_with_email, name="register-with-email"),
+    path("api/v1/auth/login", account_views.login_with_email, name="login-with-email"),
     path("api/v1/guest-sessions", account_views.create_guest_session, name="create-guest-session"),
     path("api/v1/session", account_views.current_session, name="current-session"),
     path("api/v1/route-searches", views.create_route_search, name="create-route-search"),

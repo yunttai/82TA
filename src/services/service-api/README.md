@@ -48,9 +48,10 @@ responses are schema-normalized before returning to the browser.
 Kakao responses use the same identity-encoding rule and a separate
 `SERVICE_KAKAO_LOCAL_MAX_RESPONSE_BYTES` bound (default 512 KiB).
 
-First-party tests may provision a Service user and set `service_user_id` in the
-Django session because login/social identity endpoints are not part of Public
-1.1. A route POST without a credential gets an ephemeral browser guest session;
+Public 1.2 provides CSRF-protected email registration and login backed by
+Django adaptive password hashing and an HttpOnly/SameSite session cookie.
+Authentication attempts are rate limited and login failure does not reveal
+whether an email exists. A route POST without a credential gets an ephemeral browser guest session;
 explicit `POST /api/v1/guest-sessions` additionally returns a one-time opaque
 guest token whose hash alone is stored. `saveToHistory=true` remains restricted
 to an authenticated user with current `SEARCH_HISTORY` consent.
