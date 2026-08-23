@@ -5,9 +5,14 @@ private app/data subnets, CloudFront OAC and private S3 PWA hosting, WAF,
 CloudFront-only public ALB ingress, ECS Fargate, a Service-owned RDS database,
 TLS ElastiCache, KMS/Secrets Manager, ECR, logs, alarms, autoscaling, a
 KMS-encrypted EFS access point plus EventBridge/SQS lifecycle workers, and an
-optional environment-scoped GitHub OIDC deploy role. It creates no Routing
-compute or Routing database. HTTP Routing mode accepts only an HTTPS private
-URL and an explicit exact-host allowlist.
+optional environment-scoped GitHub OIDC deploy role.
+
+`modules/routing-platform` is instantiated conditionally by the same staging
+root without merging bounded contexts. It creates the private Routing ALB/ECS,
+Routing-owned PostGIS and Redis, separate KMS/secrets/ECR/logs, dedicated
+Network-Firewall-routed subnets, one-off DB bootstrap/migration tasks, Routing
+alarms, and a separate least-privilege OIDC role. HTTP Routing mode accepts only
+the derived HTTPS private URL and exact host allowlist.
 
 Initialize staging with a separately bootstrapped encrypted state bucket and
 lock table:
@@ -31,6 +36,12 @@ owns and rotates its master password in Secrets Manager. The
 container startup adapter combines that password with non-secret RDS endpoint
 fields into `DATABASE_URL` in process memory; neither the password nor URL is
 written to Terraform state or disk.
+
+Routing has separate empty Django, application DB, migration DB, and Provider
+secret containers. After values are populated externally, use the protected
+bootstrap workflow to prepare PostGIS and the two DB roles, migrate through
+`routing_migrator`, finalize `routing_app` grants, and disable migrator login.
+See `src/infra/aws/ROUTING_STAGING_RUNBOOK.md`.
 
 The ECS task uses the backend's production Redis contract directly:
 `SERVICE_REDIS_URL=rediss://<private-primary-endpoint>:6379/0`, TLS-enabled

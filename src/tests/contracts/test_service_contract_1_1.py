@@ -146,7 +146,8 @@ class ServiceContract11Tests(unittest.TestCase):
         self.assertEqual(versions["contractVersion"], "1.3.0")
         self.assertEqual(versions["databaseContractVersion"], "1.2.0")
         self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
-        self.assertEqual(versions["rankingPolicyVersion"], "rank-0.1.1")
+        self.assertEqual(versions["rankingPolicyVersion"], "rank-0.2.0")
+        self.assertEqual(versions["strategyPolicyVersion"], "strategy-2.0.0")
 
     def test_registration_inline_example_matches_its_schema(self) -> None:
         example = self.public["paths"]["/api/v1/auth/register"]["post"]["requestBody"][

@@ -1083,7 +1083,7 @@ resource "aws_ecs_task_definition" "service" {
     secrets = concat(
       [
         { name = "SERVICE_SECRET_KEY", valueFrom = aws_secretsmanager_secret.django.arn },
-        { name = "KAKAO_LOCAL_REST_KEY", valueFrom = aws_secretsmanager_secret.kakao_local.arn },
+        { name = "KAKAO_REST_API_KEY", valueFrom = aws_secretsmanager_secret.kakao_local.arn },
         { name = "SERVICE_DATABASE_PASSWORD", valueFrom = "${aws_db_instance.service.master_user_secret[0].secret_arn}:password::" },
         { name = "SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY", valueFrom = aws_secretsmanager_secret.data_rights_artifact_key.arn }
       ],

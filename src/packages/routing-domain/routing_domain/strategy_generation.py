@@ -15,7 +15,7 @@ from enum import StrEnum
 from hashlib import sha256
 from typing import Iterable, TypeAlias
 
-from .candidate_generation import BoundedCandidateGenerator
+from .candidate_generation import BoundedCandidateGenerator, OptimalityUncertifiedError
 from .models import (
     BusWaitContribution,
     CandidateSeed,
@@ -381,11 +381,13 @@ class StrategyGenerationInput:
 
 @dataclass(frozen=True, slots=True)
 class StrategyGenerationPolicy:
-    version: str = "strategy-1.0.0"
+    version: str = "strategy-2.0.0"
     max_access_per_baseline: int = 3
     max_egress_per_baseline: int = 3
     max_taxi_only: int = 4
     max_bridges: int = 8
+    # Retained for construction compatibility only. A fixed slack above a
+    # different candidate's lower bound is not an admissible pruning proof.
     coarse_time_slack_seconds: int = 3600
 
     def __post_init__(self) -> None:
@@ -644,6 +646,17 @@ class StrategyCandidate:
     exactification: CandidateExactificationPlan
 
 
+def _strategy_frontier_key(candidate: StrategyCandidate) -> tuple[object, ...]:
+    seed = candidate.seed
+    return (
+        seed.coarse_p50_seconds,
+        seed.coarse_taxi_upper_krw,
+        seed.coarse_risk,
+        seed.pattern,
+        seed.candidate_key,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class StrategyRejection:
     candidate_key: str
@@ -666,6 +679,217 @@ class StrategyGenerationBatch:
 
     def costs(self) -> dict[str, LegCost]:
         return dict(self.cost_catalog)
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyExactificationBatch:
+    """One contiguous, cap-safe prefix from a finite strategy frontier."""
+
+    candidates: tuple[StrategyCandidate, ...]
+    exact_enrichment_plan: tuple[ExactEnrichmentRequest, ...]
+    cost_catalog: tuple[tuple[str, LegCost], ...]
+    logical_provider_calls: int
+    exactification_plan: ExactificationPlan
+    min_unseen_p50_lower_bound: int | None
+    scope_exhausted: bool
+
+    def __post_init__(self) -> None:
+        candidate_keys = tuple(item.seed.candidate_key for item in self.candidates)
+        if len(candidate_keys) != len(set(candidate_keys)):
+            raise ValueError("strategy batch candidate keys must be unique")
+        if tuple(sorted(self.candidates, key=_strategy_frontier_key)) != self.candidates:
+            raise ValueError("strategy batch candidates must preserve frontier order")
+        plan_keys = tuple(
+            item.candidate_key for item in self.exactification_plan.candidates
+        )
+        if plan_keys != candidate_keys:
+            raise ValueError("strategy batch plan keys must match batch candidates")
+        expected_calls = sum(
+            item.exactification.logical_provider_calls for item in self.candidates
+        )
+        if (
+            self.logical_provider_calls != expected_calls
+            or self.exactification_plan.logical_provider_calls != expected_calls
+        ):
+            raise ValueError("strategy batch logical provider call count is inconsistent")
+        cost_keys = tuple(key for key, _ in self.cost_catalog)
+        if len(cost_keys) != len(set(cost_keys)):
+            raise ValueError("strategy batch cost keys must be unique")
+        required_cost_keys = {
+            leg.evaluator_key
+            for candidate in self.candidates
+            for leg in candidate.seed.legs
+        }
+        if set(cost_keys) != required_cost_keys:
+            raise ValueError("strategy batch costs must exactly cover candidate legs")
+        enrichment_keys = tuple(
+            request.request_key for request in self.exact_enrichment_plan
+        )
+        if len(enrichment_keys) != len(set(enrichment_keys)):
+            raise ValueError("strategy batch enrichment requests must be unique")
+        expected_enrichment_keys = {
+            request.request_key
+            for candidate in self.candidates
+            for request in candidate.exact_enrichment
+        }
+        if set(enrichment_keys) != expected_enrichment_keys:
+            raise ValueError(
+                "strategy batch enrichment plan must cover candidate requests"
+            )
+        if self.scope_exhausted != (self.min_unseen_p50_lower_bound is None):
+            raise ValueError("strategy batch unseen lower bound contradicts exhaustion")
+        if (
+            self.min_unseen_p50_lower_bound is not None
+            and self.candidates
+            and self.min_unseen_p50_lower_bound
+            < self.candidates[-1].seed.coarse_p50_seconds
+        ):
+            raise ValueError("strategy batch unseen lower bound precedes emitted prefix")
+
+    @property
+    def seeds(self) -> tuple[CandidateSeed, ...]:
+        return tuple(item.seed for item in self.candidates)
+
+    def costs(self) -> dict[str, LegCost]:
+        return dict(self.cost_catalog)
+
+
+@dataclass(frozen=True, slots=True)
+class StrategySearchSpace:
+    """Complete finite strategy scope admitted by static constraints only."""
+
+    candidates: tuple[StrategyCandidate, ...]
+    rejected: tuple[StrategyRejection, ...]
+    cost_catalog: tuple[tuple[str, LegCost], ...]
+    policy_version: str
+    candidate_batch_cap: int
+    logical_provider_call_cap: int
+
+    def __post_init__(self) -> None:
+        if self.candidate_batch_cap <= 0 or self.logical_provider_call_cap <= 0:
+            raise ValueError("strategy search-space caps must be positive")
+        candidate_keys = tuple(item.seed.candidate_key for item in self.candidates)
+        if len(candidate_keys) != len(set(candidate_keys)):
+            raise ValueError("strategy search-space candidate keys must be unique")
+        if tuple(sorted(self.candidates, key=_strategy_frontier_key)) != self.candidates:
+            raise ValueError(
+                "strategy search-space candidates must use deterministic frontier order"
+            )
+        if any(
+            item.exactification.candidate_key != item.seed.candidate_key
+            for item in self.candidates
+        ):
+            raise ValueError("strategy candidate exactification key mismatch")
+        cost_keys = tuple(key for key, _ in self.cost_catalog)
+        if len(cost_keys) != len(set(cost_keys)):
+            raise ValueError("strategy search-space cost keys must be unique")
+        required_cost_keys = {
+            leg.evaluator_key
+            for candidate in self.candidates
+            for leg in candidate.seed.legs
+        }
+        if set(cost_keys) != required_cost_keys:
+            raise ValueError(
+                "strategy search-space costs must exactly cover candidate legs"
+            )
+
+    @property
+    def min_p50_lower_bound(self) -> int | None:
+        return (
+            self.candidates[0].seed.coarse_p50_seconds
+            if self.candidates
+            else None
+        )
+
+    def open_frontier(self) -> "StrategySearchFrontier":
+        return StrategySearchFrontier(self)
+
+
+class StrategySearchFrontier:
+    """Mutable cursor over an immutable, deterministically ordered search space."""
+
+    def __init__(self, space: StrategySearchSpace) -> None:
+        self.space = space
+        self._cursor = 0
+
+    @property
+    def scope_exhausted(self) -> bool:
+        return self._cursor >= len(self.space.candidates)
+
+    @property
+    def min_unseen_p50_lower_bound(self) -> int | None:
+        if self.scope_exhausted:
+            return None
+        return self.space.candidates[self._cursor].seed.coarse_p50_seconds
+
+    def next_exactification_batch(
+        self,
+        *,
+        candidate_cap: int | None = None,
+        logical_provider_call_cap: int | None = None,
+    ) -> StrategyExactificationBatch:
+        effective_candidate_cap = (
+            self.space.candidate_batch_cap
+            if candidate_cap is None
+            else candidate_cap
+        )
+        effective_provider_cap = (
+            self.space.logical_provider_call_cap
+            if logical_provider_call_cap is None
+            else logical_provider_call_cap
+        )
+        if not 0 < effective_candidate_cap <= self.space.candidate_batch_cap:
+            raise ValueError("candidate_cap must be within the configured batch cap")
+        if not 0 < effective_provider_cap <= self.space.logical_provider_call_cap:
+            raise ValueError(
+                "logical_provider_call_cap must be within the configured provider cap"
+            )
+
+        selected: list[StrategyCandidate] = []
+        provider_units = 0
+        while self._cursor < len(self.space.candidates):
+            candidate = self.space.candidates[self._cursor]
+            candidate_units = candidate.exactification.logical_provider_calls
+            if candidate_units > effective_provider_cap:
+                raise OptimalityUncertifiedError(
+                    "CANDIDATE_PROVIDER_CALL_CAP_UNCERTIFIED"
+                )
+            if len(selected) >= effective_candidate_cap:
+                break
+            if provider_units + candidate_units > effective_provider_cap:
+                break
+            selected.append(candidate)
+            provider_units += candidate_units
+            self._cursor += 1
+
+        evaluator_keys = {
+            leg.evaluator_key
+            for candidate in selected
+            for leg in candidate.seed.legs
+        }
+        costs = tuple(
+            item for item in self.space.cost_catalog if item[0] in evaluator_keys
+        )
+        requests: dict[str, ExactEnrichmentRequest] = {}
+        for candidate in selected:
+            for request in candidate.exact_enrichment:
+                requests.setdefault(request.request_key, request)
+        exactification = ExactificationPlan(
+            candidates=tuple(item.exactification for item in selected),
+            candidate_cap=effective_candidate_cap,
+            logical_provider_call_cap=effective_provider_cap,
+        )
+        return StrategyExactificationBatch(
+            candidates=tuple(selected),
+            exact_enrichment_plan=tuple(
+                sorted(requests.values(), key=_enrichment_sort_key)
+            ),
+            cost_catalog=costs,
+            logical_provider_calls=provider_units,
+            exactification_plan=exactification,
+            min_unseen_p50_lower_bound=self.min_unseen_p50_lower_bound,
+            scope_exhausted=self.scope_exhausted,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -749,6 +973,209 @@ class BoundedStrategyGenerator:
     ) -> None:
         self.caps = caps or CandidateCaps()
         self.policy = policy or StrategyGenerationPolicy()
+
+    def build_search_space(
+        self,
+        inputs: StrategyGenerationInput,
+        constraints: RouteConstraints,
+    ) -> StrategySearchSpace:
+        """Build the complete finite strategy scope without lossy soft caps.
+
+        The hard ``coarse_combinations`` cap remains a fail-closed resource
+        boundary.  Coarse taxi fare is never used as strict-budget proof; exact
+        evaluation owns that decision.
+        """
+
+        rejected: list[StrategyRejection] = []
+        baselines = {
+            item.baseline_id: item
+            for item in sorted(
+                inputs.transit_baselines,
+                key=lambda item: (
+                    sum(_lower_bound(leg) for leg in item.legs),
+                    item.coarse_risk,
+                    item.baseline_id,
+                ),
+            )
+        }
+        drafts: list[_Draft] = []
+        for baseline in baselines.values():
+            if (
+                baseline.from_ref != inputs.origin_ref
+                or baseline.to_ref != inputs.destination_ref
+            ):
+                rejected.append(
+                    StrategyRejection(
+                        f"transit:{baseline.baseline_id}",
+                        "BASELINE_ENDPOINT_MISMATCH",
+                    )
+                )
+                continue
+            drafts.append(
+                _Draft(
+                    f"transit:{baseline.baseline_id}",
+                    "TRANSIT_ONLY",
+                    baseline.legs,
+                    baseline.coarse_risk,
+                )
+            )
+
+        access = self._select_access(
+            inputs.access_hubs,
+            baselines,
+            inputs,
+            rejected,
+            enforce_cap=False,
+        )
+        egress = self._select_egress(
+            inputs.egress_hubs,
+            baselines,
+            inputs,
+            rejected,
+            enforce_cap=False,
+        )
+        for hub in access:
+            baseline = baselines[hub.baseline_id]
+            drafts.append(
+                _Draft(
+                    f"access:{hub.hub_id}",
+                    "TAXI_TRANSIT",
+                    (hub.taxi_quote, *baseline.legs[hub.board_leg_index :]),
+                    baseline.coarse_risk,
+                )
+            )
+        for hub in egress:
+            baseline = baselines[hub.baseline_id]
+            drafts.append(
+                _Draft(
+                    f"egress:{hub.hub_id}",
+                    "TRANSIT_TAXI",
+                    (*baseline.legs[: hub.alight_leg_index + 1], hub.taxi_quote),
+                    baseline.coarse_risk,
+                )
+            )
+        for access_hub in access:
+            for egress_hub in egress:
+                if access_hub.baseline_id != egress_hub.baseline_id:
+                    continue
+                if access_hub.board_leg_index > egress_hub.alight_leg_index:
+                    continue
+                baseline = baselines[access_hub.baseline_id]
+                drafts.append(
+                    _Draft(
+                        f"access-egress:{access_hub.hub_id}:{egress_hub.hub_id}",
+                        "TAXI_TRANSIT_TAXI",
+                        (
+                            access_hub.taxi_quote,
+                            *baseline.legs[
+                                access_hub.board_leg_index : egress_hub.alight_leg_index
+                                + 1
+                            ],
+                            egress_hub.taxi_quote,
+                        ),
+                        baseline.coarse_risk,
+                    )
+                )
+
+        for quote in sorted(inputs.taxi_only_quotes, key=_movement_sort_key):
+            key = f"taxi-only:{quote.quote_id}"
+            if (
+                quote.from_ref != inputs.origin_ref
+                or quote.to_ref != inputs.destination_ref
+            ):
+                rejected.append(StrategyRejection(key, "TAXI_ENDPOINT_MISMATCH"))
+                continue
+            drafts.append(
+                _Draft(key, "TAXI_ONLY", (quote,), 1.0 - quote.reliability_score)
+            )
+
+        for option in sorted(
+            inputs.upstream_hubs,
+            key=lambda item: (_movement_sort_key(item.taxi_quote), item.hub_id),
+        ):
+            draft = self._upstream_draft(option, baselines, inputs)
+            if isinstance(draft, StrategyRejection):
+                rejected.append(draft)
+            else:
+                drafts.append(draft)
+
+        for bridge in sorted(
+            inputs.taxi_bridges,
+            key=lambda item: (_movement_sort_key(item.taxi_quote), item.bridge_id),
+        ):
+            draft = self._bridge_draft(bridge, baselines, inputs)
+            if isinstance(draft, StrategyRejection):
+                rejected.append(draft)
+            else:
+                drafts.append(draft)
+
+        seeds: list[CandidateSeed] = []
+        draft_by_key: dict[str, _Draft] = {}
+        for draft in sorted(
+            drafts,
+            key=lambda item: (
+                item.lower_bound_seconds,
+                item.pattern,
+                item.key,
+            ),
+        ):
+            _validate_continuity(draft.movements)
+            seed = CandidateSeed(
+                candidate_key=draft.key,
+                pattern=draft.pattern,
+                legs=tuple(
+                    movement.to_leg_spec(draft.key, index)
+                    for index, movement in enumerate(draft.movements)
+                ),
+                transfer_count=_transfer_count(draft.movements),
+                coarse_p50_seconds=draft.lower_bound_seconds,
+                coarse_taxi_upper_krw=draft.taxi_upper_krw,
+                coarse_risk=draft.coarse_risk,
+            )
+            seeds.append(seed)
+            draft_by_key[draft.key] = draft
+
+        admitted = BoundedCandidateGenerator(self.caps).generate(
+            seeds,
+            constraints,
+            exact_evaluation=True,
+        )
+        rejected.extend(
+            StrategyRejection(key, reason) for key, reason in admitted.rejected
+        )
+
+        candidates: list[StrategyCandidate] = []
+        costs: dict[str, LegCost] = {}
+        for seed in admitted.candidates:
+            draft = draft_by_key[seed.candidate_key]
+            requests = self._exact_requests(draft.movements)
+            exactification = self._exactification_for(
+                seed,
+                draft.movements,
+                inputs.departure_at,
+            )
+            for movement in draft.movements:
+                current = costs.get(movement.evaluator_key)
+                if current is not None and current != movement.cost:
+                    raise ValueError(
+                        "evaluator key maps to conflicting canonical costs"
+                    )
+                costs[movement.evaluator_key] = movement.cost
+            candidates.append(StrategyCandidate(seed, requests, exactification))
+
+        return StrategySearchSpace(
+            candidates=tuple(candidates),
+            rejected=tuple(
+                sorted(
+                    set(rejected),
+                    key=lambda item: (item.candidate_key, item.reason),
+                )
+            ),
+            cost_catalog=tuple(sorted(costs.items())),
+            policy_version=self.policy.version,
+            candidate_batch_cap=self.caps.pre_pareto,
+            logical_provider_call_cap=self.caps.provider_calls,
+        )
 
     def generate(
         self,
@@ -850,10 +1277,6 @@ class BoundedStrategyGenerator:
         for bridge in bridges[self.policy.max_bridges :]:
             rejected.append(StrategyRejection(f"bridge:{bridge.bridge_id}", "TAXI_BRIDGE_CAP"))
 
-        best_public_lower = min(
-            (draft.lower_bound_seconds for draft in drafts if draft.pattern == "TRANSIT_ONLY"),
-            default=None,
-        )
         seeds: list[CandidateSeed] = []
         draft_by_key: dict[str, _Draft] = {}
         for draft in sorted(
@@ -866,14 +1289,6 @@ class BoundedStrategyGenerator:
                 item.key,
             ),
         ):
-            if (
-                best_public_lower is not None
-                and draft.pattern != "TRANSIT_ONLY"
-                and draft.lower_bound_seconds
-                > best_public_lower + self.policy.coarse_time_slack_seconds
-            ):
-                rejected.append(StrategyRejection(draft.key, "COARSE_TIME_BOUND"))
-                continue
             _validate_continuity(draft.movements)
             legs = tuple(
                 movement.to_leg_spec(draft.key, index)
@@ -942,6 +1357,8 @@ class BoundedStrategyGenerator:
         baselines: dict[str, TransitBaseline],
         inputs: StrategyGenerationInput,
         rejected: list[StrategyRejection],
+        *,
+        enforce_cap: bool = True,
     ) -> tuple[AccessHub, ...]:
         selected: list[AccessHub] = []
         counts: dict[str, int] = {}
@@ -961,7 +1378,11 @@ class BoundedStrategyGenerator:
             if hub.taxi_quote.from_ref != inputs.origin_ref or hub.taxi_quote.to_ref != board.from_ref:
                 rejected.append(StrategyRejection(key, "ACCESS_ENDPOINT_MISMATCH"))
                 continue
-            if counts.get(hub.baseline_id, 0) >= self.policy.max_access_per_baseline:
+            if (
+                enforce_cap
+                and counts.get(hub.baseline_id, 0)
+                >= self.policy.max_access_per_baseline
+            ):
                 rejected.append(StrategyRejection(key, "ACCESS_HUB_CAP"))
                 continue
             counts[hub.baseline_id] = counts.get(hub.baseline_id, 0) + 1
@@ -974,6 +1395,8 @@ class BoundedStrategyGenerator:
         baselines: dict[str, TransitBaseline],
         inputs: StrategyGenerationInput,
         rejected: list[StrategyRejection],
+        *,
+        enforce_cap: bool = True,
     ) -> tuple[EgressHub, ...]:
         selected: list[EgressHub] = []
         counts: dict[str, int] = {}
@@ -993,7 +1416,11 @@ class BoundedStrategyGenerator:
             if hub.taxi_quote.from_ref != alight.to_ref or hub.taxi_quote.to_ref != inputs.destination_ref:
                 rejected.append(StrategyRejection(key, "EGRESS_ENDPOINT_MISMATCH"))
                 continue
-            if counts.get(hub.baseline_id, 0) >= self.policy.max_egress_per_baseline:
+            if (
+                enforce_cap
+                and counts.get(hub.baseline_id, 0)
+                >= self.policy.max_egress_per_baseline
+            ):
                 rejected.append(StrategyRejection(key, "EGRESS_HUB_CAP"))
                 continue
             counts[hub.baseline_id] = counts.get(hub.baseline_id, 0) + 1
@@ -1068,6 +1495,8 @@ class BoundedStrategyGenerator:
                 + bridge.transfer_requirement.p50_seconds,
                 outbound_legs[0].transfer_requirement.p90_seconds
                 + bridge.transfer_requirement.p90_seconds,
+                outbound_legs[0].transfer_requirement.connector_walk_seconds
+                + bridge.transfer_requirement.connector_walk_seconds,
             ),
         )
         outbound_legs = (first_outbound, *outbound_legs[1:])

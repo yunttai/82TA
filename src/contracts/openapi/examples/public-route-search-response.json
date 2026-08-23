@@ -39,7 +39,7 @@
     },
     "legs": [
       {
-        "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+        "legId": "transit:mapped-public:0:provider-transit:8317445fc73ee98de0c44e091478581a957d8544b42cbaa9017426803cbf18fa:0",
         "sequence": 0,
         "mode": "BUS",
         "from": {
@@ -269,6 +269,18 @@
         "fallbackLevel": 1
       },
       {
+        "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
         "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
         "origin": "PROVIDER_ESTIMATE",
         "observedAt": "2026-08-23T00:00:00+00:00",
@@ -342,7 +354,7 @@
       },
       "legs": [
         {
-          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "legId": "transit:mapped-public:0:provider-transit:8317445fc73ee98de0c44e091478581a957d8544b42cbaa9017426803cbf18fa:0",
           "sequence": 0,
           "mode": "BUS",
           "from": {
@@ -513,6 +525,18 @@
         },
         {
           "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
           "observedAt": "2026-08-23T00:00:00+00:00",
           "receivedAt": "2026-08-23T00:00:00+00:00",
@@ -644,7 +668,7 @@
       },
       "legs": [
         {
-          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "legId": "transit:mapped-public:0:provider-transit:8317445fc73ee98de0c44e091478581a957d8544b42cbaa9017426803cbf18fa:0",
           "sequence": 0,
           "mode": "BUS",
           "from": {
@@ -815,6 +839,18 @@
         },
         {
           "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
           "observedAt": "2026-08-23T00:00:00+00:00",
           "receivedAt": "2026-08-23T00:00:00+00:00",
@@ -946,7 +982,7 @@
       },
       "legs": [
         {
-          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "legId": "transit:mapped-public:0:provider-transit:8317445fc73ee98de0c44e091478581a957d8544b42cbaa9017426803cbf18fa:0",
           "sequence": 0,
           "mode": "BUS",
           "from": {
@@ -1117,6 +1153,18 @@
         },
         {
           "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
           "observedAt": "2026-08-23T00:00:00+00:00",
           "receivedAt": "2026-08-23T00:00:00+00:00",
@@ -1248,7 +1296,7 @@
       },
       "legs": [
         {
-          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "legId": "transit:mapped-public:0:provider-transit:8317445fc73ee98de0c44e091478581a957d8544b42cbaa9017426803cbf18fa:0",
           "sequence": 0,
           "mode": "BUS",
           "from": {
@@ -1419,6 +1467,18 @@
         },
         {
           "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
           "origin": "PROVIDER_ESTIMATE",
           "observedAt": "2026-08-23T00:00:00+00:00",
           "receivedAt": "2026-08-23T00:00:00+00:00",

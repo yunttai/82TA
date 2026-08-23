@@ -102,7 +102,7 @@ class ParetoCycleSafetyTests(unittest.TestCase):
             {item.route_id for item in expected},
         )
         self.assertEqual(zero.representative_policy_version, "epsilon-scc-lexicographic-1.0.0")
-        self.assertEqual(RankingPolicy().version, "rank-0.1.1")
+        self.assertEqual(RankingPolicy().version, "rank-0.2.0")
 
 
 if __name__ == "__main__":

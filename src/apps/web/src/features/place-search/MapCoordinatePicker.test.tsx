@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe("input map coordinate picker", () => {
   it("keeps place-search fallback when the browser map key is absent", () => {
-    vi.stubEnv("VITE_KAKAO_MAP_APP_KEY", "");
+    vi.stubEnv("KAKAO_JS_API_KEY", "");
     render(<MapCoordinatePicker origin={origin} destination={destination} onPlaceSelected={vi.fn()} />);
 
     expect(screen.getByText("지도 선택을 사용할 수 없습니다.")).toBeInTheDocument();
@@ -25,7 +25,7 @@ describe("input map coordinate picker", () => {
   });
 
   it("reverse-geocodes a map click through the Service API and returns canonical PlaceRef", async () => {
-    vi.stubEnv("VITE_KAKAO_MAP_APP_KEY", "browser-domain-key");
+    vi.stubEnv("KAKAO_JS_API_KEY", "browser-domain-key");
     class FakeLatLng implements KakaoLatLng {
       constructor(private readonly lat: number, private readonly lon: number) {}
       getLat() { return this.lat; }

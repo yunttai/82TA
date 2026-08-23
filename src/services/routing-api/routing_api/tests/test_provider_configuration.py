@@ -17,9 +17,7 @@ class RecordingTransport:
 def _settings(**overrides):
     values = {
         "KAKAO_REST_API_KEY": "",
-        "KAKAO_MOBILITY_REST_API_KEY": "",
         "GBIS_SERVICE_KEY": "",
-        "KMA_SERVICE_KEY": "",
         "GITS_API_KEY": "",
         "TMAP_APP_KEY": "",
         "ODSAY_API_KEY": "",
@@ -32,7 +30,7 @@ def test_mobility_key_is_bound_only_to_the_exact_requested_operation() -> None:
     secret = "mobility-secret-must-not-render"
     transport = RecordingTransport()
     config = build_provider_adapter_config(
-        _settings(KAKAO_MOBILITY_REST_API_KEY=secret),
+        _settings(KAKAO_REST_API_KEY=secret),
         transports={("KAKAO_DIRECTIONS", "route_current"): transport},
         capabilities=foundation_capability_registry(),
         runtime_evidence=ProviderRuntimeEvidenceConfig(),
@@ -47,7 +45,7 @@ def test_mobility_key_is_bound_only_to_the_exact_requested_operation() -> None:
 
 def test_secret_presence_does_not_promote_capability_or_evidence() -> None:
     config = build_provider_adapter_config(
-        _settings(KAKAO_MOBILITY_REST_API_KEY="configured-not-approved"),
+        _settings(KAKAO_REST_API_KEY="configured-not-approved"),
         transports={("KAKAO_DIRECTIONS", "route_current"): RecordingTransport()},
         capabilities=foundation_capability_registry(),
         runtime_evidence=ProviderRuntimeEvidenceConfig(),

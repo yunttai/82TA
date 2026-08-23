@@ -42,7 +42,7 @@ afterEach(() => {
 
 describe("RouteMap canonical POLYLINE rendering", () => {
   it("renders a valid decoded line through the Kakao browser SDK", async () => {
-    vi.stubEnv("VITE_KAKAO_MAP_APP_KEY", "browser-key");
+    vi.stubEnv("KAKAO_JS_API_KEY", "browser-key");
     class FakeLatLng implements KakaoLatLng {
       constructor(private readonly lat: number, private readonly lon: number) {}
       getLat() { return this.lat; }

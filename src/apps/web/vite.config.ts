@@ -3,7 +3,8 @@ import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, ".", "VITE_");
+  const clientEnvPrefixes = ["VITE_", "KAKAO_JS_API_KEY"];
+  const env = loadEnv(mode, ".", clientEnvPrefixes);
   const privacyDocumentVersion = env.VITE_PRIVACY_DOCUMENT_VERSION;
   if (mode === "production" && (privacyDocumentVersion === undefined || privacyDocumentVersion.length < 1
     || privacyDocumentVersion.length > 64 || privacyDocumentVersion !== privacyDocumentVersion.trim())) {
@@ -11,6 +12,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    envPrefix: clientEnvPrefixes,
     plugins: [react()],
     resolve: {
       preserveSymlinks: true,

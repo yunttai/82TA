@@ -51,8 +51,8 @@ major URL 또는 compatibility adapter가 필요하다.
 - Private request `contractVersion: "1.0"`은 1.x wire compatibility family로 유지한다. OpenAPI metadata와 repository contract version은 `1.1.0`이다.
 - Routing `/v1/version.contractVersion`은 그 repository/OpenAPI metadata를
   보고한다. optimize body의 `"1.0"`과 같은 값으로 해석하지 않는다.
-- `rankingPolicyVersion`은 opaque provenance다. 현재 실행 정책의 canonical
-  식별자는 `rank-0.1.1`이며 Service는 이를 enum화하거나 재계산하지 않는다.
+- `rankingPolicyVersion`은 opaque provenance다. 1.1.0 당시 실행 정책의 canonical
+  식별자는 `rank-0.1.1`이었으며 Service는 이를 enum화하거나 재계산하지 않는다.
   과거에 저장된 다른 식별자는 당시의 historical provenance로 보존하고
   일괄 재기록하지 않는다.
 - 이번 교정은 code enum/registry를 확장하지 않는다. 좌석·버스 근거가
@@ -77,3 +77,41 @@ major URL 또는 compatibility adapter가 필요하다.
 - Service DBML의 기존 `auth_user.email`과 `password_hash`, `authenticated_session`을 사용하므로 shared DB target shape와 Routing boundary에는 변화가 없다.
 - 로그인 실패는 `INVALID_CREDENTIALS`, 중복 가입은 `ACCOUNT_ALREADY_EXISTS`로 표현하며 기존 오류 코드는 유지한다.
 - Routing OpenAPI, domain event payload와 event version은 변경하지 않는다.
+
+## `rank-0.2.0` / `strategy-2.0.0` policy decision
+
+- 분류: wire-compatible executable-policy revision. Existing request/response keys,
+  types, enum values, nullability, HTTP statuses, DBML, events, and generated clients
+  do not change. Consumers already treat `rankingPolicyVersion` and the free-form
+  computation cache metadata as opaque provenance.
+- `rank-0.2.0` identifies exact `FASTEST` and exact zero-Taxi-upper-cost
+  `PUBLIC_TRANSIT_ONLY` anchors selected from the fully evaluated, constraint-feasible,
+  deduplicated pool. Epsilon dominance only compresses the display/frontier set.
+- `strategy-2.0.0` is one combined identifier for the currently implemented finite
+  admitted-payload strategy, exactification, and bounded time-dependent graph-search
+  policy. It does not certify Provider source exhaustion or a network-global optimum.
+- Candidate, exactification, graph expansion, per-node label, complete-path,
+  Provider-call, and deadline caps remain mandatory. If an active cap makes the
+  bounded result uncertified, the producer fails closed through the existing
+  capacity/deadline response; it must not emit `COMPLETE`, a provisional optimum,
+  a new status, or an unregistered warning.
+- CCR-008 Finding A (`transferCount`/`maxTransfers`) and Finding C (additive
+  completeness metadata/warning) remain deferred. This decision must not be used to
+  infer or backfill either meaning.
+- Historical `rank-0.1.1` and `strategy-1.0.0` values remain immutable provenance.
+  Existing rows, replay bundles, telemetry, and cached responses are not relabeled.
+  Rollout requires a process restart and eviction/non-reuse of old-version response
+  caches so an old result cannot be served under the new runtime identifiers.
+- Current Routing persistence has a ranking-policy column but no dedicated combined
+  strategy/search-policy column; current public projection intentionally omits
+  computation metadata. Therefore this approval covers the runtime policy,
+  `/v1/version` ranking value, private computation provenance, existing ranking
+  persistence, deterministic replay, and version-coherent canonical examples only.
+  It does not claim full strategy provenance in durable persistence, shared cache, or
+  telemetry. Any such release claim requires a separately governed additive contract
+  and storage/observability change.
+- Activation conditions: policy defaults, Routing `/v1/version`, optimize computation,
+  platform versions, deterministic canonical examples, producer/consumer assertions,
+  and replay fixtures must all report the new identifiers; all bounded-cap tests must
+  prove fail-closed behavior; both workstreams must approve the derived examples and
+  contract-lock refresh. Until then the change is not merge/release evidence.

@@ -80,9 +80,14 @@ class TransferRequirement:
 
     p50_seconds: int = 0
     p90_seconds: int = 0
+    connector_walk_seconds: int = 0
 
     def __post_init__(self) -> None:
         TimeEstimate(self.p50_seconds, self.p90_seconds)
+        if not 0 <= self.connector_walk_seconds <= self.p50_seconds:
+            raise ValueError(
+                "connector_walk_seconds must be within the P50 transfer requirement"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,13 +124,18 @@ class LegSpec:
 
 @dataclass(frozen=True, slots=True)
 class LegCost:
-    """A time-dependent evaluator result for one supplied entry time."""
+    """A time-dependent evaluator result for one supplied entry time.
+
+    ``next_service_wait`` is explicit evidence for a fixed scheduled connection
+    missed at that entry time. It is distinct from the ordinary unscheduled wait.
+    """
 
     wait: TimeEstimate
     travel: TimeEstimate
     fare: MoneyRange | None
     reliability_score: float = 1.0
     warning_codes: tuple[str, ...] = ()
+    next_service_wait: TimeEstimate | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.reliability_score <= 1.0:

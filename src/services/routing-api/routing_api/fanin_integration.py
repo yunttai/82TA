@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
+import math
 from decimal import Decimal
 from threading import BoundedSemaphore, Event, Lock
 from time import monotonic
@@ -66,16 +67,21 @@ from routing_domain import (
     AccessHub,
     BoundedStrategyGenerator,
     BusWaitContribution,
+    CandidateCaps,
     CandidateSeed,
+    CanonicalRoutingGraph,
     CanonicalTransitTopology,
     EgressHub,
     EnrichmentKind,
     ExactificationPlan,
     ExactificationStep,
     ExactQuoteIdentity,
+    GraphSearchCaps,
+    GraphSearchUncertifiedError,
     LegCost,
     LegSpec,
     MoneyRange,
+    OptimalityUncertifiedError,
     QuoteReadiness,
     RouteConstraints,
     RouteOptimizer,
@@ -106,6 +112,7 @@ from routing_api.application import (
     OptimizeCommand,
     RequestContext,
     RoutingDeadlineExceeded,
+    RoutingCapacityExceeded,
     RoutingUnavailableError,
     UseCaseResult,
 )
@@ -341,6 +348,14 @@ class FanInTrace:
     rejected_reasons: tuple[str, ...]
     persistence_status: str
     model_inference: ModelInferenceTrace
+    returned_itinerary_count: int
+    admitted_itinerary_count: int
+    deduplicated_itinerary_count: int
+    finite_payload_complete: bool
+    network_global_complete: bool
+    graph_expansion_count: int
+    graph_seed_count: int
+    graph_recombined_count: int
 
 
 @dataclass(slots=True)
@@ -525,6 +540,34 @@ class TaxiDispatchEstimator(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class BusWaitEstimate:
+    """Entry-time Bus wait supplied by an injected live/model/history source."""
+
+    wait: TimeEstimate
+    source: str
+    version: str
+    origin: str = "HISTORICAL_PROXY"
+
+    def __post_init__(self) -> None:
+        if (
+            not self.source.strip()
+            or not self.version.strip()
+            or self.origin not in {"PROVIDER_ESTIMATE", "MODEL_PREDICTED", "HISTORICAL_PROXY"}
+        ):
+            raise ValueError("bus wait provenance must be nonblank")
+
+
+class BusWaitEstimator(Protocol):
+    def estimate(
+        self,
+        leg: CanonicalLeg,
+        *,
+        arrival_at: datetime,
+        evaluated_at: datetime,
+    ) -> BusWaitEstimate | None: ...
+
+
+@dataclass(frozen=True, slots=True)
 class FanInDependencies:
     providers: FanInProviderPorts
     mapping: MappingResolver
@@ -532,6 +575,8 @@ class FanInDependencies:
     seat_predictor: SeatRiskPredictor
     context: BusContextProviderPort | None = None
     taxi_dispatch: TaxiDispatchEstimator | None = None
+    bus_wait: BusWaitEstimator | None = None
+    bus_intelligence_enabled: bool = True
     persistence: OptimizationResultRepository | None = None
     fixture_only: bool = False
 
@@ -562,6 +607,33 @@ class _FixtureTaxiDispatchEstimator:
             TimeEstimate(90, 150),
             "FIXTURE_POLICY",
             "taxi-dispatch-fixture-0.1.0",
+        )
+
+
+class _FixtureBusWaitEstimator:
+    """Deterministic non-zero history proxy for closed fixture scenarios."""
+
+    def estimate(self, leg, *, arrival_at, evaluated_at):
+        del evaluated_at
+        route_label = (
+            leg.transit.route_label
+            if leg.transit is not None and leg.transit.route_label is not None
+            else "FIXTURE_BUS"
+        )
+        headway = 600
+        phase = int.from_bytes(
+            sha256(f"{route_label}|{leg.from_stop.name}".encode("utf-8")).digest()[:4],
+            "big",
+        ) % headway
+        second = arrival_at.hour * 3600 + arrival_at.minute * 60 + arrival_at.second
+        wait = (phase - second) % headway
+        if wait < 45:
+            wait += headway
+        return BusWaitEstimate(
+            TimeEstimate(wait, wait + 180),
+            "FIXTURE_BUS_ARRIVAL_HISTORY",
+            "fixture-bus-wait-1.0.0",
+            origin="HISTORICAL_PROXY",
         )
 
 
@@ -745,6 +817,7 @@ def fixture_fan_in_dependencies(
         eta_predictor=eta,
         seat_predictor=seat,
         taxi_dispatch=_FixtureTaxiDispatchEstimator(),
+        bus_wait=_FixtureBusWaitEstimator(),
         fixture_only=True,
     )
 
@@ -802,6 +875,7 @@ class _BusLegSnapshot:
     seat_risk_feature_context: SeatRiskFeatureContext | None = None
     context_required_operations: frozenset[str] = frozenset()
     context_complete: bool = True
+    fallback_wait: BusWaitEstimate | None = None
 
     @property
     def mapping_allows_intelligence(self) -> bool:
@@ -923,6 +997,7 @@ class _ExactStepOutcome:
     reserved_units: int
     actual_units: int
     reason: str | None = None
+    source_itinerary_id: str | None = None
 
     @property
     def resolved(self) -> bool:
@@ -1136,31 +1211,257 @@ def _coordinate_registry(
     }
 
 
+@dataclass(frozen=True, slots=True)
+class _CanonicalMovementSource:
+    leg: CanonicalLeg
+    envelope: ProviderEnvelope
+    itinerary_id: str
+    routing_topology_ref: str | None = None
+
+
+def _canonical_itinerary_identity(itinerary: CanonicalItinerary) -> str:
+    """Hash every routing-relevant normalized value, excluding opaque source IDs.
+
+    Provider itinerary/leg IDs are provenance, not route semantics.  Excluding
+    them lets exact semantic duplicates collapse, while timing, fare, topology,
+    stops and geometry remain in the identity so a potentially faster option is
+    never discarded as a duplicate.
+    """
+
+    def timestamp(value: datetime | None) -> str | None:
+        return value.astimezone(timezone.utc).isoformat() if value is not None else None
+
+    material = []
+    for leg in itinerary.legs:
+        descriptor = leg.transit
+        material.append(
+            {
+                "sequence": leg.sequence,
+                "mode": leg.mode.value,
+                "from": {
+                    "name": leg.from_stop.name,
+                    "coordinate": [leg.from_stop.coordinate.lon, leg.from_stop.coordinate.lat],
+                    "externalId": leg.from_stop.external_id,
+                    "sequence": leg.from_stop.sequence,
+                },
+                "to": {
+                    "name": leg.to_stop.name,
+                    "coordinate": [leg.to_stop.coordinate.lon, leg.to_stop.coordinate.lat],
+                    "externalId": leg.to_stop.external_id,
+                    "sequence": leg.to_stop.sequence,
+                },
+                "duration": {
+                    "p50": leg.duration.p50_seconds,
+                    "p90": leg.duration.p90_seconds,
+                    "lower": leg.duration.lower_seconds,
+                    "upper": leg.duration.upper_seconds,
+                    "origin": leg.duration.origin.value,
+                },
+                "distanceMeters": leg.distance_meters,
+                "fare": {
+                    "expected": leg.fare.expected_krw,
+                    "lower": leg.fare.lower_krw,
+                    "upper": leg.fare.upper_krw,
+                    "origin": leg.fare.origin.value,
+                },
+                "expectedStartAt": timestamp(leg.expected_start_at),
+                "expectedEndAt": timestamp(leg.expected_end_at),
+                "transit": (
+                    None
+                    if descriptor is None
+                    else {
+                        "routeLabel": descriptor.route_label,
+                        "externalRouteId": descriptor.external_route_id,
+                        "routeType": descriptor.route_type,
+                        "direction": descriptor.direction,
+                        "branchId": descriptor.branch_id,
+                        "boardingSequence": descriptor.boarding_sequence,
+                        "alightingSequence": descriptor.alighting_sequence,
+                        "terminalNames": list(descriptor.terminal_names),
+                        "liveVehicleObserved": descriptor.live_vehicle_observed,
+                    }
+                ),
+                "geometry": [[point.lon, point.lat] for point in leg.geometry],
+            }
+        )
+    encoded = json.dumps(
+        material,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()
+
+
+def _provider_transit_topology(
+    leg: CanonicalLeg,
+    from_ref: str,
+    to_ref: str,
+) -> CanonicalTransitTopology | None:
+    """Return topology only when the Provider supplied every mapping-grade field."""
+
+    descriptor = leg.transit
+    if (
+        descriptor is None
+        or descriptor.external_route_id is None
+        or descriptor.direction is None
+        or descriptor.boarding_sequence is None
+        or descriptor.alighting_sequence is None
+    ):
+        return None
+    return CanonicalTransitTopology(
+        descriptor.external_route_id,
+        descriptor.direction,
+        from_ref,
+        to_ref,
+        descriptor.boarding_sequence,
+        descriptor.alighting_sequence,
+        descriptor.branch_id,
+    )
+
+
+def _opaque_itinerary_local_topology(
+    itinerary_identity: str,
+    leg: CanonicalLeg,
+    from_ref: str,
+    to_ref: str,
+) -> CanonicalTransitTopology:
+    """Build a graph-only identity without manufacturing Provider identifiers."""
+
+    encoded = json.dumps(
+        {
+            "itineraryIdentity": itinerary_identity,
+            "legSequence": leg.sequence,
+            "mode": leg.mode.value,
+            "fromRef": from_ref,
+            "toRef": to_ref,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    digest = sha256(encoded).hexdigest()
+    return CanonicalTransitTopology(
+        f"opaque-itinerary-local:{digest}",
+        "OPAQUE_FORWARD",
+        from_ref,
+        to_ref,
+        0,
+        1,
+    )
+
+
+def _routing_transit_topology(
+    itinerary_identity: str,
+    leg: CanonicalLeg,
+    from_ref: str,
+    to_ref: str,
+) -> tuple[CanonicalTransitTopology, bool]:
+    provider_topology = _provider_transit_topology(leg, from_ref, to_ref)
+    if provider_topology is not None:
+        return provider_topology, True
+    return (
+        _opaque_itinerary_local_topology(
+            itinerary_identity, leg, from_ref, to_ref
+        ),
+        False,
+    )
+
+
+def _canonicalize_returned_itineraries(
+    payload: object,
+    origin_raw: Mapping[str, object],
+    destination_raw: Mapping[str, object],
+    *,
+    max_itineraries: int,
+) -> tuple[tuple[str, CanonicalItinerary], ...]:
+    """Return the complete finite payload in stable semantic-identity order."""
+
+    if not isinstance(payload, tuple) or not payload:
+        raise RoutingUnavailableError("required canonical transit fixture unavailable")
+    if len(payload) > max_itineraries:
+        raise RoutingUnavailableError("transit payload exceeds requested itinerary bound")
+    grouped: dict[str, list[CanonicalItinerary]] = {}
+    identity_by_provider_id: dict[str, str] = {}
+    for value in payload:
+        if not isinstance(value, CanonicalItinerary):
+            raise RoutingUnavailableError("transit payload contains a non-canonical itinerary")
+        if not (
+            _coordinates_equal(value.legs[0].from_stop.coordinate, origin_raw)
+            and _coordinates_equal(value.legs[-1].to_stop.coordinate, destination_raw)
+        ):
+            raise RoutingUnavailableError("fixture canonical endpoints do not match request")
+        if not any(
+            leg.mode.value in {"BUS", "SUBWAY", "GTX", "TRAIN"}
+            for leg in value.legs
+        ):
+            raise RoutingUnavailableError("required canonical transit baseline unavailable")
+        identity = _canonical_itinerary_identity(value)
+        previous_identity = identity_by_provider_id.setdefault(
+            value.itinerary_id, identity
+        )
+        if previous_identity != identity:
+            raise RoutingUnavailableError(
+                "transit payload reuses an itinerary ID for conflicting content"
+            )
+        grouped.setdefault(identity, []).append(value)
+
+    return tuple(
+        (
+            identity,
+            min(
+                values,
+                key=lambda itinerary: (
+                    itinerary.itinerary_id,
+                    tuple(leg.leg_id for leg in itinerary.legs),
+                ),
+            ),
+        )
+        for identity, values in sorted(grouped.items())
+    )
+
+
 def _canonical_itinerary_baseline(
     itinerary: CanonicalItinerary,
     envelope: ProviderEnvelope,
+    *,
+    baseline_id: str = "mapped-public",
+    reference_namespace: str | None = None,
+    bus_intelligence_enabled: bool = True,
 ) -> tuple[
     TransitBaseline,
     dict[str, tuple[float, float]],
-    dict[tuple[str, str, str], CanonicalLeg],
-    dict[tuple[str, str, str], ProviderEnvelope],
+    dict[tuple[str, str, str, str], _CanonicalMovementSource],
     tuple[tuple[str, CanonicalTransitEvidence], ...],
 ]:
     """Preserve every normalized itinerary movement and its causal envelope."""
 
+    itinerary_identity = _canonical_itinerary_identity(itinerary)
+    namespace = reference_namespace or itinerary_identity
     references = ["origin"]
     references.extend(
-        f"provider-stop:{itinerary.itinerary_id}:{index}"
+        f"provider-stop:{namespace}:{index}"
         for index in range(1, len(itinerary.legs))
     )
     references.append("destination")
     coordinates: dict[str, tuple[float, float]] = {}
     movements: list[WalkQuote | TransitLegInput] = []
-    resolved: dict[tuple[str, str, str], CanonicalLeg] = {}
-    supplying: dict[tuple[str, str, str], ProviderEnvelope] = {}
+    sources: dict[tuple[str, str, str, str], _CanonicalMovementSource] = {}
     bus_evidence: list[tuple[str, CanonicalTransitEvidence]] = []
     provider_code = _mapping_provider_code(envelope.provider)
+    provider_quote_readiness = (
+        QuoteReadiness.EXACT
+        if envelope.provider == "KAKAO_PUBLIC_TRANSIT"
+        else QuoteReadiness.COARSE
+    )
     for index, leg in enumerate(itinerary.legs):
+        source_leg = (
+            replace(leg, expected_start_at=None, expected_end_at=None)
+            if envelope.provider == "KAKAO_PUBLIC_TRANSIT"
+            else leg
+        )
         from_ref, to_ref = references[index], references[index + 1]
         coordinates[from_ref] = (
             leg.from_stop.coordinate.lon,
@@ -1172,45 +1473,34 @@ def _canonical_itinerary_baseline(
         )
         if leg.mode.value == "WALK":
             movement: WalkQuote | TransitLegInput = WalkQuote(
-                quote_id=f"provider-walk:{itinerary.itinerary_id}:{leg.sequence}",
+                quote_id=f"provider-walk:{namespace}:{leg.sequence}",
                 from_ref=from_ref,
                 to_ref=to_ref,
-                evaluator_key=f"provider-cost:{leg.leg_id}",
+                evaluator_key=f"provider-cost:{namespace}:{leg.sequence}:{leg.leg_id}",
                 duration=TimeEstimate(
                     leg.duration.p50_seconds, leg.duration.p90_seconds
                 ),
                 distance_meters=leg.distance_meters,
                 lower_bound_seconds=leg.duration.lower_seconds or 0,
-                readiness=QuoteReadiness.COARSE,
+                readiness=provider_quote_readiness,
                 reliability_score=0.9,
                 topology_ref=f"provider:{leg.leg_id}",
             )
             kind = EnrichmentKind.WALK
         else:
             descriptor = leg.transit
-            if (
-                descriptor is None
-                or descriptor.external_route_id is None
-                or descriptor.direction is None
-                or descriptor.boarding_sequence is None
-                or descriptor.alighting_sequence is None
-            ):
+            if descriptor is None:
                 raise RoutingUnavailableError(
-                    "canonical transit leg lacks exact topology"
+                    "canonical transit leg lacks descriptor"
                 )
+            topology, provider_topology_complete = _routing_transit_topology(
+                itinerary_identity, leg, from_ref, to_ref
+            )
             movement = TransitLegInput(
-                leg_id=f"provider-transit:{itinerary.itinerary_id}:{leg.sequence}",
+                leg_id=f"provider-transit:{namespace}:{leg.sequence}",
                 mode=leg.mode.value,
-                topology=CanonicalTransitTopology(
-                    descriptor.external_route_id,
-                    descriptor.direction,
-                    from_ref,
-                    to_ref,
-                    descriptor.boarding_sequence,
-                    descriptor.alighting_sequence,
-                    descriptor.branch_id,
-                ),
-                evaluator_key=f"provider-cost:{leg.leg_id}",
+                topology=topology,
+                evaluator_key=f"provider-cost:{namespace}:{leg.sequence}:{leg.leg_id}",
                 duration=TimeEstimate(
                     leg.duration.p50_seconds, leg.duration.p90_seconds
                 ),
@@ -1221,10 +1511,23 @@ def _canonical_itinerary_baseline(
                 ),
                 lower_bound_seconds=leg.duration.lower_seconds or 0,
                 reliability_score=0.9,
-                scheduled_departure_at=leg.expected_start_at,
-                readiness=QuoteReadiness.COARSE,
-                mapping_ready=leg.mode.value != "BUS",
-                bus_intelligence_requested=leg.mode.value == "BUS",
+                # Kakao's current journey response supplies duration, not a
+                # vehicle departure timestamp. Its parser clock is causal
+                # bookkeeping and must not be treated as a fixed connection.
+                scheduled_departure_at=(
+                    None
+                    if envelope.provider == "KAKAO_PUBLIC_TRANSIT"
+                    else leg.expected_start_at
+                ),
+                readiness=provider_quote_readiness,
+                mapping_ready=(
+                    leg.mode.value != "BUS"
+                    or not bus_intelligence_enabled
+                    or provider_topology_complete
+                ),
+                bus_intelligence_requested=(
+                    leg.mode.value == "BUS" and bus_intelligence_enabled
+                ),
                 bus_wait=None,
             )
             kind = EnrichmentKind.TRANSIT
@@ -1236,21 +1539,26 @@ def _canonical_itinerary_baseline(
                         provider_code=provider_code,
                         envelope_fingerprint=envelope.fingerprint,
                         itinerary_id=itinerary.itinerary_id,
-                        leg=leg,
+                            leg=source_leg,
                         ),
                     )
                 )
         movements.append(movement)
-        key = _movement_key(kind, from_ref, to_ref)
-        resolved[key] = leg
-        supplying[key] = envelope
+        key = (*_movement_key(kind, from_ref, to_ref), movement.evaluator_key)
+        sources[key] = _CanonicalMovementSource(
+            source_leg,
+            envelope,
+            itinerary.itinerary_id,
+            (
+                movement.topology.fingerprint
+                if isinstance(movement, TransitLegInput)
+                else None
+            ),
+        )
     return (
-        TransitBaseline(
-            "mapped-public", tuple(movements), coarse_risk=0.18
-        ),
+        TransitBaseline(baseline_id, tuple(movements), coarse_risk=0.18),
         coordinates,
-        resolved,
-        supplying,
+        sources,
         tuple(bus_evidence),
     )
 
@@ -1266,27 +1574,15 @@ def _exact_transit_movement(
     bus_wait: BusWaitContribution | None,
     mapping_ready: bool,
 ) -> TransitLegInput | None:
-    descriptor = provider_leg.transit
-    if (
-        descriptor is None
-        or descriptor.external_route_id is None
-        or descriptor.direction is None
-        or descriptor.boarding_sequence is None
-        or descriptor.alighting_sequence is None
-    ):
+    if provider_leg.transit is None:
         return None
+    provider_topology = _provider_transit_topology(
+        provider_leg, template.from_ref, template.to_ref
+    )
     return TransitLegInput(
         leg_id=template.leg_id,
         mode=provider_leg.mode.value,
-        topology=CanonicalTransitTopology(
-            descriptor.external_route_id,
-            descriptor.direction,
-            template.from_ref,
-            template.to_ref,
-            descriptor.boarding_sequence,
-            descriptor.alighting_sequence,
-            descriptor.branch_id,
-        ),
+        topology=provider_topology or template.topology,
         evaluator_key=template.evaluator_key,
         duration=TimeEstimate(
             provider_leg.duration.p50_seconds, provider_leg.duration.p90_seconds
@@ -1302,7 +1598,7 @@ def _exact_transit_movement(
         transfer_requirement=template.transfer_requirement,
         bus_wait=bus_wait if provider_leg.mode.value == "BUS" else None,
         readiness=QuoteReadiness.EXACT,
-        mapping_ready=mapping_ready,
+        mapping_ready=mapping_ready and provider_topology is not None,
         bus_intelligence_requested=False,
     )
 
@@ -1470,9 +1766,234 @@ def _coarse_strategy_inputs(
     *,
     route_suffix: str,
     main_mode: str = "BUS",
-    canonical_baseline: TransitBaseline | None = None,
+    canonical_baselines: tuple[TransitBaseline, ...] = (),
 ) -> StrategyGenerationInput:
     readiness = QuoteReadiness.COARSE
+    if route_suffix == "production" and canonical_baselines:
+        ordered = tuple(
+            sorted(
+                canonical_baselines,
+                key=lambda item: (
+                    sum(leg.lower_bound_seconds for leg in item.legs),
+                    item.baseline_id,
+                ),
+            )
+        )
+        # Preserve the fastest baseline, then spend the remaining bounded hybrid
+        # slots on mode diversity.  Pure lower-bound ordering could fill every
+        # slot with near-identical Bus itineraries and silently exclude a slightly
+        # slower Subway/GTX itinerary before Taxi access/egress/bridge variants
+        # were even generated.
+        hybrid_baseline_list = [ordered[0]]
+        remaining_baselines = list(ordered[1:])
+
+        def transit_modes(value: TransitBaseline) -> frozenset[str]:
+            return frozenset(
+                leg.mode
+                for leg in value.legs
+                if isinstance(leg, TransitLegInput)
+            )
+
+        covered_modes = set(transit_modes(ordered[0]))
+        while remaining_baselines and len(hybrid_baseline_list) < 3:
+            selected = max(
+                remaining_baselines,
+                key=lambda item: len(transit_modes(item) - covered_modes),
+            )
+            remaining_baselines.remove(selected)
+            hybrid_baseline_list.append(selected)
+            covered_modes.update(transit_modes(selected))
+        hybrid_baselines = tuple(hybrid_baseline_list)
+        access_hubs: list[AccessHub] = []
+        egress_hubs: list[EgressHub] = []
+
+        for baseline in hybrid_baselines:
+            transit_indices = [
+                index
+                for index, leg in enumerate(baseline.legs)
+                if isinstance(leg, TransitLegInput)
+            ]
+            access_indices = [
+                index
+                for index in transit_indices
+                if baseline.legs[index].from_ref != "origin"
+            ]
+            if access_indices:
+                # Prefer entering directly at the first high-capacity rail leg;
+                # otherwise replace the initial access walk with Taxi→Bus.
+                board_index = min(
+                    access_indices,
+                    key=lambda index: (
+                        baseline.legs[index].mode not in {"SUBWAY", "GTX", "TRAIN"},
+                        index,
+                    ),
+                )
+                board = baseline.legs[board_index]
+                skipped = sum(
+                    item.lower_bound_seconds for item in baseline.legs[:board_index]
+                )
+                access_hubs.append(
+                    AccessHub(
+                        f"live-access:{baseline.baseline_id}:{board_index}",
+                        baseline.baseline_id,
+                        board_index,
+                        _taxi(
+                            f"live-access:{baseline.baseline_id}:{board_index}",
+                            "origin",
+                            board.from_ref,
+                            max(0, budget),
+                            readiness=readiness,
+                            drive_seconds=max(180, min(1_800, skipped // 2)),
+                        ),
+                    )
+                )
+
+            egress_indices = [
+                index
+                for index in transit_indices
+                if baseline.legs[index].to_ref != "destination"
+            ]
+            if egress_indices:
+                alight_index = egress_indices[-1]
+                alight = baseline.legs[alight_index]
+                skipped = sum(
+                    item.lower_bound_seconds
+                    for item in baseline.legs[alight_index + 1 :]
+                )
+                egress_hubs.append(
+                    EgressHub(
+                        f"live-egress:{baseline.baseline_id}:{alight_index}",
+                        baseline.baseline_id,
+                        alight_index,
+                        _taxi(
+                            f"live-egress:{baseline.baseline_id}:{alight_index}",
+                            alight.to_ref,
+                            "destination",
+                            max(0, budget),
+                            readiness=readiness,
+                            drive_seconds=max(180, min(1_800, skipped // 2)),
+                        ),
+                    )
+                )
+
+        # Ensure at least one Bus→Taxi alternative is evaluated when a returned
+        # itinerary contains Bus before its final transit leg.
+        bus_egress_keys = {
+            (item.baseline_id, item.alight_leg_index) for item in egress_hubs
+        }
+        for baseline in hybrid_baselines:
+            bus_indices = [
+                index
+                for index, leg in enumerate(baseline.legs)
+                if isinstance(leg, TransitLegInput)
+                and leg.mode == "BUS"
+                and leg.to_ref != "destination"
+            ]
+            if not bus_indices:
+                continue
+            index = bus_indices[-1]
+            if (baseline.baseline_id, index) not in bus_egress_keys:
+                leg = baseline.legs[index]
+                egress_hubs.append(
+                    EgressHub(
+                        f"live-bus-egress:{baseline.baseline_id}:{index}",
+                        baseline.baseline_id,
+                        index,
+                        _taxi(
+                            f"live-bus-egress:{baseline.baseline_id}:{index}",
+                            leg.to_ref,
+                            "destination",
+                            max(0, budget),
+                            readiness=readiness,
+                            drive_seconds=600,
+                        ),
+                    )
+                )
+                break
+
+        bridges: list[TaxiBridge] = []
+        bridge_modes = (
+            ({"BUS"}, {"SUBWAY", "GTX", "TRAIN"}),
+            ({"SUBWAY", "GTX", "TRAIN"}, {"BUS"}),
+        )
+        for inbound_modes, outbound_modes in bridge_modes:
+            selected = None
+            for inbound in hybrid_baselines:
+                for inbound_index, inbound_leg in enumerate(inbound.legs):
+                    if not isinstance(inbound_leg, TransitLegInput) or inbound_leg.mode not in inbound_modes:
+                        continue
+                    for outbound in hybrid_baselines:
+                        for outbound_index, outbound_leg in enumerate(outbound.legs):
+                            if (
+                                not isinstance(outbound_leg, TransitLegInput)
+                                or outbound_leg.mode not in outbound_modes
+                                or inbound_leg.to_ref == outbound_leg.from_ref
+                                or (
+                                    inbound.baseline_id == outbound.baseline_id
+                                    and inbound_index >= outbound_index
+                                )
+                            ):
+                                continue
+                            selected = (
+                                inbound,
+                                inbound_index,
+                                inbound_leg,
+                                outbound,
+                                outbound_index,
+                                outbound_leg,
+                            )
+                            break
+                        if selected is not None:
+                            break
+                    if selected is not None:
+                        break
+                if selected is not None:
+                    break
+            if selected is None:
+                continue
+            inbound, inbound_index, inbound_leg, outbound, outbound_index, outbound_leg = selected
+            bridge_id = (
+                f"live-bridge:{inbound.baseline_id}:{inbound_index}:"
+                f"{outbound.baseline_id}:{outbound_index}"
+            )
+            bridges.append(
+                TaxiBridge(
+                    bridge_id,
+                    inbound.baseline_id,
+                    inbound_index,
+                    outbound.baseline_id,
+                    outbound_index,
+                    _taxi(
+                        bridge_id,
+                        inbound_leg.to_ref,
+                        outbound_leg.from_ref,
+                        max(0, budget),
+                        readiness=readiness,
+                        drive_seconds=480,
+                    ),
+                    TransferRequirement(120, 240, 60),
+                )
+            )
+
+        return StrategyGenerationInput(
+            origin_ref="origin",
+            destination_ref="destination",
+            departure_at=departure,
+            transit_baselines=ordered,
+            access_hubs=tuple(access_hubs),
+            egress_hubs=tuple(egress_hubs),
+            taxi_bridges=tuple(bridges),
+            taxi_only_quotes=(
+                _taxi(
+                    "taxi-only",
+                    "origin",
+                    "destination",
+                    max(0, budget),
+                    readiness=readiness,
+                    drive_seconds=1_200,
+                ),
+            ),
+        )
     mapped_public = TransitBaseline(
         "mapped-public",
         (
@@ -1513,11 +2034,12 @@ def _coarse_strategy_inputs(
         "upstream-bus", "BUS", f"canonical-fixture-transit-{route_suffix}",
         "upstream-stop", "destination", 5, 20, 540, readiness=readiness,
     )
-    if canonical_baseline is not None:
+    primary_canonical = canonical_baselines[0] if canonical_baselines else None
+    if primary_canonical is not None:
         canonical_transit = next(
             (
                 item
-                for item in canonical_baseline.legs
+                for item in primary_canonical.legs
                 if isinstance(item, TransitLegInput) and item.mode == "BUS"
             ),
             None,
@@ -1549,7 +2071,7 @@ def _coarse_strategy_inputs(
         destination_ref="destination",
         departure_at=departure,
         transit_baselines=(
-            canonical_baseline or mapped_public,
+            *(canonical_baselines or (mapped_public,)),
             full,
             inbound,
             outbound,
@@ -1621,22 +2143,22 @@ def _joined_vehicle_observations(
     target,
     query: BusObservationQuery,
 ) -> tuple[VehicleObservation, ...]:
-    """Join only normalized GBIS payloads; missing/unjoinable stays absent."""
+    """Build live candidates with official ETA taking precedence over position."""
 
     if not mapping.allows_bus_intelligence:
         return ()
-    if arrivals.status is not ProviderStatus.OK or locations.status is not ProviderStatus.OK:
-        return ()
-    arrival_values = arrivals.payload if isinstance(arrivals.payload, tuple) else ()
-    location_values = locations.payload if isinstance(locations.payload, tuple) else ()
-    location_keys = {
-        value.vehicle_join_key
-        for value in location_values
-        if isinstance(value, BusLocationObservation)
-        and value.route_external_id == query.route_id
-        and value.observed_at <= query.evaluated_at
-    }
+    arrival_values = (
+        arrivals.payload
+        if arrivals.status is ProviderStatus.OK and isinstance(arrivals.payload, tuple)
+        else ()
+    )
+    location_values = (
+        locations.payload
+        if locations.status is ProviderStatus.OK and isinstance(locations.payload, tuple)
+        else ()
+    )
     values: list[VehicleObservation] = []
+    arrival_keys: set[tuple[str, str]] = set()
     for value in arrival_values:
         if not isinstance(value, BusArrivalObservation):
             continue
@@ -1647,8 +2169,8 @@ def _joined_vehicle_observations(
         ):
             continue
         join_key = value.vehicle_join_key
-        if join_key is None or join_key not in location_keys:
-            continue
+        if join_key is not None:
+            arrival_keys.add(join_key)
         official = EtaPrediction(
             p50_arrival_at=value.observed_at + timedelta(seconds=value.eta_seconds),
             p90_arrival_at=value.observed_at + timedelta(seconds=value.eta_seconds),
@@ -1657,13 +2179,45 @@ def _joined_vehicle_observations(
         )
         values.append(
             VehicleObservation(
-                vehicle_ref=value.vehicle_token or "unjoinable",
+                vehicle_ref=(
+                    value.vehicle_token
+                    or "arrival_"
+                    + sha256(
+                        (
+                            f"{value.route_external_id}|{value.station_external_id}|"
+                            f"{official.p50_arrival_at.isoformat()}"
+                        ).encode("utf-8")
+                    ).hexdigest()[:24]
+                ),
                 route_id=target.route_id,
                 direction=target.direction or "UNKNOWN",
                 boarding_stop_id=target.boarding.external_id or value.station_external_id,
                 observed_at=value.observed_at,
                 official_eta=official,
                 remain_seat_observed=value.remaining_seats,
+                future_target_remaining_seats=None,
+            )
+        )
+    # A running vehicle can have a location before GBIS publishes a stop ETA.
+    # Preserve it as a model candidate; the ETA arbitrator will use the position
+    # model and then its historical predictor, or leave it unknown explicitly.
+    for value in location_values:
+        if (
+            not isinstance(value, BusLocationObservation)
+            or value.route_external_id != query.route_id
+            or value.observed_at > query.evaluated_at
+            or value.vehicle_join_key in arrival_keys
+        ):
+            continue
+        values.append(
+            VehicleObservation(
+                vehicle_ref=value.vehicle_token,
+                route_id=target.route_id,
+                direction=target.direction or "UNKNOWN",
+                boarding_stop_id=target.boarding.external_id or query.boarding_station_id,
+                observed_at=value.observed_at,
+                official_eta=None,
+                remain_seat_observed=None,
                 future_target_remaining_seats=None,
             )
         )
@@ -1736,6 +2290,23 @@ def _bus_result(
     return result
 
 
+def _usable_bus_wait(result: BusIntelligenceResult) -> TimeEstimate | None:
+    if (
+        isinstance(result.expected_wait_seconds, int)
+        and isinstance(result.p90_wait_seconds, int)
+    ):
+        return TimeEstimate(result.expected_wait_seconds, result.p90_wait_seconds)
+    # ETA remains valid for a seated bus even when seat-risk is unavailable.
+    # Keep boarding risk unknown, but do not throw away the live arrival clock.
+    if result.candidate_vehicles:
+        candidate = min(
+            result.candidate_vehicles,
+            key=lambda item: (item.wait_p50_seconds, item.wait_p90_seconds),
+        )
+        return TimeEstimate(candidate.wait_p50_seconds, candidate.wait_p90_seconds)
+    return None
+
+
 class _RequestScopedLegEvaluator:
     """Add candidate-entry-time Bus wait to exact immutable movement costs."""
 
@@ -1746,6 +2317,8 @@ class _RequestScopedLegEvaluator:
         eta_predictor: EtaPredictor,
         seat_predictor: SeatRiskPredictor,
         inference_budget: _RequestModelInferenceBudget,
+        bus_wait_estimator: BusWaitEstimator | None = None,
+        evaluated_at: datetime | None = None,
     ) -> None:
         self._base = StaticLegEvaluator(costs)
         self._snapshots = {item.topology_ref: item for item in snapshots}
@@ -1755,8 +2328,10 @@ class _RequestScopedLegEvaluator:
         self._eta_predictor = eta_predictor
         self._seat_predictor = seat_predictor
         self._inference_budget = inference_budget
+        self._bus_wait_estimator = bus_wait_estimator
+        self._evaluated_at = evaluated_at
         self._evaluations: dict[tuple[str, datetime], _BusLegEvaluation] = {}
-        self._ready_costs: dict[str, list[LegCost]] = {}
+        self._ready_costs: dict[tuple[str, datetime], LegCost] = {}
 
     @property
     def evaluations(self) -> tuple[_BusLegEvaluation, ...]:
@@ -1772,26 +2347,10 @@ class _RequestScopedLegEvaluator:
         )
         if leg.mode != "BUS" or snapshot is None:
             return base
-        ready_costs = self._ready_costs.setdefault(leg.leg_id, [])
-        if len(ready_costs) >= 2:
-            # CandidateEvaluator's third/fourth calls request movement travel at
-            # the already selected start quantiles. Re-selecting a vehicle at
-            # that instant would erase the wait causally chosen at ready time.
-            return LegCost(
-                wait=TimeEstimate(0, 0),
-                travel=base.travel,
-                fare=base.fare,
-                reliability_score=min(item.reliability_score for item in ready_costs),
-                warning_codes=tuple(
-                    sorted(
-                        {
-                            warning
-                            for item in ready_costs
-                            for warning in item.warning_codes
-                        }
-                    )
-                ),
-            )
+        cache_key = (leg.leg_id, entry_at)
+        cached = self._ready_costs.get(cache_key)
+        if cached is not None:
+            return cached
         if (
             not snapshot.mapping_allows_intelligence
             or snapshot.query is None
@@ -1818,18 +2377,13 @@ class _RequestScopedLegEvaluator:
                 seat_risk_feature_context=snapshot.seat_risk_feature_context,
                 inference_budget=self._inference_budget,
             )
-        self._evaluations[(leg.leg_id, entry_at)] = _BusLegEvaluation(
+        self._evaluations[cache_key] = _BusLegEvaluation(
             leg.leg_id, leg.topology_ref, entry_at, result
         )
-        if (
-            result.enrichment_applied
-            and isinstance(result.expected_wait_seconds, int)
-            and isinstance(result.p90_wait_seconds, int)
-        ):
+        live_wait = _usable_bus_wait(result)
+        if live_wait is not None:
             cost = LegCost(
-                wait=TimeEstimate(
-                    result.expected_wait_seconds, result.p90_wait_seconds
-                ),
+                wait=live_wait,
                 travel=base.travel,
                 fare=base.fare,
                 reliability_score=min(
@@ -1842,15 +2396,87 @@ class _RequestScopedLegEvaluator:
                     )
                 ),
             )
-            ready_costs.append(cost)
+            self._ready_costs[cache_key] = cost
+            return cost
+        fallback = None
+        if self._bus_wait_estimator is not None:
+            fallback = self._bus_wait_estimator.estimate(
+                snapshot.evidence.leg,
+                arrival_at=entry_at,
+                evaluated_at=self._evaluated_at or entry_at,
+            )
+        if fallback is not None:
+            fallback_warnings = set(base.warning_codes) - {"BUS_WAIT_UNKNOWN"}
+            reliability = base.reliability_score
+            if fallback.origin == "HISTORICAL_PROXY":
+                fallback_warnings.add("HISTORICAL_PROXY_USED")
+                reliability = min(reliability, 0.72)
+            elif fallback.origin == "MODEL_PREDICTED":
+                reliability = min(reliability, 0.82)
+            else:
+                reliability = min(reliability, 0.9)
+            cost = LegCost(
+                wait=fallback.wait,
+                travel=base.travel,
+                fare=base.fare,
+                reliability_score=reliability,
+                warning_codes=tuple(sorted(fallback_warnings)),
+            )
+            self._ready_costs[cache_key] = cost
             return cost
         if "BUS_WAIT_UNKNOWN" in base.warning_codes:
             raise ValueError("BUS_WAIT_UNKNOWN")
         # A normalized provider schedule can be the explicit fallback when Bus
         # observations are absent. Projection remains null/unobserved; the
         # schedule-derived wait is not mislabeled as Bus Intelligence.
-        ready_costs.append(base)
+        self._ready_costs[cache_key] = base
         return base
+
+    def evaluate_travel(
+        self,
+        leg,
+        start_at: datetime,
+        ready_cost: LegCost | None,
+    ) -> LegCost:
+        """Evaluate movement without re-selecting a ready-time Bus vehicle."""
+
+        base = self._base.evaluate(leg, start_at)
+        if leg.mode != "BUS" or ready_cost is None:
+            return base
+        return LegCost(
+            wait=TimeEstimate(0, 0),
+            travel=base.travel,
+            fare=base.fare,
+            reliability_score=ready_cost.reliability_score,
+            warning_codes=ready_cost.warning_codes,
+        )
+
+
+def _canonical_routing_graph(seeds: tuple[CandidateSeed, ...]) -> CanonicalRoutingGraph:
+    """Build one deterministic exact graph, rejecting ambiguous edge identity."""
+
+    by_leg_id: dict[str, LegSpec] = {}
+    for seed in seeds:
+        for leg in seed.legs:
+            current = by_leg_id.get(leg.leg_id)
+            if current is not None and current != leg:
+                raise RoutingUnavailableError("canonical graph leg identity conflict")
+            by_leg_id[leg.leg_id] = leg
+    return CanonicalRoutingGraph(
+        tuple(
+            sorted(
+                by_leg_id.values(),
+                key=lambda leg: (
+                    leg.from_ref,
+                    leg.to_ref,
+                    leg.mode,
+                    leg.topology_ref or "-",
+                    leg.evaluator_key,
+                    leg.leg_id,
+                ),
+            )
+        )
+    )
 
 
 def _unobserved_bus(*, mapping_allowed: bool) -> BusIntelligenceResult:
@@ -1896,28 +2522,134 @@ def _last_transit_envelopes(providers, result: ProviderEnvelope) -> tuple[Provid
     return (result,)
 
 
+_PROVIDER_ENDPOINT_SNAP_TOLERANCE_METERS = 25.0
+
+
+def _provider_endpoint_matches(
+    actual: Coordinate,
+    expected: tuple[float, float],
+) -> bool:
+    """Accept only small Provider road/entrance snapping around a requested point."""
+
+    actual_lat = math.radians(actual.lat)
+    expected_lat = math.radians(expected[1])
+    delta_lat = expected_lat - actual_lat
+    delta_lon = math.radians(expected[0] - actual.lon)
+    haversine = (
+        math.sin(delta_lat / 2.0) ** 2
+        + math.cos(actual_lat)
+        * math.cos(expected_lat)
+        * math.sin(delta_lon / 2.0) ** 2
+    )
+    distance_meters = 6_371_000.0 * 2.0 * math.asin(
+        min(1.0, math.sqrt(haversine))
+    )
+    return distance_meters <= _PROVIDER_ENDPOINT_SNAP_TOLERANCE_METERS
+
+
+def _canonical_movement_source(
+    envelope: ProviderEnvelope,
+    expected_mode: str,
+    *,
+    expected_from: tuple[float, float],
+    expected_to: tuple[float, float],
+    expected_topology_ref: str | None = None,
+    expected_from_ref: str = "origin",
+    expected_to_ref: str = "destination",
+) -> _CanonicalMovementSource | None:
+    if (
+        envelope.status is not ProviderStatus.OK
+        or not isinstance(envelope.payload, tuple)
+        or envelope.normalized_count != len(envelope.payload)
+    ):
+        return None
+    candidates: list[
+        tuple[bool, str, str, int, str, _CanonicalMovementSource]
+    ] = []
+    for itinerary in envelope.payload:
+        if not isinstance(itinerary, CanonicalItinerary):
+            continue
+        itinerary_identity = _canonical_itinerary_identity(itinerary)
+        for leg in itinerary.legs:
+            if leg.mode.value != expected_mode:
+                continue
+            if not (
+                _provider_endpoint_matches(
+                    leg.from_stop.coordinate, expected_from
+                )
+                and _provider_endpoint_matches(
+                    leg.to_stop.coordinate, expected_to
+                )
+            ):
+                continue
+            topology_matches = expected_topology_ref is None
+            routing_topology = None
+            if leg.transit is not None:
+                routing_topology, _ = _routing_transit_topology(
+                    itinerary_identity,
+                    leg,
+                    expected_from_ref,
+                    expected_to_ref,
+                )
+            if expected_topology_ref is not None:
+                topology_matches = (
+                    routing_topology is not None
+                    and routing_topology.fingerprint == expected_topology_ref
+                )
+            candidates.append(
+                (
+                    topology_matches,
+                    itinerary_identity,
+                    itinerary.itinerary_id,
+                    leg.sequence,
+                    leg.leg_id,
+                    _CanonicalMovementSource(
+                        leg,
+                        envelope,
+                        itinerary.itinerary_id,
+                        (
+                            routing_topology.fingerprint
+                            if routing_topology is not None
+                            else None
+                        ),
+                    ),
+                )
+            )
+    if candidates:
+        if expected_topology_ref is not None:
+            matching = [item for item in candidates if item[0]]
+            if matching:
+                candidates = matching
+            elif len(candidates) != 1:
+                # A single authoritative movement can refine a coarse topology.
+                # Multiple nonmatching choices cannot be selected safely.
+                return None
+        return min(candidates, key=lambda item: item[1:5])[5]
+    return None
+
+
 def _canonical_movement(
     envelope: ProviderEnvelope,
     expected_mode: str,
     *,
     expected_from: tuple[float, float],
     expected_to: tuple[float, float],
+    expected_topology_ref: str | None = None,
+    expected_from_ref: str = "origin",
+    expected_to_ref: str = "destination",
 ) -> CanonicalLeg | None:
-    if envelope.status is not ProviderStatus.OK or not isinstance(envelope.payload, tuple):
-        return None
-    for itinerary in envelope.payload:
-        if not isinstance(itinerary, CanonicalItinerary):
-            continue
-        for leg in itinerary.legs:
-            if (
-                leg.mode.value == expected_mode
-                and abs(leg.from_stop.coordinate.lon - expected_from[0]) <= 1e-6
-                and abs(leg.from_stop.coordinate.lat - expected_from[1]) <= 1e-6
-                and abs(leg.to_stop.coordinate.lon - expected_to[0]) <= 1e-6
-                and abs(leg.to_stop.coordinate.lat - expected_to[1]) <= 1e-6
-            ):
-                return leg
-    return None
+    """Compatibility wrapper for legacy fan-in code; selection is deterministic."""
+
+    source = _canonical_movement_source(
+        envelope,
+        expected_mode,
+        expected_from=expected_from,
+        expected_to=expected_to,
+        expected_topology_ref=expected_topology_ref,
+        expected_from_ref=expected_from_ref,
+        expected_to_ref=expected_to_ref,
+    )
+    return source.leg if source is not None else None
 
 
 def _mapping_provider_code(provider: str) -> str:
@@ -2004,12 +2736,18 @@ class CanonicalFanInOptimizeRouteUseCase:
         )
         if envelope.status is not ProviderStatus.OK or not envelope.payload:
             raise RoutingUnavailableError("required canonical transit fixture unavailable")
-        itinerary: CanonicalItinerary = envelope.payload[0]
-        if not (
-            _coordinates_equal(itinerary.legs[0].from_stop.coordinate, origin_raw)
-            and _coordinates_equal(itinerary.legs[-1].to_stop.coordinate, destination_raw)
+        if not isinstance(envelope.payload, tuple) or envelope.normalized_count != len(
+            envelope.payload
         ):
-            raise RoutingUnavailableError("fixture canonical endpoints do not match request")
+            raise RoutingUnavailableError("transit normalized count does not match payload")
+        returned_itinerary_count = len(envelope.payload)
+        canonical_itineraries = _canonicalize_returned_itineraries(
+            envelope.payload,
+            origin_raw,
+            destination_raw,
+            max_itineraries=5,
+        )
+        itinerary = canonical_itineraries[0][1]
         provider_leg = next(
             (
                 leg
@@ -2020,17 +2758,30 @@ class CanonicalFanInOptimizeRouteUseCase:
         )
         if provider_leg is None:
             raise RoutingUnavailableError("required canonical transit baseline unavailable")
-        (
-            canonical_baseline,
-            canonical_coordinates,
-            canonical_resolved,
-            canonical_envelopes,
-            bus_evidences,
-        ) = _canonical_itinerary_baseline(itinerary, envelope)
-        if not canonical_baseline.legs:
-            raise RoutingUnavailableError(
-                "required canonical transit baseline unavailable"
+        canonical_baselines: list[TransitBaseline] = []
+        canonical_coordinates: dict[str, tuple[float, float]] = {}
+        canonical_sources: dict[
+            tuple[str, str, str, str], _CanonicalMovementSource
+        ] = {}
+        bus_evidences: list[tuple[str, CanonicalTransitEvidence]] = []
+        for index, (identity, canonical_itinerary) in enumerate(canonical_itineraries):
+            baseline_id = "mapped-public" if index == 0 else f"mapped-public:{identity}"
+            baseline, coordinates, sources, evidences = _canonical_itinerary_baseline(
+                canonical_itinerary,
+                envelope,
+                baseline_id=baseline_id,
+                reference_namespace=identity,
+                bus_intelligence_enabled=(
+                    self._dependencies.bus_intelligence_enabled
+                ),
             )
+            canonical_baselines.append(baseline)
+            canonical_coordinates.update(coordinates)
+            overlap = set(canonical_sources) & set(sources)
+            if overlap:
+                raise RoutingUnavailableError("canonical itinerary identity collision")
+            canonical_sources.update(sources)
+            bus_evidences.extend(evidences)
 
         constraints = _constraints(payload)
         coarse_input = _coarse_strategy_inputs(
@@ -2038,10 +2789,25 @@ class CanonicalFanInOptimizeRouteUseCase:
             constraints.taxi_budget_krw,
             route_suffix=self._composition_key.lower(),
             main_mode=provider_leg.mode.value,
-            canonical_baseline=canonical_baseline,
+            canonical_baselines=tuple(canonical_baselines),
         )
-        generator = BoundedStrategyGenerator()
-        coarse = generator.generate(coarse_input, constraints)
+        default_caps = CandidateCaps()
+        generator = BoundedStrategyGenerator(
+            caps=replace(
+                default_caps,
+                transit_baselines=max(
+                    default_caps.transit_baselines,
+                    len(coarse_input.transit_baselines),
+                ),
+            )
+        )
+        coarse = self._build_complete_strategy_batch(
+            generator,
+            coarse_input,
+            constraints,
+            context,
+            operation_budget,
+        )
         plan = tuple((item.request_key, item.kind.value) for item in coarse.exact_enrichment_plan)
 
         composition, exact = self._resolve_exactification(
@@ -2049,7 +2815,7 @@ class CanonicalFanInOptimizeRouteUseCase:
             envelope,
             baseline_attempts,
             provider_leg,
-            bus_evidences,
+            tuple(bus_evidences),
             departure,
             observation_as_of,
             origin_raw,
@@ -2059,8 +2825,7 @@ class CanonicalFanInOptimizeRouteUseCase:
             constraints,
             operation_budget,
             canonical_coordinates,
-            canonical_resolved,
-            canonical_envelopes,
+            canonical_sources,
             inference_budget,
         )
         if self._dependencies.fixture_only:
@@ -2082,13 +2847,36 @@ class CanonicalFanInOptimizeRouteUseCase:
             self._dependencies.eta_predictor,
             self._dependencies.seat_predictor,
             inference_budget,
+            self._dependencies.bus_wait,
+            observation_as_of,
         )
-        optimized = RouteOptimizer(evaluator).optimize(
-            exact.seeds,
-            departure,
-            constraints,
-            provider_call_count=composition.provider_call_count,
-        )
+        self._check_budget(context, "graph-search")
+        graph = _canonical_routing_graph(exact.seeds)
+        try:
+            graph_outcome = RouteOptimizer(evaluator).optimize_graph(
+                graph,
+                composition.exact_input.origin_ref,
+                composition.exact_input.destination_ref,
+                departure,
+                constraints,
+                graph_caps=GraphSearchCaps(
+                    max_expansions=default_caps.coarse_combinations,
+                    max_labels_per_node=default_caps.coarse_combinations,
+                    max_complete_paths=default_caps.coarse_combinations,
+                    max_legs=12,
+                ),
+                pattern_hints=exact.seeds,
+                provider_call_count=composition.provider_call_count,
+            )
+        except (GraphSearchUncertifiedError, OptimalityUncertifiedError) as exc:
+            raise RoutingCapacityExceeded(str(exc)) from exc
+        self._check_budget(context, "graph-search")
+        graph_result = graph_outcome.graph_search
+        graph_seeds = graph_result.seeds
+        exact_topologies = {
+            tuple(leg.leg_id for leg in seed.legs) for seed in exact.seeds
+        }
+        optimized = graph_outcome.optimization
         composition = replace(
             composition, bus_evaluations=evaluator.evaluations
         )
@@ -2106,6 +2894,9 @@ class CanonicalFanInOptimizeRouteUseCase:
         response["computation"] = computation
         self._trace = FanInTrace(
             coarse_patterns=composition.coarse_patterns,
+            # Exact strategy coverage and graph-feasible output are distinct.
+            # Keep the established strategy trace here; graph execution has its
+            # own expansion/seed/recombination evidence below.
             exact_patterns=tuple(sorted({item.seed.pattern for item in exact.candidates})),
             exact_plan=plan,
             provider_call_count=composition.provider_call_count,
@@ -2117,12 +2908,29 @@ class CanonicalFanInOptimizeRouteUseCase:
                             *coarse.rejected,
                             *exact.rejected,
                             *optimized.rejected,
+                            *graph_result.rejected,
                         )
                     }
                 )
             ),
             persistence_status=persistence_status,
             model_inference=inference_budget.trace,
+            returned_itinerary_count=returned_itinerary_count,
+            admitted_itinerary_count=len(canonical_itineraries),
+            deduplicated_itinerary_count=(
+                returned_itinerary_count - len(canonical_itineraries)
+            ),
+            finite_payload_complete=True,
+            # Providers expose neither source exhaustion nor a lower bound for
+            # unreturned routes. This trace deliberately makes no network-global
+            # optimality claim.
+            network_global_complete=False,
+            graph_expansion_count=graph_result.expansion_count,
+            graph_seed_count=len(graph_seeds),
+            graph_recombined_count=sum(
+                tuple(leg.leg_id for leg in seed.legs) not in exact_topologies
+                for seed in graph_seeds
+            ),
         )
         return UseCaseResult(
             response=response,
@@ -2130,6 +2938,72 @@ class CanonicalFanInOptimizeRouteUseCase:
                 composition, optimized
             ),
             warning_codes=tuple(response["warningCodes"]),
+        )
+
+    def _build_complete_strategy_batch(
+        self,
+        generator: BoundedStrategyGenerator,
+        coarse_input: StrategyGenerationInput,
+        constraints: RouteConstraints,
+        context: RequestContext,
+        operation_budget: _ProviderOperationBudget,
+    ) -> StrategyGenerationBatch:
+        """Exhaust the finite LB-ordered frontier or fail without ranking it."""
+
+        try:
+            search_space = generator.build_search_space(coarse_input, constraints)
+        except OptimalityUncertifiedError as exc:
+            raise RoutingCapacityExceeded(str(exc)) from exc
+
+        frontier = search_space.open_frontier()
+        candidates: list[StrategyCandidate] = []
+        requests = {}
+        costs = {}
+        logical_calls = 0
+        while not frontier.scope_exhausted:
+            self._check_budget(context, "strategy-frontier")
+            remaining = self._provider_operation_cap - operation_budget.consumed - logical_calls
+            if remaining <= 0:
+                raise RoutingCapacityExceeded(
+                    "EXACT_PROVIDER_CALL_CAP_UNCERTIFIED"
+                )
+            try:
+                batch = frontier.next_exactification_batch(
+                    logical_provider_call_cap=min(
+                        search_space.logical_provider_call_cap,
+                        remaining,
+                    )
+                )
+            except OptimalityUncertifiedError as exc:
+                raise RoutingCapacityExceeded(str(exc)) from exc
+            if not batch.candidates:
+                raise RoutingCapacityExceeded(
+                    "EXACT_FRONTIER_PROGRESS_UNCERTIFIED"
+                )
+            candidates.extend(batch.candidates)
+            logical_calls += batch.logical_provider_calls
+            for request in batch.exact_enrichment_plan:
+                requests.setdefault(request.request_key, request)
+            for key, cost in batch.cost_catalog:
+                current = costs.setdefault(key, cost)
+                if current != cost:
+                    raise RoutingCapacityExceeded(
+                        "EXACT_COST_IDENTITY_CONFLICT"
+                    )
+
+        exactification_plan = ExactificationPlan(
+            candidates=tuple(item.exactification for item in candidates),
+            candidate_cap=max(1, len(candidates)),
+            logical_provider_call_cap=self._provider_operation_cap,
+        )
+        return StrategyGenerationBatch(
+            candidates=tuple(candidates),
+            rejected=search_space.rejected,
+            exact_enrichment_plan=tuple(requests.values()),
+            cost_catalog=tuple(sorted(costs.items())),
+            unique_provider_calls=logical_calls,
+            policy_version=search_space.policy_version,
+            exactification_plan=exactification_plan,
         )
 
     def _resolve_exactification(
@@ -2148,9 +3022,8 @@ class CanonicalFanInOptimizeRouteUseCase:
         constraints: RouteConstraints,
         operation_budget: _ProviderOperationBudget,
         canonical_coordinates: Mapping[str, tuple[float, float]],
-        canonical_resolved: Mapping[tuple[str, str, str], CanonicalLeg],
-        canonical_envelopes: Mapping[
-            tuple[str, str, str], ProviderEnvelope
+        canonical_sources: Mapping[
+            tuple[str, str, str, str], _CanonicalMovementSource
         ],
         inference_budget: _RequestModelInferenceBudget,
     ) -> tuple[_Composition, StrategyGenerationBatch]:
@@ -2164,7 +3037,11 @@ class CanonicalFanInOptimizeRouteUseCase:
         del bus_evidences, constraints
         plan = coarse.exactification_plan
         if plan.logical_provider_calls > plan.logical_provider_call_cap:
-            raise RoutingUnavailableError("domain exactification call cap invalid")
+            raise RoutingCapacityExceeded("domain exactification call cap invalid")
+        candidate_priority = {
+            candidate.candidate_key: index
+            for index, candidate in enumerate(plan.candidates)
+        }
 
         coordinates = _coordinate_registry(origin_raw, destination_raw)
         coordinates.update(canonical_coordinates)
@@ -2198,8 +3075,7 @@ class CanonicalFanInOptimizeRouteUseCase:
                     step,
                     entry_at,
                     departure,
-                    canonical_resolved,
-                    canonical_envelopes,
+                    canonical_sources,
                 )
                 units = self._exact_step_reservation_units(
                     step, reusable is not None
@@ -2212,7 +3088,7 @@ class CanonicalFanInOptimizeRouteUseCase:
             provider_units = sum(units for _, _, units in ready)
             stage_reserved = operation_budget.try_reserve(provider_units)
             if not stage_reserved:
-                raise RoutingUnavailableError(
+                raise RoutingCapacityExceeded(
                     "provider operation cap exhausted before exactification stage"
                 )
 
@@ -2227,7 +3103,7 @@ class CanonicalFanInOptimizeRouteUseCase:
                 for step, entry_at, units in sorted(
                     ready,
                     key=lambda item: (
-                        item[0].candidate_key,
+                        candidate_priority[item[0].candidate_key],
                         item[0].leg_sequence,
                         item[0].quote_identity(item[1]).quote_key,
                     ),
@@ -2240,8 +3116,7 @@ class CanonicalFanInOptimizeRouteUseCase:
                         departure,
                         observation_as_of,
                         coordinates,
-                        canonical_resolved,
-                        canonical_envelopes,
+                        canonical_sources,
                         units,
                         inference_budget,
                     )
@@ -2265,7 +3140,7 @@ class CanonicalFanInOptimizeRouteUseCase:
                 for future in sorted(
                     done,
                     key=lambda value: (
-                        future_items[value][0].candidate_key,
+                        candidate_priority[future_items[value][0].candidate_key],
                         future_items[value][0].leg_sequence,
                     ),
                 ):
@@ -2309,9 +3184,7 @@ class CanonicalFanInOptimizeRouteUseCase:
         leg_envelopes: dict[str, ProviderEnvelope] = {}
         leg_dispatches: dict[str, TaxiDispatchEstimate] = {}
         leg_projections: dict[str, _LegProjection] = {}
-        movement_envelopes: dict[tuple[str, str, str], ProviderEnvelope] = dict(
-            canonical_envelopes
-        )
+        movement_envelopes: dict[tuple[str, str, str], ProviderEnvelope] = {}
         movement_dispatches: dict[
             tuple[str, str, str], TaxiDispatchEstimate
         ] = {}
@@ -2350,7 +3223,9 @@ class CanonicalFanInOptimizeRouteUseCase:
                     exact_taxi_upper += cost.fare.upper_krw
                 leg_envelopes[exact_leg.leg_id] = outcome.envelope
                 leg_projections[exact_leg.leg_id] = self._projection_from_leg(
-                    outcome.canonical_leg
+                    outcome.canonical_leg,
+                    expected_start=coordinates[exact_leg.from_ref],
+                    expected_end=coordinates[exact_leg.to_ref],
                 )
                 kind = self._enrichment_kind(exact_leg.mode)
                 movement_envelopes.setdefault(
@@ -2466,29 +3341,58 @@ class CanonicalFanInOptimizeRouteUseCase:
         step: ExactificationStep,
         entry_at: datetime,
         quoted_at: datetime,
-        canonical_resolved: Mapping[tuple[str, str, str], CanonicalLeg],
-        canonical_envelopes: Mapping[
-            tuple[str, str, str], ProviderEnvelope
+        canonical_sources: Mapping[
+            tuple[str, str, str, str], _CanonicalMovementSource
         ],
-    ) -> tuple[CanonicalLeg, ProviderEnvelope] | None:
+        legacy_envelopes: Mapping[tuple[str, str, str], ProviderEnvelope] | None = None,
+    ) -> _CanonicalMovementSource | None:
+        del legacy_envelopes
         # Taxi Provider departure is entry plus the separately sourced dispatch
         # wait. The baseline movement catalog has no proof for that post-dispatch
         # request identity, so Taxi is never reusable in the first implementation.
         if step.mode == "TAXI":
             return None
-        # The baseline canonical envelope was quoted at the original request
-        # departure. Movement equality alone is insufficient for a time-aware
-        # quote/cache identity: later candidates must issue a new exact request.
-        if entry_at != quoted_at:
-            return None
-        key = _movement_key(
-            self._enrichment_kind(step.mode), step.from_ref, step.to_ref
+        key = (
+            *_movement_key(
+                self._enrichment_kind(step.mode), step.from_ref, step.to_ref
+            ),
+            step.evaluator_key,
         )
-        leg = canonical_resolved.get(key)
-        supplying = canonical_envelopes.get(key)
-        if leg is None or supplying is None or leg.mode.value != step.mode:
+        source = canonical_sources.get(key)
+        if source is None or source.leg.mode.value != step.mode:
             return None
-        return leg, supplying
+        if (
+            step.mode in {"BUS", "SUBWAY", "GTX", "TRAIN"}
+            and step.topology_ref is not None
+            and source.routing_topology_ref != step.topology_ref
+        ):
+            return None
+        movement_kind = self._enrichment_kind(step.mode)
+        enrichment = getattr(step, "enrichment", None)
+        if enrichment is not None and not any(
+            request.kind is movement_kind for request in enrichment
+        ):
+            # An EXACT movement came from the request-scoped atomic itinerary.
+            # Reuse its in-vehicle/walk duration at the candidate entry time;
+            # Bus waiting is still recomputed below from live/history evidence.
+            # Re-running a full journey search for each sliced itinerary leg is
+            # neither the same quote nor a useful traffic refresh.
+            return source
+        # The first movement is the departure-scoped baseline quote and remains
+        # reusable at the request departure even when a Provider reports a later
+        # scheduled vehicle time.  A later movement belongs to the same atomic
+        # Provider itinerary only when candidate chronology reaches that leg's
+        # exact expected-start instant.  Re-querying an individual transit leg is
+        # not equivalent: journey planners normally return a new access/egress
+        # itinerary around that leg.  Without a later-leg timestamp, fail closed.
+        if step.leg_sequence == 0:
+            if entry_at != quoted_at:
+                return None
+        else:
+            expected_entry_at = source.leg.expected_start_at
+            if expected_entry_at is None or entry_at != expected_entry_at:
+                return None
+        return source
 
     def _exact_step_reservation_units(
         self, step: ExactificationStep, movement_reused: bool
@@ -2509,9 +3413,17 @@ class CanonicalFanInOptimizeRouteUseCase:
         # plan still require an arrivals+locations pair after HIGH mapping.
         # Reserve both operations before the worker starts; unused units are
         # released deterministically when mapping is not accepted.
-        if step.mode == "BUS" and not bus_intelligence_reserved:
+        if (
+            step.mode == "BUS"
+            and self._dependencies.bus_intelligence_enabled
+            and not bus_intelligence_reserved
+        ):
             units += 2
-        if step.mode == "BUS" and self._dependencies.context is not None:
+        if (
+            step.mode == "BUS"
+            and self._dependencies.bus_intelligence_enabled
+            and self._dependencies.context is not None
+        ):
             units += len(self._dependencies.context.enabled_operations)
         return units
 
@@ -2531,9 +3443,8 @@ class CanonicalFanInOptimizeRouteUseCase:
         journey_departure: datetime,
         observation_as_of: datetime,
         coordinates: Mapping[str, tuple[float, float]],
-        canonical_resolved: Mapping[tuple[str, str, str], CanonicalLeg],
-        canonical_envelopes: Mapping[
-            tuple[str, str, str], ProviderEnvelope
+        canonical_sources: Mapping[
+            tuple[str, str, str, str], _CanonicalMovementSource
         ],
         reserved_units: int,
         inference_budget: _RequestModelInferenceBudget,
@@ -2543,8 +3454,7 @@ class CanonicalFanInOptimizeRouteUseCase:
             step,
             entry_at,
             journey_departure,
-            canonical_resolved,
-            canonical_envelopes,
+            canonical_sources,
         )
         provider_departure = entry_at
         dispatch = None
@@ -2552,6 +3462,7 @@ class CanonicalFanInOptimizeRouteUseCase:
         actual_units = 0
         result: ProviderEnvelope | None = None
         canonical_leg: CanonicalLeg | None = None
+        source_itinerary_id: str | None = None
 
         if step.mode == "TAXI":
             request_at_ready = TransitSearchRequest(
@@ -2578,7 +3489,9 @@ class CanonicalFanInOptimizeRouteUseCase:
             )
 
         if reusable is not None:
-            canonical_leg, result = reusable
+            canonical_leg = reusable.leg
+            result = reusable.envelope
+            source_itinerary_id = reusable.itinerary_id
         else:
             if not self._optional_provider_start_allowed(context):
                 return _ExactStepOutcome(
@@ -2608,12 +3521,18 @@ class CanonicalFanInOptimizeRouteUseCase:
                 )
                 attempts.extend(transit_attempts)
                 actual_units += len(transit_attempts)
-            canonical_leg = _canonical_movement(
+            selected_source = _canonical_movement_source(
                 result,
                 step.mode,
                 expected_from=coordinates[step.from_ref],
                 expected_to=coordinates[step.to_ref],
+                expected_topology_ref=step.topology_ref,
+                expected_from_ref=step.from_ref,
+                expected_to_ref=step.to_ref,
             )
+            if selected_source is not None:
+                canonical_leg = selected_source.leg
+                source_itinerary_id = selected_source.itinerary_id
 
         if result is None or canonical_leg is None:
             return _ExactStepOutcome(
@@ -2621,119 +3540,147 @@ class CanonicalFanInOptimizeRouteUseCase:
                 tuple(attempts), dispatch, None, reserved_units, actual_units,
                 "EXACT_CANONICAL_UNRESOLVED",
             )
+        if canonical_leg.mode.value in {"BUS", "SUBWAY", "GTX", "TRAIN"} and (
+            source_itinerary_id is None
+        ):
+            return _ExactStepOutcome(
+                step,
+                identity,
+                provider_departure,
+                None,
+                canonical_leg,
+                result,
+                tuple(attempts),
+                dispatch,
+                None,
+                reserved_units,
+                actual_units,
+                "EXACT_ITINERARY_PROVENANCE_UNRESOLVED",
+            )
 
         snapshot = None
         bus_wait = 0
         bus_wait_observed = False
-        if step.mode == "BUS" and canonical_leg.transit is not None:
-            descriptor = canonical_leg.transit
+        if (
+            step.mode == "BUS"
+            and canonical_leg.transit is not None
+            and isinstance(result.payload, tuple)
+            and result.payload
+        ):
+            provider_topology = _provider_transit_topology(
+                canonical_leg, step.from_ref, step.to_ref
+            )
+            topology_ref = (
+                provider_topology.fingerprint
+                if provider_topology is not None
+                else step.topology_ref
+            )
+            if topology_ref is None:
+                return _ExactStepOutcome(
+                    step, identity, provider_departure, None, canonical_leg, result,
+                    tuple(attempts), dispatch, None, reserved_units, actual_units,
+                    "EXACT_TOPOLOGY_UNRESOLVED",
+                )
+            evidence = CanonicalTransitEvidence(
+                _mapping_provider_code(result.provider),
+                result.fingerprint,
+                source_itinerary_id,
+                canonical_leg,
+            )
+            mapping, target = self._resolve_mapping(evidence, entry_at)
+            query = None
+            arrivals = None
+            locations = None
+            weather = None
+            traffic = None
+            eta_feature_context = None
+            seat_risk_feature_context = None
+            service_type = _service_type(
+                getattr(target, "route_type", None) if target is not None else None
+            )
             if (
-                descriptor.external_route_id is not None
-                and descriptor.direction is not None
-                and descriptor.boarding_sequence is not None
-                and descriptor.alighting_sequence is not None
-                and isinstance(result.payload, tuple)
-                and result.payload
+                mapping is not None
+                and mapping.allows_bus_intelligence
+                and target is not None
+                and service_type in {"GENERAL", "SEATED"}
+                and self._optional_provider_start_allowed(context)
             ):
-                topology_ref = CanonicalTransitTopology(
-                    descriptor.external_route_id,
-                    descriptor.direction,
-                    step.from_ref,
-                    step.to_ref,
-                    descriptor.boarding_sequence,
-                    descriptor.alighting_sequence,
-                    descriptor.branch_id,
-                ).fingerprint
-                evidence = CanonicalTransitEvidence(
-                    _mapping_provider_code(result.provider),
-                    result.fingerprint,
-                    result.payload[0].itinerary_id,
+                query = BusObservationQuery(
+                    target.route_id,
+                    target.boarding.external_id or "UNAVAILABLE",
+                    observation_as_of,
+                )
+                group = self._fetch_bus_optional_group(
+                    context,
+                    self._dependencies.providers,
+                    self._dependencies.context,
+                    query,
+                    target,
                     canonical_leg,
+                    service_type,
                 )
-                mapping, target = self._resolve_mapping(evidence, entry_at)
-                query = None
-                arrivals = None
-                locations = None
-                weather = None
-                traffic = None
-                eta_feature_context = None
-                seat_risk_feature_context = None
-                service_type = _service_type(
-                    getattr(target, "route_type", None) if target is not None else None
-                )
-                if (
-                    mapping is not None
-                    and mapping.allows_bus_intelligence
-                    and target is not None
-                    and service_type in {"GENERAL", "SEATED"}
-                    and self._optional_provider_start_allowed(context)
-                ):
-                    query = BusObservationQuery(
-                        target.route_id,
-                        target.boarding.external_id or "UNAVAILABLE",
-                        observation_as_of,
-                    )
-                    group = self._fetch_bus_optional_group(
-                        context,
-                        self._dependencies.providers,
-                        self._dependencies.context,
-                        query,
-                        target,
-                        canonical_leg,
-                        service_type,
-                    )
-                    arrivals = group.arrivals
-                    locations = group.locations
-                    weather = group.weather
-                    traffic = group.traffic
-                    eta_feature_context = group.eta_feature_context
-                    seat_risk_feature_context = group.seat_risk_feature_context
-                    actual_units += group.started_units
-                    attempts.extend(group.envelopes)
-                snapshot = _BusLegSnapshot(
-                    topology_ref,
-                    evidence,
+                arrivals = group.arrivals
+                locations = group.locations
+                weather = group.weather
+                traffic = group.traffic
+                eta_feature_context = group.eta_feature_context
+                seat_risk_feature_context = group.seat_risk_feature_context
+                actual_units += group.started_units
+                attempts.extend(group.envelopes)
+            snapshot = _BusLegSnapshot(
+                topology_ref,
+                evidence,
+                mapping,
+                target,
+                query,
+                arrivals,
+                locations,
+                service_type,
+                step.leg_id,
+                weather,
+                traffic,
+                eta_feature_context,
+                seat_risk_feature_context,
+                group.required_operations if query is not None else frozenset(),
+                group.context_complete if query is not None else True,
+            )
+            if (
+                snapshot.mapping_allows_intelligence
+                and query is not None
+                and arrivals is not None
+                and locations is not None
+            ):
+                bus = _bus_result(
                     mapping,
                     target,
-                    query,
+                    entry_at,
+                    True,
                     arrivals,
                     locations,
-                    service_type,
-                    step.leg_id,
-                    weather,
-                    traffic,
-                    eta_feature_context,
-                    seat_risk_feature_context,
-                    group.required_operations if query is not None else frozenset(),
-                    group.context_complete if query is not None else True,
+                    self._dependencies.eta_predictor,
+                    self._dependencies.seat_predictor,
+                    query,
+                    service_type=service_type,
+                    evaluated_at=observation_as_of,
+                    eta_feature_context=eta_feature_context,
+                    seat_risk_feature_context=seat_risk_feature_context,
+                    inference_budget=inference_budget,
                 )
-                if (
-                    snapshot.mapping_allows_intelligence
-                    and query is not None
-                    and arrivals is not None
-                    and locations is not None
-                ):
-                    bus = _bus_result(
-                        mapping,
-                        target,
-                        entry_at,
-                        True,
-                        arrivals,
-                        locations,
-                        self._dependencies.eta_predictor,
-                        self._dependencies.seat_predictor,
-                        query,
-                        service_type=service_type,
-                        evaluated_at=observation_as_of,
-                        eta_feature_context=eta_feature_context,
-                        seat_risk_feature_context=seat_risk_feature_context,
-                        inference_budget=inference_budget,
-                    )
-                    if bus.enrichment_applied and isinstance(
-                        bus.expected_wait_seconds, int
-                    ):
-                        bus_wait = bus.expected_wait_seconds
-                        bus_wait_observed = True
+                live_wait = _usable_bus_wait(bus)
+                if live_wait is not None:
+                    bus_wait = live_wait.p50_seconds
+                    bus_wait_observed = True
+
+            if not bus_wait_observed and self._dependencies.bus_wait is not None:
+                fallback_wait = self._dependencies.bus_wait.estimate(
+                    canonical_leg,
+                    arrival_at=entry_at,
+                    evaluated_at=observation_as_of,
+                )
+                if fallback_wait is not None:
+                    bus_wait = fallback_wait.wait.p50_seconds
+                    bus_wait_observed = True
+                    snapshot = replace(snapshot, fallback_wait=fallback_wait)
 
         if (
             step.mode == "BUS"
@@ -2781,6 +3728,7 @@ class CanonicalFanInOptimizeRouteUseCase:
             snapshot,
             reserved_units,
             actual_units,
+            source_itinerary_id=source_itinerary_id,
         )
 
     @staticmethod
@@ -2812,10 +3760,24 @@ class CanonicalFanInOptimizeRouteUseCase:
             f"{outcome.step.candidate_key}:{outcome.step.leg_sequence}"
         )
         warning_codes: tuple[str, ...] = ()
+        reliability_score = 0.9
         if outcome.dispatch is not None:
             wait_cost = outcome.dispatch.wait
+            warning_codes = ("TAXI_DISPATCH_WAIT_ESTIMATED",)
         elif provider_leg.mode.value == "BUS":
-            if provider_leg.expected_start_at is None:
+            fallback_wait = (
+                outcome.snapshot.fallback_wait
+                if outcome.snapshot is not None
+                else None
+            )
+            if fallback_wait is not None:
+                wait_cost = fallback_wait.wait
+                if fallback_wait.origin == "HISTORICAL_PROXY":
+                    warning_codes = ("HISTORICAL_PROXY_USED",)
+                    reliability_score = 0.72
+                elif fallback_wait.origin == "MODEL_PREDICTED":
+                    reliability_score = 0.82
+            elif provider_leg.expected_start_at is None:
                 wait_cost = TimeEstimate(0, 0)
                 warning_codes = ("BUS_WAIT_UNKNOWN",)
             else:
@@ -2854,12 +3816,26 @@ class CanonicalFanInOptimizeRouteUseCase:
                 provider_leg.fare.lower_krw,
                 provider_leg.fare.upper_krw,
             ),
-            reliability_score=0.9,
+            reliability_score=reliability_score,
             warning_codes=warning_codes,
         )
 
     @staticmethod
-    def _projection_from_leg(leg: CanonicalLeg) -> _LegProjection:
+    def _projection_from_leg(
+        leg: CanonicalLeg,
+        *,
+        expected_start: tuple[float, float],
+        expected_end: tuple[float, float],
+    ) -> _LegProjection:
+        """Project Provider evidence onto the admitted canonical graph edge.
+
+        Road and station Providers commonly snap request coordinates by a few
+        metres.  The exactifier already verifies that snap against the bounded
+        tolerance; the response must still expose the canonical graph nodes so
+        adjacent legs and the requested route endpoints remain exactly joined.
+        Provider geometry is retained as evidence of the travelled path.
+        """
+
         descriptor = leg.transit
         transit = (
             {
@@ -2871,8 +3847,8 @@ class CanonicalFanInOptimizeRouteUseCase:
             if descriptor is not None
             else None
         )
-        start = (leg.from_stop.coordinate.lon, leg.from_stop.coordinate.lat)
-        end = (leg.to_stop.coordinate.lon, leg.to_stop.coordinate.lat)
+        start = expected_start
+        end = expected_end
         geometry = tuple((item.lon, item.lat) for item in leg.geometry)
         return _LegProjection(
             leg.from_stop.name,
@@ -3064,16 +4040,19 @@ class CanonicalFanInOptimizeRouteUseCase:
                 operation_budget.release(transit_cap - actual_transit_calls)
                 provider_envelopes.extend(_last_transit_envelopes(providers, result))
                 expected_mode = transit_modes.get((request.from_ref, request.to_ref))
-                value = (
-                    _canonical_movement(
+                source = (
+                    _canonical_movement_source(
                         result,
                         expected_mode,
                         expected_from=from_coordinate,
                         expected_to=to_coordinate,
+                        expected_from_ref=request.from_ref,
+                        expected_to_ref=request.to_ref,
                     )
                     if expected_mode is not None else None
                 )
-                if value is not None:
+                if source is not None:
+                    value = source.leg
                     resolved[key] = value
                     resolved_envelopes[key] = result
                     if value.mode.value == "BUS" and value.transit is not None:
@@ -3098,7 +4077,7 @@ class CanonicalFanInOptimizeRouteUseCase:
                             evidence = CanonicalTransitEvidence(
                                 _mapping_provider_code(result.provider),
                                 result.fingerprint,
-                                result.payload[0].itinerary_id,
+                                source.itinerary_id,
                                 value,
                             )
                             evidence_by_topology[topology_ref] = evidence
@@ -4380,6 +5359,10 @@ class CanonicalFanInOptimizeRouteUseCase:
     def _resolve_mapping(self, evidence, evaluated_at):
         if evidence is None:
             return None, None
+        if _provider_transit_topology(
+            evidence.leg, "mapping-board", "mapping-alight"
+        ) is None:
+            return _unavailable_mapping(evidence.leg), None
         try:
             mapping, target = self._dependencies.mapping(evidence, evaluated_at)
         except Exception:

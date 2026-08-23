@@ -29,7 +29,7 @@
 - `publicService`: generated runtime client의 Public API 경계
 
 Route 시간·비용·ranking·확률은 재계산하지 않는다. Kakao 지도는
-`VITE_KAKAO_MAP_APP_KEY`가 있고 실제 GeoJSON geometry가 있을 때만 그린다.
+`KAKAO_JS_API_KEY`가 있고 실제 GeoJSON geometry가 있을 때만 그린다.
 GEOJSON과 bounded standard POLYLINE만 검증 후 표시하며 geometry가 없거나
 malformed/oversized이면 직선으로 위장하지 않는다.
 현재 위치와 guest token은 page memory에서만 사용하며 브라우저 저장소나 로그에

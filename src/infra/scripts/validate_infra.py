@@ -29,6 +29,7 @@ else:
 
 if docker := shutil.which("docker"):
     run([docker, "compose", "-f", "src/infra/docker/compose.service-product.yml", "config", "--quiet"])
+    run([docker, "compose", "-f", "src/infra/docker/compose.routing-e2e.yml", "config", "--quiet"])
 else:
     print("SKIP docker compose config: docker is not installed")
 

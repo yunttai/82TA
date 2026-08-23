@@ -215,7 +215,8 @@ describe("route search vertical slice", () => {
     for (const label of ["가장 빠른 경로", "가장 안정적인 경로", "비용 효율 경로", "대중교통만 이용"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    expect(screen.getAllByText("버스 실시간 정보를 사용할 수 없습니다.")).toHaveLength(5);
+    expect(document.querySelectorAll(".route-card")).toHaveLength(1);
+    expect(screen.getAllByText("버스 실시간 정보를 사용할 수 없습니다.")).toHaveLength(2);
 
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (input instanceof Request ? input.url : input.toString()).endsWith("/api/v1/route-searches"))).toBe(true));
     const healthCall = fetchMock.mock.calls.find(([input]) => (input instanceof Request ? input.url : input.toString()).endsWith("/api/v1/health"));

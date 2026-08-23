@@ -27,6 +27,7 @@ from provider_core.runtime import (
     RuntimeGateReason,
 )
 from provider_core.transport import (
+    HttpsConnectProxyConnectionFactory,
     NetworkEgressAttestation,
     PinnedHttpsConnectionFactory,
     StrictHttpsTransport,
@@ -171,7 +172,13 @@ class RuntimeEvidenceTests(unittest.TestCase):
         self.assertEqual(transport.calls, 0)
 
     def test_executable_path_preserves_exact_evidence_schema_version(self) -> None:
-        schema_version = "kakao-transit-contract-v1"
+        schema_version = next(
+            spec.response_schema_version
+            for spec in ENDPOINT_SPECS
+            if spec.provider == "KAKAO_PUBLIC_TRANSIT"
+            and spec.operation == "search_current"
+        )
+        self.assertIsNotNone(schema_version)
         foundation_spec = next(
             spec
             for spec in ENDPOINT_SPECS
@@ -197,24 +204,15 @@ class RuntimeEvidenceTests(unittest.TestCase):
             def send(self, request):
                 self.calls.append(request)
                 body = {
-                    "routes": [
-                        {
-                            "id": "verified-schema-route",
-                            "origin": {"lon": 127.1, "lat": 37.3},
-                            "destination": {"lon": 127.2, "lat": 37.4},
-                            "durationSeconds": 600,
-                            "p90Seconds": 720,
-                            "distanceMeters": 10000,
-                            "fareKrw": 2000,
-                            "routeId": "sanitized-route",
-                            "routeLabel": "SAN-1",
-                            "direction": "Sanitized Northbound",
-                            "geometry": [
-                                {"lon": 127.1, "lat": 37.3},
-                                {"lon": 127.2, "lat": 37.4},
-                            ],
-                        }
-                    ]
+                    "status": "OK",
+                    "properties": {"total": 1, "bus": 1, "subway": 0, "busAndSubway": 0, "landingURL": "https://map.kakao.com/link/by/traffic/sanitized"},
+                    "routes": [{
+                        "properties": {"type": "BUS", "totalDistance": 10000, "totalTime": 600, "transfers": 0, "fare": {"value": 2000}},
+                        "steps": [{
+                            "properties": {"guidance": "sanitized", "type": "BUS", "distance": 10000, "time": 600, "stops": [{"name": "Sanitized Start"}, {"name": "Sanitized End"}], "vehicles": [{"name": "SAN-1", "type": "직행"}]},
+                            "path": {"points": [[127.1, 37.3], [127.2, 37.4]]},
+                        }],
+                    }],
                 }
                 return HttpResponse(
                     200,
@@ -335,9 +333,15 @@ class FakeConnection:
 
 
 class FakeConnectionFactory:
-    def __init__(self, connection: FakeConnection) -> None:
+    def __init__(
+        self,
+        connection: FakeConnection,
+        *,
+        external_target_resolution: bool = False,
+    ) -> None:
         self.connection = connection
         self.calls = []
+        self.external_target_resolution = external_target_resolution
 
     def open(self, **kwargs):
         self.calls.append(kwargs)
@@ -404,6 +408,27 @@ class StrictHttpsTransportTests(unittest.TestCase):
         with self.assertRaises(TransportSecurityError):
             private_transport.send(HttpRequest("GET", ENDPOINT))
         self.assertEqual(private_factory.calls, [])
+
+    def test_attested_external_proxy_owns_dns_validation_on_internal_network(self) -> None:
+        response = FakeResponse(200, [("Content-Type", "application/json")], b"{}")
+        resolver = FakeResolver()
+        connection = FakeConnection(response)
+        factory = FakeConnectionFactory(
+            connection,
+            external_target_resolution=True,
+        )
+        transport = StrictHttpsTransport(
+            (ENDPOINT,),
+            egress_attestation=egress(),
+            resolver=resolver,
+            connection_factory=factory,
+            clock=lambda: NOW,
+            monotonic_clock=lambda: 10.0,
+        )
+        result = transport.send(HttpRequest("GET", ENDPOINT))
+        self.assertEqual(result.body, b"{}")
+        self.assertEqual(resolver.calls, [])
+        self.assertEqual(factory.calls[0]["resolved_ip"], "")
 
     def test_unallowlisted_endpoint_redirect_and_ambiguous_headers_are_rejected(self) -> None:
         ok, _, _, _ = self.transport(
@@ -476,6 +501,21 @@ class FakeSocket:
         self.closed = True
 
 
+class FakeProxySocket(FakeSocket):
+    def __init__(self, response: bytes) -> None:
+        super().__init__()
+        self.response = response
+        self.sent = bytearray()
+
+    def sendall(self, value: bytes) -> None:
+        self.sent.extend(value)
+
+    def recv(self, amount: int) -> bytes:
+        value = self.response[:amount]
+        self.response = self.response[amount:]
+        return value
+
+
 class FakeTlsContext:
     check_hostname = True
     verify_mode = ssl.CERT_REQUIRED
@@ -509,6 +549,64 @@ class PinnedConnectionFactoryTests(unittest.TestCase):
         self.assertEqual(context.calls, [(raw, "provider.example")])
         connection.set_read_timeout(0.4)
         self.assertEqual(tls_socket.timeouts[-1], 0.4)
+
+
+class HttpsConnectProxyConnectionFactoryTests(unittest.TestCase):
+    def test_proxy_tunnel_contains_only_provider_authority_and_keeps_system_tls(self) -> None:
+        raw = FakeProxySocket(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+        tls_socket = FakeSocket()
+        opened = []
+        context = FakeTlsContext(tls_socket)
+        factory = HttpsConnectProxyConnectionFactory(
+            "http://routing-egress-proxy:3128",
+            socket_opener=lambda address, timeout: opened.append((address, timeout)) or raw,
+            tls_context_factory=lambda: context,
+        )
+        connection = factory.open(
+            hostname="provider.example",
+            port=443,
+            resolved_ip="93.184.216.34",
+            connect_timeout_seconds=0.7,
+        )
+        self.assertEqual(opened, [(('routing-egress-proxy', 3128), 0.7)])
+        self.assertEqual(
+            bytes(raw.sent),
+            b"CONNECT provider.example:443 HTTP/1.1\r\n"
+            b"Host: provider.example:443\r\n"
+            b"Connection: keep-alive\r\n\r\n",
+        )
+        self.assertEqual(context.calls, [(raw, "provider.example")])
+        connection.set_read_timeout(0.4)
+        self.assertEqual(tls_socket.timeouts[-1], 0.4)
+
+    def test_proxy_url_and_tunnel_response_fail_closed(self) -> None:
+        for invalid in (
+            "https://proxy.example:3128",
+            "http://user:secret@proxy.example:3128",
+            "http://proxy.example:3128/path",
+        ):
+            with self.assertRaises(ValueError):
+                HttpsConnectProxyConnectionFactory(invalid)
+
+        for response in (
+            b"HTTP/1.1 403 Rejected\r\n\r\n",
+            b"HTTP/1.1 200 Connection Established\r\n\r\nunexpected",
+            b"x" * 4_097,
+        ):
+            raw = FakeProxySocket(response)
+            factory = HttpsConnectProxyConnectionFactory(
+                "http://proxy.example:3128",
+                socket_opener=lambda address, timeout, raw=raw: raw,
+                tls_context_factory=lambda: FakeTlsContext(FakeSocket()),
+            )
+            with self.assertRaises(TransportSecurityError):
+                factory.open(
+                    hostname="provider.example",
+                    port=443,
+                    resolved_ip="93.184.216.34",
+                    connect_timeout_seconds=0.7,
+                )
+            self.assertTrue(raw.closed)
 
 
 class VehicleTokenTests(unittest.TestCase):

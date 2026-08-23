@@ -18,8 +18,8 @@ Django·ORM·HTTP·Provider raw payload에 의존하지 않는 순수 Python 도
 - constraint, topology dedupe, exact Pareto와 cycle-safe epsilon SCC 대표 정책
 - FASTEST, STABLE, EFFICIENT, PUBLIC_TRANSIT_ONLY 대표 선택
 
-전략 생성 정책은 `strategy-1.0.0`, 기본 내부 ranking 정책은
-`rank-0.1.1`이며 EFFICIENT는 비용순 frontier의 인접한
+전략 생성·유한 탐색 정책은 `strategy-2.0.0`, 기본 내부 ranking 정책은
+`rank-0.2.0`이며 EFFICIENT는 비용순 frontier의 인접한
 더 저렴한 tier 대비 successive marginal time saving을 사용한다.
 
 Python 3.12 이상에서 독립 패키지로 설치할 수 있다.

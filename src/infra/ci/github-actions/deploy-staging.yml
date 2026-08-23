@@ -93,7 +93,7 @@ jobs:
 
       - name: Build and publish PWA assets
         env:
-          VITE_KAKAO_MAP_APP_KEY: ${{ vars.KAKAO_MAP_APP_KEY }}
+          KAKAO_JS_API_KEY: ${{ vars.KAKAO_JS_API_KEY }}
           VITE_PRIVACY_DOCUMENT_VERSION: ${{ env.PRIVACY_DOCUMENT_VERSION }}
         run: |
           set -euo pipefail

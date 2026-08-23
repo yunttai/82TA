@@ -215,7 +215,12 @@ class CanonicalRouteChainTests(unittest.TestCase):
             canonical_application().version()["rankingPolicyVersion"],
             self.private_response["computation"]["rankingPolicyVersion"],
         }
-        self.assertEqual(ranking_versions, {"rank-0.1.1"})
+        self.assertEqual(ranking_versions, {"rank-0.2.0"})
+        strategy_versions = {
+            versions["strategyPolicyVersion"],
+            self.private_response["computation"]["cache"]["strategyPolicyVersion"],
+        }
+        self.assertEqual(strategy_versions, {"strategy-2.0.0"})
 
     def test_public_contract_documents_complete_safe_error_matrix(self) -> None:
         public_spec = yaml.safe_load(

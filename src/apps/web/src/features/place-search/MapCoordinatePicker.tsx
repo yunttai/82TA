@@ -23,7 +23,7 @@ export function MapCoordinatePicker({ origin, destination, disabled = false, onP
   const [target, setTarget] = useState<Target>("ORIGIN");
   const [status, setStatus] = useState<"READY" | "NO_KEY" | "FAILED" | "GEOCODING">("READY");
   const [pendingCoordinate, setPendingCoordinate] = useState<PlaceRef["coordinate"] | null>(null);
-  const appKey = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
+  const appKey = import.meta.env.KAKAO_JS_API_KEY;
   const activePlace = target === "ORIGIN" ? origin : destination;
 
   useEffect(() => {

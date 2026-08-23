@@ -2,9 +2,26 @@ service_image = "123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/82ta-staging/
 service_desired_count = 0 # bootstrap; set to 2 only after secrets + migration gate
 consent_document_version = "REPLACE_WITH_PUBLISHED_POLICY_VERSION"
 
+# The final staging topology includes Routing, but both desired counts stay zero
+# until the immutable image, private TLS/DNS, routing_app/PostGIS, and evidence gates pass.
+routing_enabled       = true
+routing_image         = "123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/82ta-staging/routing-api@sha256:REPLACE_WITH_64_HEX"
+routing_desired_count = 0
+routing_private_hostname = "routing.staging.internal"
+routing_private_zone_id  = "REPLACE_WITH_PRIVATE_ZONE_ID"
+routing_certificate_arn  = "arn:aws:acm:ap-northeast-2:123456789012:certificate/REPLACE"
+routing_production_dependencies_factory = "routing_deployment.baseline:build_dependencies"
+routing_provider_config_factory          = "provider_core.production:build_kakao_baseline_config"
+routing_provider_evidence_json           = "{}" # replace from reviewed evidence artifact; never put keys here
+routing_provider_firewall_endpoint_ids = {
+  ap-northeast-2a = "vpce-REPLACE_WITH_AUDITED_NETWORK_FIREWALL_ENDPOINT_A"
+  ap-northeast-2c = "vpce-REPLACE_WITH_AUDITED_NETWORK_FIREWALL_ENDPOINT_C"
+}
+routing_build_version = "REPLACE_WITH_IMAGE_REVISION"
+
 # Stub is the safe initial stage when the separately deployed private Routing
 # service is unavailable. HTTP mode requires both fields and a populated token.
-routing_gateway_mode      = "stub"
+routing_gateway_mode      = "http"
 routing_api_base_url      = ""
 routing_api_allowed_hosts = []
 

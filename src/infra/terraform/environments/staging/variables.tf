@@ -19,6 +19,74 @@ variable "service_desired_count" {
   default     = 0
 }
 
+variable "routing_enabled" {
+  description = "Create the private Routing stack. Keep false until image, secrets, DB role, certificate, and provider evidence are ready."
+  type        = bool
+  default     = false
+}
+
+variable "routing_image" {
+  description = "Immutable Routing image URI by digest. Required when routing_enabled=true."
+  type        = string
+  default     = ""
+  validation {
+    condition     = !var.routing_enabled || can(regex("@sha256:[0-9a-f]{64}$", var.routing_image))
+    error_message = "routing_image must use an immutable sha256 digest when Routing is enabled."
+  }
+}
+
+variable "routing_desired_count" {
+  description = "Keep zero through secret/DB migration/readiness gates; use at least two for staging SLO evidence."
+  type        = number
+  default     = 0
+}
+
+variable "routing_private_hostname" {
+  description = "Private Route 53 name covered by the internal ALB certificate."
+  type        = string
+  default     = "routing.staging.internal"
+}
+
+variable "routing_private_zone_id" {
+  description = "Private Route 53 hosted zone associated with the platform VPC."
+  type        = string
+  default     = ""
+}
+
+variable "routing_certificate_arn" {
+  description = "Regional ACM/private-CA certificate for routing_private_hostname."
+  type        = string
+  default     = ""
+}
+
+variable "routing_production_dependencies_factory" {
+  description = "Reviewed dependency factory; empty keeps readiness unavailable/all-false."
+  type        = string
+  default     = "routing_deployment.baseline:build_dependencies"
+}
+
+variable "routing_provider_config_factory" {
+  type    = string
+  default = "provider_core.production:build_kakao_baseline_config"
+}
+
+variable "routing_provider_evidence_json" {
+  description = "Approved non-secret evidence document. Keep {} until schema/key/terms/production approval is current."
+  type        = string
+  default     = "{}"
+}
+
+variable "routing_provider_firewall_endpoint_ids" {
+  description = "Map each availability zone to an audited AWS Network Firewall VPC endpoint ID."
+  type        = map(string)
+  default     = {}
+}
+
+variable "routing_build_version" {
+  type    = string
+  default = "routing-api-foundation-0.1.0"
+}
+
 variable "consent_document_version" {
   description = "Published policy version shared by the Django task and Vite build."
   type        = string

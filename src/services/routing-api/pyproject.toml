@@ -23,8 +23,8 @@ integration = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["routing_api*", "transport_mapping*"]
-exclude = ["routing_api.tests*", "transport_mapping.tests*"]
+include = ["routing_api*", "routing_deployment*", "transport_mapping*"]
+exclude = ["routing_api.tests*", "routing_deployment.tests*", "transport_mapping.tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["routing_api/tests"]

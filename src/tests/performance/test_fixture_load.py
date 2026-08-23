@@ -646,11 +646,11 @@ def test_integrated_r1_reports_actual_expanded_fixture_operation_count(
     result = _api_call(app, clock, _token(clock), payload, 1_500, 10)
     assert result[0] == 200
     reported = result[3]["computation"]["cache"]["providerCallCount"]  # type: ignore[index]
-    assert reported == len(operations) == 10
+    assert reported == len(operations) == 11
     assert operations.count("TRANSIT:search") == 4
     assert operations.count("GBIS:arrivals") == 1
     assert operations.count("GBIS:locations") == 1
-    assert operations.count("TAXI:route_current") == 4
+    assert operations.count("TAXI:route_current") == 5
     assert operations.count("WALK:route") == 0
     assert not any("MAPPING" in operation for operation in operations)
     _metric(
@@ -712,7 +712,7 @@ def test_integrated_r1_container_concurrency_measurement(
     assert calls == 4 * len(successful)
     assert all(item[1] == "PARTIAL" for item in successful)
     assert all(
-        item[3]["computation"]["cache"]["providerCallCount"] == 10
+        item[3]["computation"]["cache"]["providerCallCount"] == 11
         for item in successful
     )
     assert all(item[3]["computation"]["candidateCounts"]["generated"] <= 20 for item in successful)
@@ -785,18 +785,18 @@ def test_integrated_deadline_inside_optional_reserve_starts_no_exact_work(
             get_application.cache_clear()
 
     assert result[0] == 200
-    assert result[1] == "NO_FEASIBLE_ROUTE"
-    assert result[3]["routes"] == []
-    assert result[3]["computation"]["candidateCounts"]["generated"] == 0
+    assert result[1] == "PARTIAL"
+    assert result[3]["routes"]
+    assert result[3]["computation"]["candidateCounts"]["generated"] >= 1
     assert result[3]["computation"]["cache"]["providerCallCount"] == 1
     assert calls == 1
     _metric(
         scenario="integrated_optional_exact_start_gate",
         requests=1,
-        no_feasible_route_rate=1.0,
+        partial_minimum_route_rate=1.0,
         fixture_provider_calls=calls,
         network_provider_calls=0,
-        candidates_max=0,
+        candidates_min=result[3]["computation"]["candidateCounts"]["generated"],
         client_deadline_seconds=0.24,
         optional_start_reserve_seconds=1.75,
     )

@@ -41,7 +41,7 @@ requested with identity encoding and rejected if encoded or larger than
 `SERVICE_ROUTING_MAX_RESPONSE_BYTES` (default 2 MiB) before generated model/JSON
 parsing.
 
-Kakao Local is enabled only when `KAKAO_LOCAL_REST_KEY` is present, and the key
+Kakao Local is enabled only when `KAKAO_REST_API_KEY` is present, and the key
 is mandatory in production. Without a key in development, suggestion returns
 an empty canonical list and reverse geocoding returns a coordinate-only safe
 placeholder so local/mobile development remains usable.

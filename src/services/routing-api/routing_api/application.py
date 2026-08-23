@@ -232,7 +232,7 @@ class FixtureOptimizeRouteUseCase:
             "expiresAt": (now + timedelta(seconds=120)).isoformat(),
             "computation": {
                 "durationMs": 0,
-                "rankingPolicyVersion": "rank-0.1.1",
+                "rankingPolicyVersion": "rank-0.2.0",
                 "mappingVersion": None,
                 "candidateCounts": {
                     "generated": 1,

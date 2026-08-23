@@ -64,7 +64,15 @@ class NamedProviderSuiteTests(unittest.TestCase):
                 (
                     "KAKAO_DIRECTIONS",
                     "route_current",
-                ): "kakao-directions.v1.current-route.20260824"
+                ): "kakao-directions.v1.current-route.20260824",
+                (
+                    "KAKAO_PUBLIC_TRANSIT",
+                    "search_current",
+                ): "kakao.public-transit.rest.v2.2026-08-24",
+                (
+                    "KAKAO_WALK",
+                    "route",
+                ): "kakao.walk.rest.v2.2026-08-24",
             },
         )
 

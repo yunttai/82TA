@@ -54,7 +54,12 @@ from provider_core.named import (
 from provider_core.requests import TransitSearchRequest
 from provider_core.resilience import Deadline
 from routing_api.application import InMemoryIdempotencyStore, RoutingApiApplication
-from routing_api.application import OptimizeCommand, RequestContext, RoutingUnavailableError
+from routing_api.application import (
+    OptimizeCommand,
+    RequestContext,
+    RoutingCapacityExceeded,
+    RoutingUnavailableError,
+)
 from routing_api.auth import Hs256ServiceBearerVerifier
 from routing_api.capabilities import foundation_capability_projection
 from routing_api.contract import CanonicalContractValidator
@@ -71,6 +76,7 @@ from routing_api.fanin_integration import (
     FanInDependencies,
     InMemoryOptimizationPersistence,
     SevenPatternFixtureOptimizeRouteUseCase,
+    _CanonicalMovementSource,
     _ProviderOperationBudget,
     _expanded_provider_operation_units,
     _service_type,
@@ -716,6 +722,66 @@ def test_taxi_movement_is_never_reused_before_dispatch_identity_is_known() -> No
     ) is None
 
 
+def test_later_itinerary_leg_is_reused_only_at_provider_expected_start() -> None:
+    class TransitStep:
+        mode = "BUS"
+        leg_sequence = 1
+        from_ref = "boarding-stop"
+        to_ref = "alighting-stop"
+        evaluator_key = "provider-cost:scheduled-leg"
+        topology_ref = None
+
+    clock = FakeClock()
+    scenario = fixture_scenario("R1")
+    use_case = SevenPatternFixtureOptimizeRouteUseCase(scenario, clock)
+    departure = datetime.fromisoformat(_SCENARIO_DEPARTURES["R1"])
+    origin, destination = _SCENARIO_ENDPOINTS["R1"]
+    envelope = fixture_fan_in_dependencies(scenario).providers.transit(
+        TransitSearchRequest(
+            ProviderCoordinate(*origin),
+            ProviderCoordinate(*destination),
+            departure,
+        ),
+        deadline=Deadline.after_ms(1_000),
+    )
+    assert envelope.payload
+    scheduled_start = departure + timedelta(seconds=120)
+    provider_leg = replace(
+        envelope.payload[0].legs[0],
+        expected_start_at=scheduled_start,
+        expected_end_at=(
+            scheduled_start
+            + timedelta(seconds=envelope.payload[0].legs[0].duration.p50_seconds)
+        ),
+    )
+    source = _CanonicalMovementSource(
+        provider_leg,
+        envelope,
+        envelope.payload[0].itinerary_id,
+    )
+    sources = {
+        (
+            "TRANSIT",
+            TransitStep.from_ref,
+            TransitStep.to_ref,
+            TransitStep.evaluator_key,
+        ): source
+    }
+
+    assert use_case._reusable_canonical_step(  # type: ignore[arg-type]
+        TransitStep(),
+        scheduled_start,
+        departure,
+        sources,
+    ) is source
+    assert use_case._reusable_canonical_step(  # type: ignore[arg-type]
+        TransitStep(),
+        scheduled_start + timedelta(seconds=1),
+        departure,
+        sources,
+    ) is None
+
+
 def test_same_depth_exact_provider_calls_are_bounded_and_concurrent() -> None:
     class DelayedProviders(_CausalProviderPorts):
         def __init__(self, base):
@@ -820,6 +886,7 @@ def test_optional_exact_calls_do_not_start_inside_serialization_reserve() -> Non
         threading.Event(),
     )
     outcome = use_case.execute(OptimizeCommand(payload), context)
+    assert outcome.response["status"] == "PARTIAL"
     assert outcome.response["routes"]
     assert providers.exact_starts == 0
     assert use_case.trace.provider_call_count == 1
@@ -1148,13 +1215,15 @@ def test_named_fixture_drops_unresolved_segments_after_coarse_plan() -> None:
     assert set(trace.exact_patterns) == {"TRANSIT_ONLY"}
     assert trace.exact_plan
     assert len(trace.exact_plan) == len({item[0] for item in trace.exact_plan})
-    assert {kind for _, kind in trace.exact_plan} >= {
-        "WALK", "TAXI", "MAPPING", "BUS_INTELLIGENCE"
-    }
+    exact_kinds = {kind for _, kind in trace.exact_plan}
+    assert exact_kinds >= {"WALK", "TAXI", "TRANSIT", "BUS_INTELLIGENCE"}
+    # The documented Kakao shape has no external route ID or direction. Its
+    # graph-only topology must never manufacture a canonical mapping request.
+    assert "MAPPING" not in exact_kinds
     assert trace.provider_call_count <= 64
     # Authoritative candidate-chain exactification settles only operations that
     # actually started; descendants of an unresolved step are never invoked.
-    assert trace.provider_call_count == 10
+    assert trace.provider_call_count == 11
     assert response.json()["computation"]["cache"]["providerCallCount"] == trace.provider_call_count
     fixture_operations = [
         item
@@ -1162,7 +1231,11 @@ def test_named_fixture_drops_unresolved_segments_after_coarse_plan() -> None:
         if item["provider"].startswith("FIXTURE::")
     ]
     assert trace.provider_call_count == 1 + len(fixture_operations)
-    assert "COARSE_TAXI_BUDGET" in trace.rejected_reasons
+    assert "COARSE_TAXI_BUDGET" not in trace.rejected_reasons
+    assert all(
+        route["taxiCost"]["upper"] <= request["constraints"]["taxiBudget"]["maxAmount"]
+        for route in response.json()["routes"]
+    )
     assert "TAXI_BRIDGE_CONNECTION_INFEASIBLE" in trace.rejected_reasons
     assert "UPSTREAM_ROUTE_DIRECTION_MISMATCH" in trace.rejected_reasons
     assert response.json()["computation"]["cache"]["exactEnrichmentResolved"] is True
@@ -1265,7 +1338,7 @@ def test_cap_is_reserved_before_any_gbis_fixture_operation(monkeypatch) -> None:
         True,
         threading.Event(),
     )
-    with pytest.raises(RoutingUnavailableError, match="operation cap"):
+    with pytest.raises(RoutingCapacityExceeded, match="CALL_CAP_UNCERTIFIED"):
         use_case.execute(OptimizeCommand(payload), context)
     assert calls == []
 
@@ -1579,7 +1652,7 @@ def test_container_default_is_503_without_source_activation_and_r1_is_integrated
         )
         assert version.status_code == 200
         assert version.json()["contractVersion"] == "1.1.0"
-        assert version.json()["rankingPolicyVersion"] == "rank-0.1.1"
+        assert version.json()["rankingPolicyVersion"] == "rank-0.2.0"
         assert (
             version.json()["rankingPolicyVersion"]
             == integrated.json()["computation"]["rankingPolicyVersion"]

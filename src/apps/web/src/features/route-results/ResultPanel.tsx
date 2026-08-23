@@ -129,6 +129,41 @@ const recommendationLabels: ReadonlyArray<readonly [RecommendationKey, string]> 
   ["publicTransitOnly", "대중교통만 이용"],
 ];
 
+interface RecommendationCardItem {
+  key: string;
+  labels: readonly string[];
+  route: RouteCandidate | null | undefined;
+}
+
+function recommendationCards(
+  recommendations: PublicRouteSearchResponse["recommendations"],
+): readonly RecommendationCardItem[] {
+  const cards: RecommendationCardItem[] = [];
+  const routeIndexes = new Map<string, number>();
+
+  recommendationLabels.forEach(([key, label]) => {
+    const route = recommendations[key];
+    if (route == null) {
+      cards.push({ key: `slot:${key}`, labels: [label], route });
+      return;
+    }
+
+    const existingIndex = routeIndexes.get(route.routeId);
+    if (existingIndex === undefined) {
+      routeIndexes.set(route.routeId, cards.length);
+      cards.push({ key: `route:${route.routeId}`, labels: [label], route });
+      return;
+    }
+
+    const existing = cards[existingIndex];
+    if (existing !== undefined) {
+      cards[existingIndex] = { ...existing, labels: [...existing.labels, label] };
+    }
+  });
+
+  return cards;
+}
+
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
@@ -273,7 +308,7 @@ function BusIntelligence({ route, searchId }: { route: RouteCandidate; searchId:
 }
 
 function RouteCard({
-  label,
+  labels,
   route,
   selected,
   selectedLegId,
@@ -281,7 +316,7 @@ function RouteCard({
   onSelect,
   strictTaxiBudgetKrw,
 }: {
-  label: string;
+  labels: readonly string[];
   route: RouteCandidate | null | undefined;
   selected: boolean;
   selectedLegId?: string;
@@ -292,7 +327,9 @@ function RouteCard({
   if (route == null) {
     return (
       <article className="route-card route-card-empty">
-        <p className="card-kicker">{label}</p>
+        <div className="card-kicker-list" aria-label="추천 유형">
+          {labels.map((label) => <span className="card-kicker" key={label}>{label}</span>)}
+        </div>
         <h3>추천 경로 없음</h3>
         <p>현재 응답에는 이 추천 유형에 해당하는 경로가 없습니다.</p>
       </article>
@@ -302,7 +339,9 @@ function RouteCard({
   if (!isRouteUsable(route, strictTaxiBudgetKrw)) {
     return (
       <article className="route-card route-card-empty" role="status">
-        <p className="card-kicker">{label}</p>
+        <div className="card-kicker-list" aria-label="추천 유형">
+          {labels.map((label) => <span className="card-kicker" key={label}>{label}</span>)}
+        </div>
         <h3>경로 정보를 검증할 수 없습니다</h3>
         <p>시간·비용 범위나 이동 구간 순서가 계약과 맞지 않아 잘못된 값을 숨겼습니다. 다시 검색해 주세요.</p>
       </article>
@@ -313,7 +352,9 @@ function RouteCard({
     <article className={`route-card${selected ? " route-card-selected" : ""}`}>
       <div className="card-heading">
         <div>
-          <p className="card-kicker">{label}</p>
+          <div className="card-kicker-list" aria-label="추천 유형">
+            {labels.map((label) => <span className="card-kicker" key={label}>{label}</span>)}
+          </div>
           <h3>{formatDuration(route.totalDuration.p50Seconds)}</h3>
         </div>
         <span className="confidence-chip">신뢰도 {confidenceMessages[route.totalDuration.confidence.grade]}</span>
@@ -457,14 +498,15 @@ function EmptyState({ phase, problem, onRetry, onRestart }: { phase: ResultPanel
 
 export function ResultPanel({ phase, response, problem, initialRouteId, initialLegId, strictTaxiBudgetKrw, onRetry, onRestart }: ResultPanelProps) {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const cards = response === null ? [] : recommendationCards(response.recommendations);
 
   useEffect(() => {
     if (response === null) {
       setSelectedRouteId(null);
       return;
     }
-    const routes = recommendationLabels
-      .map(([key]) => response.recommendations[key])
+    const routes = recommendationCards(response.recommendations)
+      .map((card) => card.route)
       .filter((route): route is RouteCandidate => route != null);
     const requested = routes.find((route) => route.routeId === initialRouteId);
     setSelectedRouteId(requested?.routeId ?? routes[0]?.routeId ?? null);
@@ -495,19 +537,19 @@ export function ResultPanel({ phase, response, problem, initialRouteId, initialL
       <div className="results-workspace">
         <div className="result-map-pane">
           <RouteMap
-            route={recommendationLabels
-              .map(([key]) => response.recommendations[key])
+            route={cards
+              .map((card) => card.route)
               .find((route) => route?.routeId === selectedRouteId) ?? null}
             {...(initialLegId === undefined ? {} : { selectedLegId: initialLegId })}
           />
         </div>
         <div className="route-grid" aria-label="추천 경로 목록">
-          {recommendationLabels.map(([key, label]) => (
+          {cards.map((card) => (
             <RouteCard
-              key={key}
-              label={label}
-              route={response.recommendations[key]}
-              selected={response.recommendations[key]?.routeId === selectedRouteId}
+              key={card.key}
+              labels={card.labels}
+              route={card.route}
+              selected={card.route?.routeId === selectedRouteId}
               {...(initialLegId === undefined ? {} : { selectedLegId: initialLegId })}
               searchId={response.searchId}
               onSelect={(route) => setSelectedRouteId(route.routeId)}

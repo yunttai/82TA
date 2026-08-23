@@ -23,7 +23,7 @@ const modeLabels = {
 export function RouteMap({ route, selectedLegId }: RouteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"READY" | "NO_KEY" | "FAILED">("READY");
-  const appKey = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
+  const appKey = import.meta.env.KAKAO_JS_API_KEY;
 
   useEffect(() => {
     if (route === null || container.current === null) return undefined;

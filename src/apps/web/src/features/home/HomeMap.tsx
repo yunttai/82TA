@@ -26,7 +26,7 @@ export function HomeMap() {
   const mapsApi = useRef<Awaited<ReturnType<typeof loadKakaoMaps>> | null>(null);
   const [mapStatus, setMapStatus] = useState<MapStatus>("LOADING");
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("IDLE");
-  const appKey = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
+  const appKey = import.meta.env.KAKAO_JS_API_KEY;
   const secureLocation = window.isSecureContext === true;
   const geolocationAvailable = "geolocation" in navigator;
 
