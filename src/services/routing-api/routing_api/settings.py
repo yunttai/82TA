@@ -41,6 +41,19 @@ def _strict_boolean(name: str, *, default: bool = False) -> bool:
     return normalized == "true"
 
 
+def _optional_provider_credential(name: str) -> str:
+    """Read a bounded opaque Provider credential without normalizing its value."""
+
+    value = os.environ.get(name, "")
+    if not value:
+        return ""
+    if value != value.strip() or len(value) > 512 or any(
+        ord(character) < 33 or ord(character) == 127 for character in value
+    ):
+        raise ImproperlyConfigured(f"{name} must be a bounded opaque credential")
+    return value
+
+
 def _runtime_environment() -> str:
     value = os.environ.get("ROUTING_RUNTIME_ENVIRONMENT", "PRODUCTION").strip().upper()
     if value not in _RUNTIME_ENVIRONMENTS:
@@ -233,3 +246,16 @@ ROUTING_FIXTURE_SCENARIO = os.environ.get("ROUTING_FIXTURE_SCENARIO", "")
 ROUTING_ALLOW_FIXTURE_BACKEND = _strict_boolean(
     "ROUTING_ALLOW_FIXTURE_BACKEND", default=False
 )
+
+# Credential presence is configuration only. It does not promote a Provider to
+# KEY_VERIFIED or PRODUCTION_APPROVED; provider-core's independent capability and
+# runtime-evidence gates still decide whether an operation may execute.
+KAKAO_REST_API_KEY = _optional_provider_credential("KAKAO_REST_API_KEY")
+KAKAO_MOBILITY_REST_API_KEY = _optional_provider_credential(
+    "KAKAO_MOBILITY_REST_API_KEY"
+)
+GBIS_SERVICE_KEY = _optional_provider_credential("GBIS_SERVICE_KEY")
+KMA_SERVICE_KEY = _optional_provider_credential("KMA_SERVICE_KEY")
+GITS_API_KEY = _optional_provider_credential("GITS_API_KEY")
+TMAP_APP_KEY = _optional_provider_credential("TMAP_APP_KEY")
+ODSAY_API_KEY = _optional_provider_credential("ODSAY_API_KEY")

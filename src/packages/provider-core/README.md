@@ -10,9 +10,11 @@ and deterministic sanitized fixtures.
 - No live endpoint, credential, key probe, or production approval is included.
 - Missing registry entries are `UNVERIFIED`, `UNAPPROVED`, fixture-only, and disabled.
 - `DOCUMENTED`, `KEY_VERIFIED`, and `PRODUCTION_APPROVED` are independent.
-- Every named operation also has an independent response-schema gate. It remains
-  false, so even an accidental capability promotion cannot execute an unverified
-  vendor response normalizer.
+- Every named operation also has an independent response-schema gate. Only Kakao
+  Mobility `KAKAO_DIRECTIONS/route_current` has a checked-in strict vendor-response
+  normalizer and schema revision. All other live response-schema gates remain false.
+  A verified schema alone never bypasses capability, approval, binding, runtime
+  evidence, or egress gates.
 - Live execution additionally requires immutable exact-operation key, production,
   and response-schema evidence with IDs, SHA-256 bindings, versions, and unexpired
   validity windows. There is no environment-boolean promotion path.
@@ -44,9 +46,11 @@ and deterministic sanitized fixtures.
 - `provider_core.runtime`: immutable capability/key/production/schema evidence gate
 - `provider_core.telemetry`: secret-free call, retry, quota, cost, and byte counters
 
-The named fixtures use a strict internal sanitized schema to test canonical
-normalization. They are not copied vendor payloads and do not establish live schema
-compatibility. Unpinned HTTPS operations have no executable URL.
+The named fixtures use strict sanitized schemas to test canonical normalization.
+`route_current` mirrors the documented Kakao Directions v1 shape; values and messages
+are synthetic and contain no key, identity, or raw transaction evidence. Other named
+fixtures remain internal schemas and do not establish live compatibility. Unpinned
+HTTPS operations have no executable URL.
 
 ## Production assembly boundary
 
@@ -64,8 +68,17 @@ header: those remain fixed by the reviewed `EndpointSpec` and exact allowlist.
 
 Even a correctly scoped binding is insufficient. The same operation must independently
 pass `DOCUMENTED`, `KEY_VERIFIED`, `PRODUCTION_APPROVED`, non-fixture, response-schema,
-and unexpired runtime-evidence gates. The checked-in live response-schema gates remain
-false, so this package makes no live Provider success or commercial-readiness claim.
+and unexpired runtime-evidence gates. The current Directions schema implementation
+does not provide key-verification or commercial-approval evidence and therefore makes
+no live success or commercial-readiness claim by itself.
+
+`KakaoMobilityDirectionsAdapter.normalize_current_response()` is a narrow pure seam
+for a separately controlled capability probe. It validates and normalizes an already
+decoded response but performs no HTTP or gate promotion. The current request fixes
+`priority=RECOMMEND`, `alternatives=false`, `summary=false`, and the documented vehicle
+defaults. Unknown fields/codes, malformed units or geometry, and inconsistent section
+totals fail closed. Kakao supplies one duration and point fare; the mandatory canonical
+range slots preserve those values as equal endpoints, without adding uncertainty.
 
 `StrictHttpsTransport` accepts only the fixed endpoint strings supplied by the
 composition root. Its resolver and pinned connection factory prevent a validated DNS

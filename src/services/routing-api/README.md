@@ -11,6 +11,34 @@ composition을 활성화한다. Local fixture scenario는 아래의 opt-in과 no
 runtime gate를 함께 통과해야 한다. 미검증 live Provider 기능은 모두 disabled이고
 fixture fallback 응답은 `PARTIAL`이다.
 
+## Provider credentials
+
+Routing은 다음 환경변수를 exact Provider operation credential로 읽는다.
+
+```text
+KAKAO_REST_API_KEY
+KAKAO_MOBILITY_REST_API_KEY
+GBIS_SERVICE_KEY
+KMA_SERVICE_KEY
+GITS_API_KEY
+TMAP_APP_KEY
+ODSAY_API_KEY
+```
+
+`routing_api.provider_configuration.build_provider_adapter_config()`가 각 값을
+operation-scoped binding으로 감싼다. 키가 있다는 사실만으로 `KEY_VERIFIED` 또는
+`PRODUCTION_APPROVED`가 되지는 않으며, capability registry와 만료 가능한 runtime
+evidence는 배포 composition이 별도로 주입해야 한다. `.env.local`은 Django가 자동
+로딩하지 않는다. 로컬 셸에서는 실행 전에 아래처럼 export하고, 컨테이너에서는
+Compose/ECS secret 환경변수로 주입한다.
+
+```bash
+set -a
+. src/services/routing-api/.env.local
+set +a
+export ROUTING_RUNTIME_ENVIRONMENT=DEVELOPMENT
+```
+
 ## Local test
 
 ```powershell

@@ -185,6 +185,28 @@ def test_explicit_local_runtimes_have_safe_nonempty_service_auth_defaults() -> N
         assert completed.returncode == 0, completed.stderr
 
 
+def test_provider_credentials_are_optional_bounded_configuration_only() -> None:
+    secret = "provider-credential-test-value"
+    completed = _settings_process(
+        "import routing_api.settings as s; "
+        "assert s.KAKAO_MOBILITY_REST_API_KEY == 'provider-credential-test-value'; "
+        "assert s.GBIS_SERVICE_KEY == ''",
+        ROUTING_RUNTIME_ENVIRONMENT="TEST",
+        KAKAO_MOBILITY_REST_API_KEY=secret,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert secret not in completed.stdout + completed.stderr
+
+    invalid = _settings_process(
+        "import routing_api.settings",
+        ROUTING_RUNTIME_ENVIRONMENT="TEST",
+        KAKAO_MOBILITY_REST_API_KEY=" credential-with-spaces ",
+    )
+    assert invalid.returncode != 0
+    assert "KAKAO_MOBILITY_REST_API_KEY" in invalid.stderr
+    assert "credential-with-spaces" not in invalid.stdout + invalid.stderr
+
+
 def test_explicit_production_settings_trust_only_the_internal_alb_header_contract() -> None:
     completed = _settings_process(
         "import routing_api.settings as s; "
