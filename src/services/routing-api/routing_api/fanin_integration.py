@@ -813,6 +813,73 @@ class _BusLegSnapshot:
         )
 
 
+def _fixture_envelope_at(
+    envelope: ProviderEnvelope | None,
+    evaluated_at: datetime,
+) -> ProviderEnvelope | None:
+    """Bind sanitized fixture transport metadata to the replay request clock.
+
+    Fixture payloads contain scenario-local timestamps for their synthetic
+    observations. Those timestamps are not the time at which this replay
+    fetched or received the fixture, and projecting them as such can place
+    provenance after the response that contains it. Keep the payload intact,
+    but make the transport envelope causal with the request evaluation clock.
+    """
+
+    if envelope is None:
+        return None
+    observed_at = evaluated_at if envelope.observed_at is not None else None
+    return replace(
+        envelope,
+        fetched_at=evaluated_at,
+        received_at=evaluated_at,
+        observed_at=observed_at,
+    )
+
+
+def _align_fixture_provenance_clock(
+    composition: _Composition,
+    evaluated_at: datetime,
+) -> _Composition:
+    """Return one fixture composition whose projected envelopes share one clock."""
+
+    aligned_by_identity: dict[int, ProviderEnvelope] = {}
+
+    def aligned(envelope: ProviderEnvelope) -> ProviderEnvelope:
+        identity = id(envelope)
+        existing = aligned_by_identity.get(identity)
+        if existing is not None:
+            return existing
+        value = _fixture_envelope_at(envelope, evaluated_at)
+        assert value is not None
+        aligned_by_identity[identity] = value
+        return value
+
+    return replace(
+        composition,
+        provider_envelopes=tuple(aligned(item) for item in composition.provider_envelopes),
+        baseline_envelope=aligned(composition.baseline_envelope),
+        movement_envelopes=tuple(
+            (key, aligned(envelope))
+            for key, envelope in composition.movement_envelopes
+        ),
+        bus_snapshots=tuple(
+            replace(
+                snapshot,
+                arrivals=_fixture_envelope_at(snapshot.arrivals, evaluated_at),
+                locations=_fixture_envelope_at(snapshot.locations, evaluated_at),
+                weather=_fixture_envelope_at(snapshot.weather, evaluated_at),
+                traffic=_fixture_envelope_at(snapshot.traffic, evaluated_at),
+            )
+            for snapshot in composition.bus_snapshots
+        ),
+        leg_envelopes=tuple(
+            (key, aligned(envelope))
+            for key, envelope in composition.leg_envelopes
+        ),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _BusOptionalGroup:
     arrivals: ProviderEnvelope | None = None
@@ -906,6 +973,21 @@ def _unique_provider_envelopes(composition: _Composition) -> tuple[ProviderEnvel
     if not any(item is composition.baseline_envelope for item in values):
         values.insert(0, composition.baseline_envelope)
     return tuple(values)
+
+
+def _provider_envelope_projection_key(envelope: ProviderEnvelope) -> tuple[object, ...]:
+    """Stable logical order for canonical arrays fed by concurrent fan-in."""
+
+    return (
+        envelope.provider,
+        envelope.operation,
+        envelope.fingerprint,
+        envelope.status.value,
+        envelope.message_code or "",
+        envelope.received_at,
+        envelope.latency_ms,
+        envelope.cache_hit,
+    )
 
 
 def _coordinates_between(
@@ -1981,6 +2063,11 @@ class CanonicalFanInOptimizeRouteUseCase:
             canonical_envelopes,
             inference_budget,
         )
+        if self._dependencies.fixture_only:
+            composition = _align_fixture_provenance_clock(
+                composition,
+                request_evaluated_at,
+            )
         if exact.exact_enrichment_plan:
             unresolved = ",".join(
                 f"{item.kind.value}:{item.from_ref}>{item.to_ref}"
@@ -3880,6 +3967,11 @@ class CanonicalFanInOptimizeRouteUseCase:
 
     def _provider_status(self, composition):
         actual = _unique_provider_envelopes(composition)
+        projected = (
+            sorted(actual, key=_provider_envelope_projection_key)
+            if self._dependencies.fixture_only
+            else actual
+        )
         statuses = [
             {
                 "provider": (
@@ -3894,7 +3986,7 @@ class CanonicalFanInOptimizeRouteUseCase:
                 "cache": item.cache_hit,
                 "messageCode": item.message_code,
             }
-            for item in actual
+            for item in projected
         ]
         if self._dependencies.fixture_only:
             # Sanitized fixture execution never promotes a live capability.
@@ -3960,7 +4052,13 @@ class CanonicalFanInOptimizeRouteUseCase:
             })
         actual_without_selected: list[ProviderEnvelope] = []
         skipped_selected = False
-        for item in _unique_provider_envelopes(composition):
+        actual = _unique_provider_envelopes(composition)
+        projected = (
+            sorted(actual, key=_provider_envelope_projection_key)
+            if self._dependencies.fixture_only
+            else actual
+        )
+        for item in projected:
             if not skipped_selected and item is composition.baseline_envelope:
                 skipped_selected = True
                 continue

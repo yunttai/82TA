@@ -1,0 +1,27 @@
+[project]
+name = "budget-route-service-api"
+version = "0.1.0"
+description = "Public Django API for the Budget Route Platform"
+requires-python = ">=3.12"
+dependencies = [
+  "cryptography>=50,<51",
+  "Django>=5.2,<6",
+  "dj-database-url>=2.3,<3",
+  "httpx>=0.28,<0.29",
+  "jsonschema[format]>=4.25,<5",
+  "psycopg[binary]>=3.2,<4",
+  "PyYAML>=6.0,<7",
+  "redis>=6,<8",
+  "routing-client-python",
+]
+
+[dependency-groups]
+dev = [
+  "fakeredis>=2.31,<3",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+routing-client-python = { path = "../../generated/routing-client-python" }

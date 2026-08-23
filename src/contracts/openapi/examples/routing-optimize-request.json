@@ -1,31 +1,61 @@
 {
   "contractVersion": "1.0",
-  "requestId": "01JEXAMPLE",
+  "requestId": "6aa87de7-8af7-55c9-bbb4-f518722ed833",
   "origin": {
-    "coordinate": {"lon": 127.187456, "lat": 37.222345},
+    "coordinate": {
+      "lon": 127.187456,
+      "lat": 37.222345
+    },
     "regionHint": "GYEONGGI_YONGIN"
   },
   "destination": {
-    "coordinate": {"lon": 127.111159, "lat": 37.394761},
+    "coordinate": {
+      "lon": 127.111159,
+      "lat": 37.394761
+    },
     "regionHint": "GYEONGGI_SEONGNAM"
   },
-  "departureTime": "2026-08-23T07:40:00+09:00",
-  "arrivalDeadline": null,
+  "departureTime": "2026-08-24T07:40:00+09:00",
   "constraints": {
-    "taxiBudget": {"currency": "KRW", "maxAmount": 10000, "strict": true},
+    "taxiBudget": {
+      "currency": "KRW",
+      "maxAmount": 10000,
+      "strict": true
+    },
     "maxWalkSeconds": 900,
     "maxTransfers": 3,
     "maxTaxiLegs": 2,
     "allowTaxiBridge": true,
-    "allowedModes": ["WALK", "TAXI", "BUS", "SUBWAY", "GTX"]
+    "allowedModes": [
+      "BUS",
+      "GTX",
+      "SUBWAY",
+      "TAXI",
+      "TRAIN",
+      "WALK"
+    ],
+    "accessibility": {
+      "avoidStairs": false,
+      "wheelchair": false
+    }
   },
   "preference": {
     "profile": "BALANCED",
-    "riskAversion": 0.6,
-    "walkingAversion": 0.3,
-    "transferAversion": 0.4,
-    "accessibility": {"avoidStairs": false}
+    "avoidHighBusSeatRisk": false,
+    "accessibility": {
+      "avoidStairs": false,
+      "wheelchair": false
+    }
   },
-  "requestedRecommendations": ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"],
-  "clientContext": {"locale": "ko-KR", "timezone": "Asia/Seoul"}
+  "requestedRecommendations": [
+    "FASTEST",
+    "STABLE",
+    "EFFICIENT",
+    "PUBLIC_TRANSIT_ONLY"
+  ],
+  "clientContext": {
+    "locale": "ko-KR",
+    "timezone": "Asia/Seoul"
+  },
+  "arrivalDeadline": null
 }

@@ -68,6 +68,10 @@ class RoutingUnavailableError(RuntimeError):
     """The required baseline providers cannot produce any valid route."""
 
 
+class UnsupportedRegionError(RuntimeError):
+    """The requested origin/destination corridor is outside supported coverage."""
+
+
 class RoutingDeadlineExceeded(RuntimeError):
     """The injected use case did not complete inside the effective deadline."""
 
@@ -228,7 +232,7 @@ class FixtureOptimizeRouteUseCase:
             "expiresAt": (now + timedelta(seconds=120)).isoformat(),
             "computation": {
                 "durationMs": 0,
-                "rankingPolicyVersion": "rank-foundation-0.1.0",
+                "rankingPolicyVersion": "rank-0.1.1",
                 "mappingVersion": None,
                 "candidateCounts": {
                     "generated": 1,
@@ -662,6 +666,14 @@ class RoutingApiApplication:
                 correlation_id,
                 retryable=True,
             )
+        except UnsupportedRegionError:
+            self._idempotency.abandon(idempotency_key, fingerprint)
+            return _problem(
+                422,
+                "UNSUPPORTED_REGION",
+                "Requested region is unsupported",
+                correlation_id,
+            )
         except RoutingUnavailableError:
             self._idempotency.abandon(idempotency_key, fingerprint)
             return _problem(
@@ -749,7 +761,7 @@ class RoutingApiApplication:
     def version(self) -> Mapping[str, object]:
         return {
             "buildVersion": self._build_version,
-            "contractVersion": "1.0.0",
+            "contractVersion": self._contract.contract_version,
             "rankingPolicyVersion": self._ranking_policy_version,
             "models": [
                 {"purpose": item["purpose"], "version": item["version"]}

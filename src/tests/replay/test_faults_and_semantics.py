@@ -400,7 +400,7 @@ def test_epsilon_dominance_cycle_cannot_erase_a_nonempty_feasible_set() -> None:
     )
 
 
-def test_canonical_example_b1_b2_are_recorded_not_copied_into_producer_behavior() -> None:
+def test_canonical_example_has_no_dangling_ids_or_unregistered_codes() -> None:
     example = json.loads(
         (ROOT / "src/contracts/openapi/examples/routing-optimize-response.json").read_text(encoding="utf-8")
     )
@@ -419,6 +419,8 @@ def test_canonical_example_b1_b2_are_recorded_not_copied_into_producer_behavior(
         if item["messageCode"] is not None and item["messageCode"] not in registered_codes
     }
 
-    assert dangling_recommendations == {"route_01", "route_02", "route_03", "route_public_01"}
-    assert dangling_pareto == {"route_01", "route_02", "route_public_01"}
-    assert unregistered_messages == {"NO_SEAT_DATA_FOR_ROUTE"}
+    assert example["routes"]
+    assert dangling_recommendations == set()
+    assert dangling_pareto == set()
+    assert unregistered_messages == set()
+    assert "NO_SEAT_DATA_FOR_ROUTE" not in json.dumps(example)

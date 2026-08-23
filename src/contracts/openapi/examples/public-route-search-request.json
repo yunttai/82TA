@@ -3,17 +3,19 @@
     "displayName": "명지대학교 자연캠퍼스",
     "coordinate": {"lon": 127.187456, "lat": 37.222345},
     "provider": "KAKAO_LOCAL",
-    "providerPlaceId": "example-origin"
+    "providerPlaceId": "example-origin",
+    "regionCode": "GYEONGGI_YONGIN"
   },
   "destination": {
     "displayName": "판교역",
     "coordinate": {"lon": 127.111159, "lat": 37.394761},
     "provider": "KAKAO_LOCAL",
-    "providerPlaceId": "example-destination"
+    "providerPlaceId": "example-destination",
+    "regionCode": "GYEONGGI_SEONGNAM"
   },
   "departure": {
     "type": "DEPART_AT",
-    "time": "2026-08-23T07:40:00+09:00"
+    "time": "2026-08-24T07:40:00+09:00"
   },
   "arrivalDeadline": null,
   "taxiBudget": {"currency": "KRW", "maxAmount": 10000, "strict": true},
@@ -23,9 +25,10 @@
     "maxTaxiLegs": 2,
     "allowTaxiBridge": true,
     "avoidHighBusSeatRisk": false,
+    "allowedModes": ["BUS", "GTX", "SUBWAY", "TAXI", "TRAIN", "WALK"],
     "optimization": "BALANCED",
     "accessibility": {"avoidStairs": false, "wheelchair": false}
   },
   "requestedRecommendations": ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"],
-  "saveToHistory": true
+  "saveToHistory": false
 }

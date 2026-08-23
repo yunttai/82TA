@@ -5,9 +5,9 @@ _workspace/**
 !_workspace/routing-intelligence/.gitkeep
 !_workspace/integration/.gitkeep
 
-# Generated product artifacts
-src/generated/**
-!src/generated/README.md
+# Generated client source, generator configuration, and package lock files are
+# committed. Disposable dependency, environment, cache, and build directories
+# remain excluded by the rules below and package-local ignore files.
 
 # Secrets and local runtime
 **/.env

@@ -32,17 +32,35 @@ src/contracts/openapi/routing-private.v1.yaml
 ```text
 GET    /api/v1/places/suggest
 GET    /api/v1/places/reverse-geocode
+POST   /api/v1/guest-sessions
+GET/DELETE /api/v1/session
 POST   /api/v1/route-searches
 GET    /api/v1/route-searches/{searchId}
 POST   /api/v1/route-searches/{searchId}/feedback
 GET/PUT /api/v1/me/preferences
 GET/POST /api/v1/me/saved-places
+PATCH/DELETE /api/v1/me/saved-places/{savedPlaceId}
 GET/POST /api/v1/me/favorite-journeys
-DELETE /api/v1/me/data
+PATCH/DELETE /api/v1/me/favorite-journeys/{favoriteJourneyId}
+GET      /api/v1/me/consents
+PUT      /api/v1/me/consents/{consentType}
+POST     /api/v1/me/data-exports
+GET      /api/v1/me/data-exports/{jobId}
+POST     /api/v1/me/data-deletions
+GET      /api/v1/me/data-deletions/{jobId}
+DELETE /api/v1/me/data  # deprecated compatibility alias
 GET    /api/v1/support/capabilities
 ```
 
 Public API는 내부 provider status 전체, 원문 번호판, raw payload, artifact URI, feature vector를 노출하지 않는다.
+
+### Public→Private 정책
+
+- `DEPART_AT`만 Private 1.x로 전달한다. `ARRIVE_BY`는 `ARRIVE_BY_UNSUPPORTED`이며 Service가 시각을 역산하지 않는다.
+- Public `allowedModes`와 `avoidHighBusSeatRisk`는 Private의 같은 의미 필드로 pass-through한다. 생략된 mode 목록만 canonical 전체 목록으로 채운다.
+- `saveToHistory`·owner·consent·guest token·user identity는 Routing으로 전송하지 않는다.
+- `baseline`은 Routing의 `publicTransitOnly` recommendation ID가 지시한 route다. Service가 새 baseline을 고르지 않는다.
+- Public `support`는 Routing capability를 축약하며 missing coverage는 `UNKNOWN`이다.
 
 ## 4. Private Routing API
 
@@ -80,6 +98,12 @@ GET  /v1/version
 - enum consumer는 unknown value를 처리
 - Routing producer는 Service consumer보다 먼저 backward-compatible field를 배포
 - deprecation 기간 뒤 제거
+- compatible minor는 OpenAPI/DB/code registry metadata의 minor를 올리되, Private request의 `contractVersion: "1.0"`은 1.x wire compatibility family로 유지한다.
+- `/v1/version.contractVersion`은 현재 로드된 Private OpenAPI의 repository
+  metadata(`1.1.0`)를 보고한다. optimize request/response body의 wire family
+  `1.0`과 구분한다.
+- `rankingPolicyVersion`은 exact opaque provenance이며 Service가 의미를
+  추론하거나 다시 계산하지 않는다.
 
 ## 7. Generated Clients
 

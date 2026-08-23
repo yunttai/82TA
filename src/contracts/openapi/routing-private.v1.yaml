@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Budget Route Routing & Intelligence API
-  version: 1.0.0
+  version: 1.1.0
 servers:
   - url: https://routing.internal.example.invalid
 security:
@@ -163,7 +163,10 @@ components:
       additionalProperties: false
       required: [contractVersion, requestId, origin, destination, departureTime, constraints, preference, requestedRecommendations, clientContext]
       properties:
-        contractVersion: {type: string, const: '1.0'}
+        contractVersion:
+          type: string
+          const: '1.0'
+          description: Major compatibility family. Compatible 1.x contract minors retain this wire value.
         requestId: {type: string}
         origin:
           type: object
@@ -291,4 +294,8 @@ components:
               purpose: {type: string}
               version: {type: string}
               state: {type: string}
+        busIntelligenceCoverage:
+          type: string
+          enum: [LIVE, PARTIAL, HISTORICAL, UNSUPPORTED, UNKNOWN]
+          description: Optional exact source for the public coverage projection. Absence maps to UNKNOWN.
         degraded: {type: array, items: {type: string}}

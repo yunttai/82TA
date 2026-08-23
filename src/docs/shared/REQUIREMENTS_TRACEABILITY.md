@@ -29,6 +29,13 @@
 | FR-IAM-001~007 | Service | Service DBML, Public OpenAPI | `src/services/service-api` | SEC-IAM-*, DATA-DELETE-* |
 | FR-OPS-001~006 | Joint/Routing | health/version/capability, events | `src/services`, `src/workers`, `src/infra` | RES-*, PERF-*, DR-* |
 
+Service IAM 1.1 세부 evidence에는 guest token expiry/ownership, preference ETag 충돌, saved-place/favorite IDOR, versioned consent, export URL 만료, deletion job 및 backup/analytics 삭제 증빙을 포함한다.
+
+첫 Service↔Routing 통합의 1.1 교정 evidence는 `FR-OPT-002`의 nonempty R1
+canonical chain·참조 무결성·등록 code 검증, `FR-UI-007`의 Public 422/504
+오류 매트릭스·projection redaction, `FR-OPS-004`의 metadata `1.1.0`/wire
+`1.0` 분리와 `rank-0.1.1` provenance 일치를 포함한다.
+
 ## 4. 완료 판정
 
 구현 PR은 관련 요구사항 ID와 테스트 ID를 기록한다. 요구사항에 `releaseGate`와 evidence가 없으면 `DONE`으로 전환하지 않는다. QA는 구현 존재 여부가 아니라 **PRD → 계약 → 생산자 → 소비자 → 저장소 → 테스트**의 연결을 교차 검증한다.

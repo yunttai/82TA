@@ -1,35 +1,1542 @@
 {
   "contractVersion": "1.0",
-  "searchId": "01JEXAMPLE",
+  "searchId": "00000000-0000-4000-8000-000000000006",
   "status": "PARTIAL",
-  "generatedAt": "2026-08-23T07:40:05.421+09:00",
-  "expiresAt": "2026-08-23T07:42:05.421+09:00",
-  "baseline": null,
-  "recommendations": {
-    "fastest": null,
-    "stable": null,
-    "efficient": null,
-    "publicTransitOnly": null
+  "generatedAt": "2026-08-23T00:00:00+00:00",
+  "expiresAt": "2026-08-23T00:02:00+00:00",
+  "baseline": {
+    "routeId": "route_6d206a95ed947d8a",
+    "pattern": "TRANSIT_ONLY",
+    "totalDuration": {
+      "p50Seconds": 3300,
+      "p90Seconds": 4200,
+      "lowerSeconds": null,
+      "upperSeconds": null,
+      "confidence": {
+        "score": 0.9,
+        "grade": "HIGH"
+      },
+      "origin": "PROVIDER_ESTIMATE"
+    },
+    "arrivalAt": {
+      "p50": "2026-08-24T08:35:00+09:00",
+      "p90": "2026-08-24T08:50:00+09:00"
+    },
+    "taxiCost": {
+      "currency": "KRW",
+      "expected": 0,
+      "lower": 0,
+      "upper": 0,
+      "origin": "PROVIDER_ESTIMATE"
+    },
+    "totalFareExpected": 3000,
+    "walkSeconds": 0,
+    "transferCount": 0,
+    "taxiLegCount": 0,
+    "reliabilityScore": 0.9,
+    "dominance": {
+      "onParetoFrontier": true
+    },
+    "legs": [
+      {
+        "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+        "sequence": 0,
+        "mode": "BUS",
+        "from": {
+          "name": "Sanitized R1 South Origin",
+          "coordinate": {
+            "lon": 127.187456,
+            "lat": 37.222345
+          },
+          "canonicalStopId": "00000000-0000-4000-8000-000000000101",
+          "providerStopId": "sanitized-r1-stop-origin"
+        },
+        "to": {
+          "name": "Sanitized R1 North Destination",
+          "coordinate": {
+            "lon": 127.111159,
+            "lat": 37.394761
+          },
+          "canonicalStopId": "00000000-0000-4000-8000-000000000102",
+          "providerStopId": "sanitized-r1-stop-destination"
+        },
+        "expectedStartAt": "2026-08-24T07:40:00+09:00",
+        "expectedEndAt": "2026-08-24T08:35:00+09:00",
+        "duration": {
+          "p50Seconds": 3300,
+          "p90Seconds": 4200,
+          "lowerSeconds": null,
+          "upperSeconds": null,
+          "confidence": {
+            "score": 0.9,
+            "grade": "HIGH"
+          },
+          "origin": "PROVIDER_ESTIMATE"
+        },
+        "distanceMeters": 28400,
+        "fare": {
+          "currency": "KRW",
+          "expected": 3000,
+          "lower": 3000,
+          "upper": 3000,
+          "origin": "PROVIDER_ESTIMATE"
+        },
+        "geometry": {
+          "encoding": "GEOJSON",
+          "value": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                127.187456,
+                37.222345
+              ],
+              [
+                127.1681,
+                37.2719
+              ],
+              [
+                127.1387,
+                37.3336
+              ],
+              [
+                127.111159,
+                37.394761
+              ]
+            ]
+          }
+        },
+        "transit": {
+          "routeLabel": "SAN-R1-701",
+          "routeType": "SEAT_BUS",
+          "direction": "Sanitized R1 Northbound Terminal"
+        },
+        "busIntelligence": null,
+        "provenance": [
+          {
+            "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+            "origin": "PROVIDER_ESTIMATE",
+            "observedAt": "2026-08-23T00:00:00+00:00",
+            "receivedAt": "2026-08-23T00:00:00+00:00",
+            "ageSeconds": null,
+            "confidence": {
+              "score": 0.0,
+              "grade": "UNKNOWN"
+            },
+            "fallbackLevel": 0
+          },
+          {
+            "provider": "FIXTURE::GBIS_V2/arrivals",
+            "origin": "PROVIDER_ESTIMATE",
+            "observedAt": "2026-08-23T00:00:00+00:00",
+            "receivedAt": "2026-08-23T00:00:00+00:00",
+            "ageSeconds": null,
+            "confidence": {
+              "score": 0.0,
+              "grade": "UNKNOWN"
+            },
+            "fallbackLevel": 0
+          },
+          {
+            "provider": "FIXTURE::GBIS_V2/locations",
+            "origin": "PROVIDER_ESTIMATE",
+            "observedAt": "2026-08-23T00:00:00+00:00",
+            "receivedAt": "2026-08-23T00:00:00+00:00",
+            "ageSeconds": null,
+            "confidence": {
+              "score": 0.0,
+              "grade": "UNKNOWN"
+            },
+            "fallbackLevel": 0
+          },
+          {
+            "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+            "origin": "UNKNOWN",
+            "observedAt": null,
+            "receivedAt": "2026-08-23T00:00:00+00:00",
+            "ageSeconds": null,
+            "confidence": {
+              "score": 1.0,
+              "grade": "HIGH"
+            },
+            "fallbackLevel": 0
+          }
+        ]
+      }
+    ],
+    "reasonCodes": [
+      "LOWER_P90_ARRIVAL_TIME",
+      "LOW_TRANSFER_RISK",
+      "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET"
+    ],
+    "warningCodes": [
+      "BUS_DATA_UNAVAILABLE"
+    ],
+    "provenance": [
+      {
+        "provider": "SANITIZED_TRANSIT_FIXTURE",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": 0,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 0
+      },
+      {
+        "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+        "origin": "UNKNOWN",
+        "observedAt": null,
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 1.0,
+          "grade": "HIGH"
+        },
+        "fallbackLevel": 0
+      },
+      {
+        "provider": "FIXTURE::GBIS_V2/arrivals",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::GBIS_V2/locations",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      },
+      {
+        "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+        "origin": "PROVIDER_ESTIMATE",
+        "observedAt": "2026-08-23T00:00:00+00:00",
+        "receivedAt": "2026-08-23T00:00:00+00:00",
+        "ageSeconds": null,
+        "confidence": {
+          "score": 0.0,
+          "grade": "UNKNOWN"
+        },
+        "fallbackLevel": 1
+      }
+    ]
   },
-  "paretoFrontier": [],
+  "recommendations": {
+    "fastest": {
+      "routeId": "route_6d206a95ed947d8a",
+      "pattern": "TRANSIT_ONLY",
+      "totalDuration": {
+        "p50Seconds": 3300,
+        "p90Seconds": 4200,
+        "lowerSeconds": null,
+        "upperSeconds": null,
+        "confidence": {
+          "score": 0.9,
+          "grade": "HIGH"
+        },
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "arrivalAt": {
+        "p50": "2026-08-24T08:35:00+09:00",
+        "p90": "2026-08-24T08:50:00+09:00"
+      },
+      "taxiCost": {
+        "currency": "KRW",
+        "expected": 0,
+        "lower": 0,
+        "upper": 0,
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "totalFareExpected": 3000,
+      "walkSeconds": 0,
+      "transferCount": 0,
+      "taxiLegCount": 0,
+      "reliabilityScore": 0.9,
+      "dominance": {
+        "onParetoFrontier": true
+      },
+      "legs": [
+        {
+          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {
+            "name": "Sanitized R1 South Origin",
+            "coordinate": {
+              "lon": 127.187456,
+              "lat": 37.222345
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000101",
+            "providerStopId": "sanitized-r1-stop-origin"
+          },
+          "to": {
+            "name": "Sanitized R1 North Destination",
+            "coordinate": {
+              "lon": 127.111159,
+              "lat": 37.394761
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000102",
+            "providerStopId": "sanitized-r1-stop-destination"
+          },
+          "expectedStartAt": "2026-08-24T07:40:00+09:00",
+          "expectedEndAt": "2026-08-24T08:35:00+09:00",
+          "duration": {
+            "p50Seconds": 3300,
+            "p90Seconds": 4200,
+            "lowerSeconds": null,
+            "upperSeconds": null,
+            "confidence": {
+              "score": 0.9,
+              "grade": "HIGH"
+            },
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "distanceMeters": 28400,
+          "fare": {
+            "currency": "KRW",
+            "expected": 3000,
+            "lower": 3000,
+            "upper": 3000,
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "geometry": {
+            "encoding": "GEOJSON",
+            "value": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  127.187456,
+                  37.222345
+                ],
+                [
+                  127.1681,
+                  37.2719
+                ],
+                [
+                  127.1387,
+                  37.3336
+                ],
+                [
+                  127.111159,
+                  37.394761
+                ]
+              ]
+            }
+          },
+          "transit": {
+            "routeLabel": "SAN-R1-701",
+            "routeType": "SEAT_BUS",
+            "direction": "Sanitized R1 Northbound Terminal"
+          },
+          "busIntelligence": null,
+          "provenance": [
+            {
+              "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/arrivals",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/locations",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+              "origin": "UNKNOWN",
+              "observedAt": null,
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 1.0,
+                "grade": "HIGH"
+              },
+              "fallbackLevel": 0
+            }
+          ]
+        }
+      ],
+      "reasonCodes": [
+        "LOWER_P90_ARRIVAL_TIME",
+        "LOW_TRANSFER_RISK",
+        "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET"
+      ],
+      "warningCodes": [
+        "BUS_DATA_UNAVAILABLE"
+      ],
+      "provenance": [
+        {
+          "provider": "SANITIZED_TRANSIT_FIXTURE",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": 0,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+          "origin": "UNKNOWN",
+          "observedAt": null,
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 1.0,
+            "grade": "HIGH"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/arrivals",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        }
+      ]
+    },
+    "stable": {
+      "routeId": "route_6d206a95ed947d8a",
+      "pattern": "TRANSIT_ONLY",
+      "totalDuration": {
+        "p50Seconds": 3300,
+        "p90Seconds": 4200,
+        "lowerSeconds": null,
+        "upperSeconds": null,
+        "confidence": {
+          "score": 0.9,
+          "grade": "HIGH"
+        },
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "arrivalAt": {
+        "p50": "2026-08-24T08:35:00+09:00",
+        "p90": "2026-08-24T08:50:00+09:00"
+      },
+      "taxiCost": {
+        "currency": "KRW",
+        "expected": 0,
+        "lower": 0,
+        "upper": 0,
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "totalFareExpected": 3000,
+      "walkSeconds": 0,
+      "transferCount": 0,
+      "taxiLegCount": 0,
+      "reliabilityScore": 0.9,
+      "dominance": {
+        "onParetoFrontier": true
+      },
+      "legs": [
+        {
+          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {
+            "name": "Sanitized R1 South Origin",
+            "coordinate": {
+              "lon": 127.187456,
+              "lat": 37.222345
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000101",
+            "providerStopId": "sanitized-r1-stop-origin"
+          },
+          "to": {
+            "name": "Sanitized R1 North Destination",
+            "coordinate": {
+              "lon": 127.111159,
+              "lat": 37.394761
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000102",
+            "providerStopId": "sanitized-r1-stop-destination"
+          },
+          "expectedStartAt": "2026-08-24T07:40:00+09:00",
+          "expectedEndAt": "2026-08-24T08:35:00+09:00",
+          "duration": {
+            "p50Seconds": 3300,
+            "p90Seconds": 4200,
+            "lowerSeconds": null,
+            "upperSeconds": null,
+            "confidence": {
+              "score": 0.9,
+              "grade": "HIGH"
+            },
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "distanceMeters": 28400,
+          "fare": {
+            "currency": "KRW",
+            "expected": 3000,
+            "lower": 3000,
+            "upper": 3000,
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "geometry": {
+            "encoding": "GEOJSON",
+            "value": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  127.187456,
+                  37.222345
+                ],
+                [
+                  127.1681,
+                  37.2719
+                ],
+                [
+                  127.1387,
+                  37.3336
+                ],
+                [
+                  127.111159,
+                  37.394761
+                ]
+              ]
+            }
+          },
+          "transit": {
+            "routeLabel": "SAN-R1-701",
+            "routeType": "SEAT_BUS",
+            "direction": "Sanitized R1 Northbound Terminal"
+          },
+          "busIntelligence": null,
+          "provenance": [
+            {
+              "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/arrivals",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/locations",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+              "origin": "UNKNOWN",
+              "observedAt": null,
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 1.0,
+                "grade": "HIGH"
+              },
+              "fallbackLevel": 0
+            }
+          ]
+        }
+      ],
+      "reasonCodes": [
+        "LOWER_P90_ARRIVAL_TIME",
+        "LOW_TRANSFER_RISK",
+        "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET"
+      ],
+      "warningCodes": [
+        "BUS_DATA_UNAVAILABLE"
+      ],
+      "provenance": [
+        {
+          "provider": "SANITIZED_TRANSIT_FIXTURE",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": 0,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+          "origin": "UNKNOWN",
+          "observedAt": null,
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 1.0,
+            "grade": "HIGH"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/arrivals",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        }
+      ]
+    },
+    "efficient": {
+      "routeId": "route_6d206a95ed947d8a",
+      "pattern": "TRANSIT_ONLY",
+      "totalDuration": {
+        "p50Seconds": 3300,
+        "p90Seconds": 4200,
+        "lowerSeconds": null,
+        "upperSeconds": null,
+        "confidence": {
+          "score": 0.9,
+          "grade": "HIGH"
+        },
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "arrivalAt": {
+        "p50": "2026-08-24T08:35:00+09:00",
+        "p90": "2026-08-24T08:50:00+09:00"
+      },
+      "taxiCost": {
+        "currency": "KRW",
+        "expected": 0,
+        "lower": 0,
+        "upper": 0,
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "totalFareExpected": 3000,
+      "walkSeconds": 0,
+      "transferCount": 0,
+      "taxiLegCount": 0,
+      "reliabilityScore": 0.9,
+      "dominance": {
+        "onParetoFrontier": true
+      },
+      "legs": [
+        {
+          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {
+            "name": "Sanitized R1 South Origin",
+            "coordinate": {
+              "lon": 127.187456,
+              "lat": 37.222345
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000101",
+            "providerStopId": "sanitized-r1-stop-origin"
+          },
+          "to": {
+            "name": "Sanitized R1 North Destination",
+            "coordinate": {
+              "lon": 127.111159,
+              "lat": 37.394761
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000102",
+            "providerStopId": "sanitized-r1-stop-destination"
+          },
+          "expectedStartAt": "2026-08-24T07:40:00+09:00",
+          "expectedEndAt": "2026-08-24T08:35:00+09:00",
+          "duration": {
+            "p50Seconds": 3300,
+            "p90Seconds": 4200,
+            "lowerSeconds": null,
+            "upperSeconds": null,
+            "confidence": {
+              "score": 0.9,
+              "grade": "HIGH"
+            },
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "distanceMeters": 28400,
+          "fare": {
+            "currency": "KRW",
+            "expected": 3000,
+            "lower": 3000,
+            "upper": 3000,
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "geometry": {
+            "encoding": "GEOJSON",
+            "value": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  127.187456,
+                  37.222345
+                ],
+                [
+                  127.1681,
+                  37.2719
+                ],
+                [
+                  127.1387,
+                  37.3336
+                ],
+                [
+                  127.111159,
+                  37.394761
+                ]
+              ]
+            }
+          },
+          "transit": {
+            "routeLabel": "SAN-R1-701",
+            "routeType": "SEAT_BUS",
+            "direction": "Sanitized R1 Northbound Terminal"
+          },
+          "busIntelligence": null,
+          "provenance": [
+            {
+              "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/arrivals",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/locations",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+              "origin": "UNKNOWN",
+              "observedAt": null,
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 1.0,
+                "grade": "HIGH"
+              },
+              "fallbackLevel": 0
+            }
+          ]
+        }
+      ],
+      "reasonCodes": [
+        "LOWER_P90_ARRIVAL_TIME",
+        "LOW_TRANSFER_RISK",
+        "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET"
+      ],
+      "warningCodes": [
+        "BUS_DATA_UNAVAILABLE"
+      ],
+      "provenance": [
+        {
+          "provider": "SANITIZED_TRANSIT_FIXTURE",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": 0,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+          "origin": "UNKNOWN",
+          "observedAt": null,
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 1.0,
+            "grade": "HIGH"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/arrivals",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        }
+      ]
+    },
+    "publicTransitOnly": {
+      "routeId": "route_6d206a95ed947d8a",
+      "pattern": "TRANSIT_ONLY",
+      "totalDuration": {
+        "p50Seconds": 3300,
+        "p90Seconds": 4200,
+        "lowerSeconds": null,
+        "upperSeconds": null,
+        "confidence": {
+          "score": 0.9,
+          "grade": "HIGH"
+        },
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "arrivalAt": {
+        "p50": "2026-08-24T08:35:00+09:00",
+        "p90": "2026-08-24T08:50:00+09:00"
+      },
+      "taxiCost": {
+        "currency": "KRW",
+        "expected": 0,
+        "lower": 0,
+        "upper": 0,
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "totalFareExpected": 3000,
+      "walkSeconds": 0,
+      "transferCount": 0,
+      "taxiLegCount": 0,
+      "reliabilityScore": 0.9,
+      "dominance": {
+        "onParetoFrontier": true
+      },
+      "legs": [
+        {
+          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {
+            "name": "Sanitized R1 South Origin",
+            "coordinate": {
+              "lon": 127.187456,
+              "lat": 37.222345
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000101",
+            "providerStopId": "sanitized-r1-stop-origin"
+          },
+          "to": {
+            "name": "Sanitized R1 North Destination",
+            "coordinate": {
+              "lon": 127.111159,
+              "lat": 37.394761
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000102",
+            "providerStopId": "sanitized-r1-stop-destination"
+          },
+          "expectedStartAt": "2026-08-24T07:40:00+09:00",
+          "expectedEndAt": "2026-08-24T08:35:00+09:00",
+          "duration": {
+            "p50Seconds": 3300,
+            "p90Seconds": 4200,
+            "lowerSeconds": null,
+            "upperSeconds": null,
+            "confidence": {
+              "score": 0.9,
+              "grade": "HIGH"
+            },
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "distanceMeters": 28400,
+          "fare": {
+            "currency": "KRW",
+            "expected": 3000,
+            "lower": 3000,
+            "upper": 3000,
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "geometry": {
+            "encoding": "GEOJSON",
+            "value": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  127.187456,
+                  37.222345
+                ],
+                [
+                  127.1681,
+                  37.2719
+                ],
+                [
+                  127.1387,
+                  37.3336
+                ],
+                [
+                  127.111159,
+                  37.394761
+                ]
+              ]
+            }
+          },
+          "transit": {
+            "routeLabel": "SAN-R1-701",
+            "routeType": "SEAT_BUS",
+            "direction": "Sanitized R1 Northbound Terminal"
+          },
+          "busIntelligence": null,
+          "provenance": [
+            {
+              "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/arrivals",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/locations",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+              "origin": "UNKNOWN",
+              "observedAt": null,
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 1.0,
+                "grade": "HIGH"
+              },
+              "fallbackLevel": 0
+            }
+          ]
+        }
+      ],
+      "reasonCodes": [
+        "LOWER_P90_ARRIVAL_TIME",
+        "LOW_TRANSFER_RISK",
+        "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET"
+      ],
+      "warningCodes": [
+        "BUS_DATA_UNAVAILABLE"
+      ],
+      "provenance": [
+        {
+          "provider": "SANITIZED_TRANSIT_FIXTURE",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": 0,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+          "origin": "UNKNOWN",
+          "observedAt": null,
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 1.0,
+            "grade": "HIGH"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/arrivals",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        }
+      ]
+    }
+  },
+  "paretoFrontier": [
+    {
+      "routeId": "route_6d206a95ed947d8a",
+      "taxiCostUpper": 0,
+      "p50Seconds": 3300,
+      "p90Seconds": 4200
+    }
+  ],
   "warnings": [
-    "PROVIDER_PARTIAL_FAILURE"
+    "BUS_DATA_UNAVAILABLE"
   ],
   "support": {
-    "features": {
-      "currentTransit": true,
-      "futureTransit": false,
-      "currentTaxi": true,
-      "futureTaxi": false,
-      "multiDestinationTaxi": false,
-      "busSeatRisk": true,
-      "busEtaModel": true,
-      "taxiBridge": true,
-      "realtimeRerouting": false
-    },
-    "busIntelligenceCoverage": "PARTIAL",
+    "features": {},
+    "busIntelligenceCoverage": "UNKNOWN",
     "degraded": [
-      "KAKAO_MULTI_DESTINATION_UNVERIFIED"
+      "ROUTING_CAPABILITIES_UNAVAILABLE"
     ]
+  },
+  "history": {
+    "saved": false,
+    "ownerKind": "GUEST",
+    "retainedUntil": "2026-08-23T00:02:00+00:00"
   }
 }

@@ -1,7 +1,7 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.0.1",
-  "contractVersion": "1.0.0",
+  "contextVersion": "1.1.0",
+  "contractVersion": "1.1.0",
   "canonicalFiles": [
     "src/docs/shared/PROJECT_CONTEXT.md",
     "src/docs/shared/PRD.md",
@@ -25,6 +25,9 @@
     "src/contracts/openapi/examples/routing-optimize-request.json",
     "src/contracts/openapi/examples/public-route-search-response.json",
     "src/contracts/openapi/examples/public-route-search-request.json",
+    "src/contracts/openapi/examples/public-guest-session-response.json",
+    "src/contracts/openapi/examples/public-consent-response.json",
+    "src/contracts/openapi/examples/public-data-rights-job-response.json",
     "src/contracts/database/service-db.dbml",
     "src/contracts/database/routing-db.dbml",
     "src/contracts/database/schema-ownership.yaml",

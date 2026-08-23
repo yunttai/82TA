@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Budget Route Common Components
-  version: 1.0.0
+  version: 1.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 paths: {}
 components:
@@ -107,6 +107,10 @@ components:
         riskAversion: {type: number, minimum: 0, maximum: 1, default: 0.5}
         walkingAversion: {type: number, minimum: 0, maximum: 1, default: 0.5}
         transferAversion: {type: number, minimum: 0, maximum: 1, default: 0.5}
+        avoidHighBusSeatRisk:
+          type: boolean
+          default: false
+          description: User preference passed through by Service. Routing alone decides how supported Bus Intelligence affects candidates and ranking.
         accessibility: {$ref: '#/components/schemas/Accessibility'}
     StopRef:
       type: object

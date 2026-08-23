@@ -78,6 +78,10 @@ class CanonicalContractValidator:
     def __init__(self, contract_path: Path | None = None) -> None:
         self._path = (contract_path or default_contract_path()).resolve()
         document = _load_yaml(self._path)
+        version = document.get("info", {}).get("version")
+        if not isinstance(version, str) or not version.strip() or len(version) > 64:
+            raise ValueError("OpenAPI info.version must be a non-empty bounded string")
+        self._contract_version = version
         schema = document["components"]["schemas"]["OptimizeRouteRequest"]
         resolved = _dereference(schema, document, self._path)
         self._request_validator = Draft202012Validator(resolved, format_checker=FormatChecker())
@@ -86,6 +90,10 @@ class CanonicalContractValidator:
         self._response_validator = Draft202012Validator(
             resolved_response, format_checker=FormatChecker()
         )
+
+    @property
+    def contract_version(self) -> str:
+        return self._contract_version
 
     def validate_optimize_request(self, payload: object) -> tuple[ContractViolation, ...]:
         errors = sorted(

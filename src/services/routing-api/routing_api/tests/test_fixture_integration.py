@@ -1578,6 +1578,7 @@ def test_container_default_is_503_without_source_activation_and_r1_is_integrated
             HTTP_AUTHORIZATION=headers["HTTP_AUTHORIZATION"],
         )
         assert version.status_code == 200
+        assert version.json()["contractVersion"] == "1.1.0"
         assert version.json()["rankingPolicyVersion"] == "rank-0.1.1"
         assert (
             version.json()["rankingPolicyVersion"]

@@ -1,0 +1,8 @@
+{
+  "project_name_override": "routing-client-python",
+  "package_name_override": "routing_client",
+  "post_hooks": [
+    "ruff check . --fix --select F,I --no-respect-gitignore",
+    "ruff format . --no-respect-gitignore"
+  ]
+}

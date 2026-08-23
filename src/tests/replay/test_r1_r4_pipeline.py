@@ -46,6 +46,7 @@ def test_r1_r4_fixture_chain_is_deterministic_and_semantically_valid(
     assert "BUS_DATA_UNAVAILABLE" in first_api.body["warningCodes"]
 
     routes = first_api.body["routes"]
+    generated_at = datetime.fromisoformat(first_api.body["generatedAt"])
     returned = {route["routeId"] for route in routes}
     recommendations = first_api.body["recommendations"]
     assert set(recommendations) == {"fastest", "stable", "efficient", "publicTransitOnly"}
@@ -65,6 +66,18 @@ def test_r1_r4_fixture_chain_is_deterministic_and_semantically_valid(
         assert route["dominance"]["onParetoFrontier"] == (
             route["routeId"] in first_api.body["paretoRouteIds"]
         )
+        provenance = [
+            *route["provenance"],
+            *(item for leg in route["legs"] for item in leg["provenance"]),
+        ]
+        assert provenance
+        for item in provenance:
+            received_at = datetime.fromisoformat(item["receivedAt"])
+            assert received_at <= generated_at
+            if item["observedAt"] is not None:
+                assert datetime.fromisoformat(item["observedAt"]) <= received_at
+            if item["ageSeconds"] is not None:
+                assert item["ageSeconds"] >= 0
         for leg in route["legs"]:
             assert leg["duration"]["p90Seconds"] >= leg["duration"]["p50Seconds"]
             assert datetime.fromisoformat(leg["expectedStartAt"]) <= datetime.fromisoformat(

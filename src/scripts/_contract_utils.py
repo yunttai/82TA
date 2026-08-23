@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 
+CANONICAL_TEXT_SUFFIXES = frozenset({".dbml", ".json", ".md", ".yaml", ".yml"})
+
+
 def project_root(start: Path | None = None) -> Path:
     current = (start or Path(__file__)).resolve()
     for candidate in [current, *current.parents]:
@@ -18,11 +21,17 @@ def project_root(start: Path | None = None) -> Path:
 
 
 def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    raw = path.read_bytes()
+    if path.suffix.lower() in CANONICAL_TEXT_SUFFIXES:
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"canonical text is not valid UTF-8: {path}") from exc
+        # Git may materialize CRLF on Windows even though the committed blob and
+        # Linux checkout use LF. Hash canonical text semantics, while unknown or
+        # binary extensions remain byte-exact below.
+        raw = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
 
 def load_json(path: Path) -> Any:

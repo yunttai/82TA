@@ -19,6 +19,8 @@ Trusted internal: private Routing API, approved model registry, production DB
 | SSRF | Provider URL allowlist, 사용자 URL 금지, egress 제어 |
 | 위치 이력 노출 | 최소 저장, encryption, redaction, 삭제 |
 | 계정 탈취 | secure cookie, CSRF, login rate limit, audit |
+| guest/session 탈취 | opaque high-entropy token, server-side hash, short TTL, rotation/revoke, localStorage 금지 |
+| export URL 유출 | owner authorization, short-lived URL, no direct object reference, download audit |
 | Routing API 위조 | private network, service JWT/workload identity |
 | cache poisoning | canonical key, response validation, ACL |
 | model artifact RCE | registry, native safe format, hash/signature, fixed path |
@@ -32,6 +34,9 @@ Trusted internal: private Routing API, approved model registry, production DB
 - Routing에는 user identity를 보내지 않는다.
 - 로그·trace에는 낮은 정밀도 region만 사용한다.
 - saved place와 route history는 명시적 저장·삭제를 지원한다.
+- history opt-in은 로그인과 `SEARCH_HISTORY` 동의를 요구하며 guest 결과는 짧은 결과 TTL만 유지한다.
+- data export/deletion job의 상태 조회는 동일 owner에게만 허용하고, 삭제 완료는 backup/analytics retention까지 증빙한다.
+- 다른 owner의 search·saved place·favorite·data-rights job ID는 resource 존재를 숨기기 위해 `404`로 응답한다. `403`은 동일 owner의 consent·scope 부족에만 사용한다.
 - 분석 dataset에는 정확한 좌표와 `집/직장/학교` label을 복사하지 않는다.
 
 ## 내부 서비스 인증

@@ -1,10 +1,42 @@
 openapi: 3.1.0
 info:
   title: Budget Route Service Public API
-  version: 1.0.0
+  version: 1.1.0
 servers:
   - url: https://api.example.invalid
+security: []
 paths:
+  /api/v1/guest-sessions:
+    post:
+      operationId: createGuestSession
+      responses:
+        '201':
+          description: Short-lived guest credential for ownership-bound searches
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GuestSessionCredential'}
+        '429': {$ref: '#/components/responses/Problem'}
+  /api/v1/session:
+    get:
+      operationId: getCurrentSession
+      security:
+        - sessionCookie: []
+        - guestToken: []
+      responses:
+        '200':
+          description: Current authenticated or guest session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SessionContext'}
+        '401': {$ref: '#/components/responses/Problem'}
+    delete:
+      operationId: revokeCurrentSession
+      security:
+        - sessionCookie: []
+        - guestToken: []
+      responses:
+        '204': {description: Session revoked}
+        '401': {$ref: '#/components/responses/Problem'}
   /api/v1/places/suggest:
     get:
       operationId: suggestPlaces
@@ -12,7 +44,7 @@ paths:
         - in: query
           name: query
           required: true
-          schema: {type: string, minLength: 1, maxLength: 100}
+          schema: {type: string, minLength: 2, maxLength: 100}
         - in: query
           name: lon
           schema: {type: number}
@@ -32,6 +64,8 @@ paths:
                     type: array
                     items: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
         '400': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '502': {$ref: '#/components/responses/Problem'}
   /api/v1/places/reverse-geocode:
     get:
       operationId: reverseGeocode
@@ -51,6 +85,8 @@ paths:
             application/json:
               schema: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
         '400': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '502': {$ref: '#/components/responses/Problem'}
   /api/v1/route-searches:
     post:
       operationId: createRouteSearch
@@ -75,9 +111,13 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/PublicRouteSearchResponse'}
         '400': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
         '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
         '429': {$ref: '#/components/responses/Problem'}
+        '502': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
+        '504': {$ref: '#/components/responses/Problem'}
     get:
       operationId: listRouteSearches
       security: [{sessionCookie: []}]
@@ -93,9 +133,14 @@ paths:
                   items:
                     type: array
                     items: {$ref: '#/components/schemas/PublicRouteSearchResponse'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
   /api/v1/route-searches/{searchId}:
     get:
       operationId: getRouteSearch
+      security:
+        - sessionCookie: []
+        - guestToken: []
       parameters:
         - in: path
           name: searchId
@@ -111,10 +156,14 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/PublicRouteSearchResponse'}
+        '403': {$ref: '#/components/responses/Problem'}
         '404': {$ref: '#/components/responses/Problem'}
   /api/v1/route-searches/{searchId}/feedback:
     post:
       operationId: submitRouteFeedback
+      security:
+        - sessionCookie: []
+        - guestToken: []
       parameters:
         - in: path
           name: searchId
@@ -127,6 +176,7 @@ paths:
             schema: {$ref: '#/components/schemas/RouteFeedbackInput'}
       responses:
         '204': {description: Feedback accepted}
+        '403': {$ref: '#/components/responses/Problem'}
         '404': {$ref: '#/components/responses/Problem'}
   /api/v1/me/preferences:
     get:
@@ -138,9 +188,20 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/UserPreferences'}
+          headers:
+            ETag:
+              description: Quoted preference version for optimistic concurrency
+              schema: {type: string}
+        '401': {$ref: '#/components/responses/Problem'}
     put:
       operationId: updatePreferences
       security: [{sessionCookie: []}]
+      parameters:
+        - in: header
+          name: If-Match
+          required: false
+          description: Optional quoted preference version. First-party clients send the ETag returned by GET.
+          schema: {type: string}
       requestBody:
         required: true
         content:
@@ -152,6 +213,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/UserPreferences'}
+          headers:
+            ETag:
+              description: Quoted preference version for optimistic concurrency
+              schema: {type: string}
+        '409': {$ref: '#/components/responses/Problem'}
   /api/v1/me/saved-places:
     get:
       operationId: listSavedPlaces
@@ -178,6 +244,34 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SavedPlace'}
+  /api/v1/me/saved-places/{savedPlaceId}:
+    patch:
+      operationId: updateSavedPlace
+      security: [{sessionCookie: []}]
+      parameters:
+        - {$ref: '#/components/parameters/SavedPlaceId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SavedPlaceUpdate'}
+      responses:
+        '200':
+          description: Updated saved place
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedPlace'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+    delete:
+      operationId: deleteSavedPlace
+      security: [{sessionCookie: []}]
+      parameters:
+        - {$ref: '#/components/parameters/SavedPlaceId'}
+      responses:
+        '204': {description: Saved place deleted}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
   /api/v1/me/favorite-journeys:
     get:
       operationId: listFavoriteJourneys
@@ -204,12 +298,135 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/FavoriteJourney'}
+  /api/v1/me/favorite-journeys/{favoriteJourneyId}:
+    patch:
+      operationId: updateFavoriteJourney
+      security: [{sessionCookie: []}]
+      parameters:
+        - {$ref: '#/components/parameters/FavoriteJourneyId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FavoriteJourneyUpdate'}
+      responses:
+        '200':
+          description: Updated favorite journey
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FavoriteJourney'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+    delete:
+      operationId: deleteFavoriteJourney
+      security: [{sessionCookie: []}]
+      parameters:
+        - {$ref: '#/components/parameters/FavoriteJourneyId'}
+      responses:
+        '204': {description: Favorite journey deleted}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/consents:
+    get:
+      operationId: listConsents
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Latest recorded state for each consent type
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/ConsentRecord'}
+        '401': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/consents/{consentType}:
+    put:
+      operationId: recordConsent
+      security: [{sessionCookie: []}]
+      parameters:
+        - {$ref: '#/components/parameters/ConsentType'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConsentInput'}
+      responses:
+        '200':
+          description: Recorded consent state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConsentRecord'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/data-exports:
+    post:
+      operationId: createDataExport
+      security: [{sessionCookie: []}]
+      responses:
+        '202':
+          description: Export scheduled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataRightsJob'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/data-exports/{jobId}:
+    get:
+      operationId: getDataExport
+      security: [{sessionCookie: []}]
+      parameters:
+        - {$ref: '#/components/parameters/DataRightsJobId'}
+      responses:
+        '200':
+          description: Export status and a short-lived download URL when complete
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataRightsJob'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/data-deletions:
+    post:
+      operationId: createDataDeletion
+      security: [{sessionCookie: []}]
+      responses:
+        '202':
+          description: Deletion scheduled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataRightsJob'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/data-deletions/{jobId}:
+    get:
+      operationId: getDataDeletion
+      security: [{sessionCookie: []}]
+      parameters:
+        - {$ref: '#/components/parameters/DataRightsJobId'}
+      responses:
+        '200':
+          description: Deletion status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataRightsJob'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
   /api/v1/me/data:
     delete:
       operationId: deleteUserData
+      deprecated: true
+      description: Compatibility alias. New clients use POST /api/v1/me/data-deletions and poll its status.
       security: [{sessionCookie: []}]
       responses:
-        '202': {description: Deletion scheduled}
+        '202':
+          description: Deletion scheduled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataRightsJob'}
+        '401': {$ref: '#/components/responses/Problem'}
   /api/v1/support/capabilities:
     get:
       operationId: getPublicCapabilities
@@ -238,6 +455,31 @@ components:
       type: apiKey
       in: cookie
       name: sessionid
+    guestToken:
+      type: apiKey
+      in: header
+      name: X-Guest-Token
+  parameters:
+    SavedPlaceId:
+      in: path
+      name: savedPlaceId
+      required: true
+      schema: {type: string, format: uuid}
+    FavoriteJourneyId:
+      in: path
+      name: favoriteJourneyId
+      required: true
+      schema: {type: string, format: uuid}
+    ConsentType:
+      in: path
+      name: consentType
+      required: true
+      schema: {$ref: '#/components/schemas/ConsentType'}
+    DataRightsJobId:
+      in: path
+      name: jobId
+      required: true
+      schema: {type: string, format: uuid}
   responses:
     Problem:
       description: Problem Details
@@ -253,6 +495,7 @@ components:
         origin: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
         destination: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
         departure:
+          description: ARRIVE_BY is reserved in the Public API but returns ARRIVE_BY_UNSUPPORTED until the Private Routing API supports that search type.
           type: object
           additionalProperties: false
           required: [type, time]
@@ -271,13 +514,21 @@ components:
             maxTaxiLegs: {type: integer, minimum: 0, maximum: 3}
             allowTaxiBridge: {type: boolean}
             avoidHighBusSeatRisk: {type: boolean}
+            allowedModes:
+              description: Passed to Routing without Service-side ranking or cost interpretation. Omission uses all canonical modes.
+              type: array
+              uniqueItems: true
+              items: {type: string, enum: [WALK, WAIT, TRANSFER, TAXI, BUS, SUBWAY, GTX, TRAIN]}
             optimization: {type: string, enum: [FASTEST, STABLE, EFFICIENT, BALANCED]}
             accessibility: {$ref: './common/components.v1.yaml#/components/schemas/Accessibility'}
         requestedRecommendations:
           type: array
           uniqueItems: true
           items: {type: string, enum: [FASTEST, STABLE, EFFICIENT, PUBLIC_TRANSIT_ONLY]}
-        saveToHistory: {type: boolean, default: false}
+        saveToHistory:
+          type: boolean
+          default: false
+          description: Service-local opt-in. It is never forwarded to Routing and requires an authenticated owner with current SEARCH_HISTORY consent when true.
     PublicRouteSearchResponse:
       type: object
       additionalProperties: false
@@ -316,6 +567,34 @@ components:
               p90Seconds: {type: integer}
         warnings: {type: array, items: {type: string}}
         support: {$ref: '#/components/schemas/PublicCapabilities'}
+        history: {$ref: '#/components/schemas/HistoryMetadata'}
+    HistoryMetadata:
+      type: object
+      additionalProperties: false
+      required: [saved, ownerKind]
+      properties:
+        saved: {type: boolean}
+        ownerKind: {type: string, enum: [GUEST, USER]}
+        retainedUntil: {type: [string, 'null'], format: date-time}
+    GuestSessionCredential:
+      type: object
+      additionalProperties: false
+      required: [guestToken, expiresAt]
+      properties:
+        guestToken:
+          type: string
+          minLength: 32
+          writeOnly: true
+          description: Opaque bearer credential returned once and never persisted in browser localStorage.
+        expiresAt: {type: string, format: date-time}
+    SessionContext:
+      type: object
+      additionalProperties: false
+      required: [subjectType, authenticated, expiresAt]
+      properties:
+        subjectType: {type: string, enum: [GUEST, USER]}
+        authenticated: {type: boolean}
+        expiresAt: {type: string, format: date-time}
     RouteFeedbackInput:
       type: object
       additionalProperties: false
@@ -340,6 +619,8 @@ components:
         optimizationProfile: {type: string, enum: [FASTEST, STABLE, EFFICIENT, BALANCED]}
         accessibility: {$ref: './common/components.v1.yaml#/components/schemas/Accessibility'}
         privacy: {type: object}
+        version: {type: integer, minimum: 1, readOnly: true}
+        updatedAt: {type: string, format: date-time, readOnly: true}
     SavedPlaceInput:
       type: object
       additionalProperties: false
@@ -349,13 +630,24 @@ components:
         place: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
         isSensitive: {type: boolean, default: true}
     SavedPlace:
-      allOf:
-        - {$ref: '#/components/schemas/SavedPlaceInput'}
-        - type: object
-          required: [id, createdAt]
-          properties:
-            id: {type: string, format: uuid}
-            createdAt: {type: string, format: date-time}
+      type: object
+      additionalProperties: false
+      required: [id, label, place, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        label: {type: string, maxLength: 50}
+        place: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
+        isSensitive: {type: boolean}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    SavedPlaceUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        label: {type: string, maxLength: 50}
+        place: {$ref: './common/components.v1.yaml#/components/schemas/PlaceRef'}
+        isSensitive: {type: boolean}
     FavoriteJourneyInput:
       type: object
       additionalProperties: false
@@ -366,13 +658,61 @@ components:
         destinationSavedPlaceId: {type: string, format: uuid}
         defaultConstraints: {type: object}
     FavoriteJourney:
-      allOf:
-        - {$ref: '#/components/schemas/FavoriteJourneyInput'}
-        - type: object
-          required: [id, createdAt]
-          properties:
-            id: {type: string, format: uuid}
-            createdAt: {type: string, format: date-time}
+      type: object
+      additionalProperties: false
+      required: [id, nickname, originSavedPlaceId, destinationSavedPlaceId, defaultConstraints, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        nickname: {type: string, maxLength: 100}
+        originSavedPlaceId: {type: string, format: uuid}
+        destinationSavedPlaceId: {type: string, format: uuid}
+        defaultConstraints: {type: object}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    FavoriteJourneyUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        nickname: {type: string, maxLength: 100}
+        originSavedPlaceId: {type: string, format: uuid}
+        destinationSavedPlaceId: {type: string, format: uuid}
+        defaultConstraints: {type: object}
+    ConsentType:
+      type: string
+      enum: [SEARCH_HISTORY, PRECISE_LOCATION, PRODUCT_ANALYTICS, ROUTING_FEEDBACK]
+    ConsentInput:
+      type: object
+      additionalProperties: false
+      required: [documentVersion, accepted]
+      properties:
+        documentVersion: {type: string, minLength: 1, maxLength: 64}
+        accepted: {type: boolean}
+    ConsentRecord:
+      type: object
+      additionalProperties: false
+      required: [consentType, documentVersion, accepted, recordedAt]
+      properties:
+        consentType: {$ref: '#/components/schemas/ConsentType'}
+        documentVersion: {type: string}
+        accepted: {type: boolean}
+        recordedAt: {type: string, format: date-time}
+    DataRightsJob:
+      type: object
+      additionalProperties: false
+      required: [jobId, type, status, requestedAt]
+      properties:
+        jobId: {type: string, format: uuid}
+        type: {type: string, enum: [EXPORT, DELETE]}
+        status: {type: string, enum: [PENDING, RUNNING, COMPLETE, FAILED]}
+        requestedAt: {type: string, format: date-time}
+        completedAt: {type: [string, 'null'], format: date-time}
+        downloadUrl:
+          type: [string, 'null']
+          format: uri
+          description: Short-lived same-user URL returned only for a completed export.
+        downloadExpiresAt: {type: [string, 'null'], format: date-time}
+        failureCode: {type: [string, 'null']}
     PublicCapabilities:
       type: object
       additionalProperties: false

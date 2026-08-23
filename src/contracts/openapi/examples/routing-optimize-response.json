@@ -1,31 +1,537 @@
 {
   "contractVersion": "1.0",
-  "requestId": "01JEXAMPLE",
+  "requestId": "6aa87de7-8af7-55c9-bbb4-f518722ed833",
   "status": "PARTIAL",
-  "generatedAt": "2026-08-23T07:40:05.230+09:00",
-  "expiresAt": "2026-08-23T07:42:05.230+09:00",
+  "generatedAt": "2026-08-23T00:00:00+00:00",
+  "expiresAt": "2026-08-23T00:02:00+00:00",
   "computation": {
-    "durationMs": 5140,
-    "rankingPolicyVersion": "rank-1.0.0",
-    "mappingVersion": "map-1.0.0",
-    "candidateCounts": {"generated": 84, "coarsePruned": 27, "fullyEvaluated": 12, "pareto": 5},
-    "cache": {"transitHit": false, "taxiMatrixHit": true, "busRealtimeHit": false}
+    "durationMs": 0,
+    "rankingPolicyVersion": "rank-0.1.1",
+    "mappingVersion": "0.1.0-planned",
+    "candidateCounts": {
+      "generated": 1,
+      "coarsePruned": 0,
+      "fullyEvaluated": 1,
+      "pareto": 1
+    },
+    "cache": {
+      "fixture": false,
+      "strategyPolicyVersion": "strategy-1.0.0",
+      "exactEnrichmentResolved": true,
+      "providerCallCount": 10,
+      "optimizationPersistence": "NOT_CONFIGURED"
+    }
   },
   "recommendations": {
-    "fastest": "route_01",
-    "stable": "route_03",
-    "efficient": "route_02",
-    "publicTransitOnly": "route_public_01"
+    "fastest": "route_6d206a95ed947d8a",
+    "stable": "route_6d206a95ed947d8a",
+    "efficient": "route_6d206a95ed947d8a",
+    "publicTransitOnly": "route_6d206a95ed947d8a"
   },
-  "routes": [],
-  "paretoRouteIds": ["route_public_01", "route_02", "route_01"],
+  "routes": [
+    {
+      "routeId": "route_6d206a95ed947d8a",
+      "pattern": "TRANSIT_ONLY",
+      "totalDuration": {
+        "p50Seconds": 3300,
+        "p90Seconds": 4200,
+        "lowerSeconds": null,
+        "upperSeconds": null,
+        "confidence": {
+          "score": 0.9,
+          "grade": "HIGH"
+        },
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "arrivalAt": {
+        "p50": "2026-08-24T08:35:00+09:00",
+        "p90": "2026-08-24T08:50:00+09:00"
+      },
+      "taxiCost": {
+        "currency": "KRW",
+        "expected": 0,
+        "lower": 0,
+        "upper": 0,
+        "origin": "PROVIDER_ESTIMATE"
+      },
+      "totalFareExpected": 3000,
+      "walkSeconds": 0,
+      "transferCount": 0,
+      "taxiLegCount": 0,
+      "reliabilityScore": 0.9,
+      "dominance": {
+        "onParetoFrontier": true
+      },
+      "legs": [
+        {
+          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {
+            "name": "Sanitized R1 South Origin",
+            "coordinate": {
+              "lon": 127.187456,
+              "lat": 37.222345
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000101",
+            "providerStopId": "sanitized-r1-stop-origin"
+          },
+          "to": {
+            "name": "Sanitized R1 North Destination",
+            "coordinate": {
+              "lon": 127.111159,
+              "lat": 37.394761
+            },
+            "canonicalStopId": "00000000-0000-4000-8000-000000000102",
+            "providerStopId": "sanitized-r1-stop-destination"
+          },
+          "expectedStartAt": "2026-08-24T07:40:00+09:00",
+          "expectedEndAt": "2026-08-24T08:35:00+09:00",
+          "duration": {
+            "p50Seconds": 3300,
+            "p90Seconds": 4200,
+            "lowerSeconds": null,
+            "upperSeconds": null,
+            "confidence": {
+              "score": 0.9,
+              "grade": "HIGH"
+            },
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "distanceMeters": 28400,
+          "fare": {
+            "currency": "KRW",
+            "expected": 3000,
+            "lower": 3000,
+            "upper": 3000,
+            "origin": "PROVIDER_ESTIMATE"
+          },
+          "geometry": {
+            "encoding": "GEOJSON",
+            "value": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  127.187456,
+                  37.222345
+                ],
+                [
+                  127.1681,
+                  37.2719
+                ],
+                [
+                  127.1387,
+                  37.3336
+                ],
+                [
+                  127.111159,
+                  37.394761
+                ]
+              ]
+            }
+          },
+          "transit": {
+            "routeLabel": "SAN-R1-701",
+            "externalRouteId": "sanitized-r1-route-701",
+            "routeType": "SEAT_BUS",
+            "direction": "Sanitized R1 Northbound Terminal"
+          },
+          "busIntelligence": null,
+          "provenance": [
+            {
+              "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/arrivals",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "FIXTURE::GBIS_V2/locations",
+              "origin": "PROVIDER_ESTIMATE",
+              "observedAt": "2026-08-23T00:00:00+00:00",
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 0.0,
+                "grade": "UNKNOWN"
+              },
+              "fallbackLevel": 0
+            },
+            {
+              "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+              "origin": "UNKNOWN",
+              "observedAt": null,
+              "receivedAt": "2026-08-23T00:00:00+00:00",
+              "ageSeconds": null,
+              "confidence": {
+                "score": 1.0,
+                "grade": "HIGH"
+              },
+              "fallbackLevel": 0
+            }
+          ]
+        }
+      ],
+      "reasonCodes": [
+        "LOWER_P90_ARRIVAL_TIME",
+        "LOW_TRANSFER_RISK",
+        "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET"
+      ],
+      "warningCodes": [
+        "BUS_DATA_UNAVAILABLE"
+      ],
+      "provenance": [
+        {
+          "provider": "SANITIZED_TRANSIT_FIXTURE",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": 0,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "TRANSPORT_MAPPING/0.1.0-planned",
+          "origin": "UNKNOWN",
+          "observedAt": null,
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 1.0,
+            "grade": "HIGH"
+          },
+          "fallbackLevel": 0
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/arrivals",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::GBIS_V2/locations",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
+          "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        }
+      ]
+    }
+  ],
+  "paretoRouteIds": [
+    "route_6d206a95ed947d8a"
+  ],
   "providerStatus": [
-    {"provider": "KAKAO_TRANSIT", "operation": "SEARCH", "status": "OK", "latencyMs": 1120, "cache": false, "messageCode": null},
-    {"provider": "GBIS", "operation": "ARRIVALS", "status": "PARTIAL", "latencyMs": 830, "cache": false, "messageCode": "NO_SEAT_DATA_FOR_ROUTE"}
+    {
+      "provider": "FIXTURE::GBIS_V2",
+      "operation": "arrivals",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "FIXTURE::GBIS_V2",
+      "operation": "locations",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "FIXTURE::KAKAO_DIRECTIONS",
+      "operation": "route_current",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "FIXTURE::KAKAO_DIRECTIONS",
+      "operation": "route_current",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "FIXTURE::KAKAO_DIRECTIONS",
+      "operation": "route_current",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "FIXTURE::KAKAO_DIRECTIONS",
+      "operation": "route_current",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "SANITIZED_TRANSIT_FIXTURE",
+      "operation": "search",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "SANITIZED_TRANSIT_FIXTURE",
+      "operation": "search",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "SANITIZED_TRANSIT_FIXTURE",
+      "operation": "search",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "SANITIZED_TRANSIT_FIXTURE",
+      "operation": "search",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "KAKAO_PUBLIC_TRANSIT",
+      "operation": "search_current",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "KAKAO_WALK",
+      "operation": "route",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "KAKAO_DIRECTIONS",
+      "operation": "route_current",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "KAKAO_MULTI_DESTINATION",
+      "operation": "many_destinations",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "KAKAO_MULTI_ORIGIN",
+      "operation": "many_origins",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "KAKAO_FUTURE_DIRECTIONS",
+      "operation": "route_future",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "GBIS_V2",
+      "operation": "arrivals",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "GBIS_V2",
+      "operation": "locations",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "GBIS_V2",
+      "operation": "routes",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "GBIS_V2",
+      "operation": "stations",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "KMA",
+      "operation": "weather_context",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "GITS",
+      "operation": "traffic_context",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "TMAP_TRANSIT",
+      "operation": "search",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "ODSAY",
+      "operation": "search",
+      "status": "DISABLED",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    }
   ],
-  "modelVersions": [
-    {"purpose": "BUS_ETA", "version": "eta-2026.08.2"},
-    {"purpose": "SEAT_RISK", "version": "seat-2026.08.3"}
-  ],
-  "warningCodes": ["PROVIDER_PARTIAL_FAILURE"]
+  "modelVersions": [],
+  "warningCodes": [
+    "BUS_DATA_UNAVAILABLE"
+  ]
 }

@@ -21,6 +21,7 @@ from routing_api.application import (
     RoutingCapacityExceeded,
     RoutingApiApplication,
     RoutingDeadlineExceeded,
+    UnsupportedRegionError,
     UnavailableOptimizeRouteUseCase,
     UseCaseResult,
 )
@@ -340,6 +341,17 @@ class RoutingApiTests(SimpleTestCase):
         self.assertEqual(response.json()["code"], "TRANSIT_PROVIDER_UNAVAILABLE")
         self.assertTrue(response.json()["retryable"])
 
+    def test_unsupported_region_returns_registered_nonretryable_422(self) -> None:
+        class UnsupportedUseCase:
+            def execute(inner_self, command, context):
+                raise UnsupportedRegionError("outside approved corridor")
+
+        self.app = self._application(UnsupportedUseCase())
+        response = self._post(_request_payload())
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["code"], "UNSUPPORTED_REGION")
+        self.assertFalse(response.json()["retryable"])
+
     def test_optional_incomplete_does_not_overwrite_no_feasible_route(self) -> None:
         fixture = self.fixture_use_case
 
@@ -442,7 +454,8 @@ class RoutingApiTests(SimpleTestCase):
         ready = self.client.get("/v1/health/ready", **auth)
         self.assertEqual(version.status_code, 200)
         self.assertEqual(version.json()["models"], [])
-        self.assertEqual(version.json()["contractVersion"], "1.0.0")
+        self.assertEqual(version.json()["contractVersion"], "1.1.0")
+        self.assertEqual(version.json()["contractVersion"], self.contract.contract_version)
         self.assertEqual(ready.status_code, 200)
         self.assertEqual(ready.json()["status"], "degraded")
 

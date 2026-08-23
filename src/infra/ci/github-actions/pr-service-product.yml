@@ -1,0 +1,103 @@
+name: service-product-pr
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - "src/apps/web/**"
+      - "src/services/service-api/**"
+      - "src/contracts/**"
+      - "src/generated/**"
+      - "src/infra/**"
+      - "src/tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --disable-pip-version-check pyyaml jsonschema openapi-spec-validator
+      - run: python src/scripts/validate_repository.py
+      - run: python src/scripts/verify_contract_lock.py
+      - run: python -m unittest discover -s src/tests/contracts -p "test_*.py"
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+        working-directory: src/services/service-api
+      - run: uv run python manage.py makemigrations --check --dry-run
+        working-directory: src/services/service-api
+      - run: uv run python manage.py test
+        working-directory: src/services/service-api
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/apps/web/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: src/apps/web
+      - run: npm run typecheck
+        working-directory: src/apps/web
+      - run: npm test
+        working-directory: src/apps/web
+      - run: npm run build
+        working-directory: src/apps/web
+
+  mobile-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/apps/web/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: src/apps/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: src/apps/web
+      - run: npm run test:e2e:chromium
+        working-directory: src/apps/web
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: python src/infra/scripts/validate_infra.py
+      - run: docker compose -f src/infra/docker/compose.service-product.yml config --quiet
+      - run: docker build --file src/infra/docker/service-api/Dockerfile src
+      - run: docker build --file src/infra/docker/web/Dockerfile src
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: src
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+      - uses: anchore/sbom-action@v0
+        with:
+          path: src
+          artifact-name: service-product-sbom.spdx.json

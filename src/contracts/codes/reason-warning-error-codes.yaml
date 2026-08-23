@@ -1,4 +1,4 @@
-version: 1.0.0
+version: 1.1.0
 reasonCodes:
   FASTER_THAN_PUBLIC_TRANSIT: 대중교통 기준보다 빠름
   BEST_MARGINAL_TIME_SAVING: 추가 비용 대비 절감시간이 가장 큼
@@ -28,14 +28,20 @@ warningCodes:
 errorCodes:
   INVALID_COORDINATE: {httpStatus: 400, retryable: false}
   UNSUPPORTED_TIME: {httpStatus: 400, retryable: false}
+  ARRIVE_BY_UNSUPPORTED: {httpStatus: 400, retryable: false}
   CONSTRAINT_OUT_OF_RANGE: {httpStatus: 400, retryable: false}
   AUTH_REQUIRED: {httpStatus: 401, retryable: false}
+  SESSION_EXPIRED: {httpStatus: 401, retryable: false}
   SERVICE_AUTH_REQUIRED: {httpStatus: 401, retryable: false}
   FORBIDDEN: {httpStatus: 403, retryable: false}
+  CONSENT_REQUIRED: {httpStatus: 403, retryable: false}
   SEARCH_NOT_FOUND: {httpStatus: 404, retryable: false}
+  DATA_RIGHTS_JOB_NOT_FOUND: {httpStatus: 404, retryable: false}
   NO_ROUTE_FOUND: {httpStatus: 404, retryable: false}
   IDEMPOTENCY_CONFLICT: {httpStatus: 409, retryable: false}
   CONTRACT_VERSION_CONFLICT: {httpStatus: 409, retryable: false}
+  PREFERENCE_VERSION_CONFLICT: {httpStatus: 409, retryable: false}
+  DATA_RIGHTS_JOB_CONFLICT: {httpStatus: 409, retryable: false}
   UNSUPPORTED_REGION: {httpStatus: 422, retryable: false}
   RATE_LIMITED: {httpStatus: 429, retryable: true}
   PROVIDER_BAD_RESPONSE: {httpStatus: 502, retryable: true}
@@ -52,3 +58,7 @@ enums:
   SearchStatus: [VALIDATING, SEARCHING, COMPLETE, PARTIAL, NO_FEASIBLE_ROUTE, PROVIDER_UNAVAILABLE, FAILED, EXPIRED]
   ProviderStatus: [OK, PARTIAL, TIMEOUT, RATE_LIMITED, UNAVAILABLE, BAD_RESPONSE, DISABLED]
   ModelDeploymentState: [REGISTERED, VALIDATED, SHADOW, CANARY, ACTIVE, RETIRED, REJECTED]
+  SessionSubjectType: [GUEST, USER]
+  ConsentType: [SEARCH_HISTORY, PRECISE_LOCATION, PRODUCT_ANALYTICS, ROUTING_FEEDBACK]
+  DataRightsJobType: [EXPORT, DELETE]
+  DataRightsJobStatus: [PENDING, RUNNING, COMPLETE, FAILED]
