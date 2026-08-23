@@ -24,6 +24,7 @@
     "riskAversion": 0.6,
     "walkingAversion": 0.3,
     "transferAversion": 0.4,
+    "avoidHighBusSeatRisk": false,
     "accessibility": {"avoidStairs": false}
   },
   "requestedRecommendations": ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"],

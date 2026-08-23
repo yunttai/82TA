@@ -1,0 +1,10 @@
+{
+  "jobId": "4f6e0a8f-cd31-4b12-9b2b-5b387f9be013",
+  "type": "EXPORT",
+  "status": "PENDING",
+  "requestedAt": "2026-08-23T08:00:00+09:00",
+  "completedAt": null,
+  "downloadUrl": null,
+  "downloadExpiresAt": null,
+  "failureCode": null
+}

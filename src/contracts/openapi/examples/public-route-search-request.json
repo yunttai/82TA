@@ -23,6 +23,7 @@
     "maxTaxiLegs": 2,
     "allowTaxiBridge": true,
     "avoidHighBusSeatRisk": false,
+    "allowedModes": ["WALK", "WAIT", "TRANSFER", "TAXI", "BUS", "SUBWAY", "GTX", "TRAIN"],
     "optimization": "BALANCED",
     "accessibility": {"avoidStairs": false, "wheelchair": false}
   },

@@ -16,6 +16,8 @@ Routing & Intelligence owns Routing DB.
 - saved place·favorite journey
 - route search public snapshot
 - user feedback·consent·audit
+- guest/authenticated session hash와 revoke 상태
+- data export·deletion job 상태와 내부 artifact reference
 
 ## 3. Routing DB 전용
 
@@ -66,6 +68,11 @@ Routing & Intelligence owns Routing DB.
 | raw provider payload | 최소 기간·약관 준수 |
 | model artifact·metric | 재현을 위해 장기 |
 | security audit | 정책상 필요한 기간 |
+| guest session | 최대 24시간, revoke/expiry 후 token material 제거 |
+| data export artifact | download 만료 후 즉시 또는 운영 정책상 최단 기간 |
+| data-rights job metadata | 법적·운영 증빙 기간, exact exported content 제외 |
+
+`saveToHistory=false` 검색은 결과 조회·idempotency에 필요한 짧은 TTL만 사용한다. `true`는 로그인 사용자와 현재 `SEARCH_HISTORY` 동의를 요구한다. owner 경계는 user 또는 anonymous session 중 정확히 하나여야 하며 Routing에는 어느 owner 식별자도 전달하지 않는다.
 
 ## 9. Migration
 

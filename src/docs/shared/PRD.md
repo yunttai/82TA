@@ -5,7 +5,7 @@
 | 항목 | 값 |
 |---|---|
 | 제품 | Budget Route Platform |
-| 문서 버전 | 1.0.0 |
+| 문서 버전 | 1.1.0 |
 | 상태 | Baseline / 공동 원본 |
 | 기준일 | 2026-08-23 KST |
 | 적용 작업흐름 | Service Product, Routing & Intelligence |
@@ -185,6 +185,14 @@ GBIS 좌석 데이터가 없더라도 transit·taxi 경로를 `PARTIAL`로 제�
 | FR-IAM-006 | 사용자 데이터 export | P1/GA | Service |
 | FR-IAM-007 | 위치·피드백 동의 기록 | P0/GA | Service |
 
+Service 계정·개인정보 계약은 다음을 만족한다.
+
+- guest credential은 짧은 수명의 opaque 값으로 발급하고 서버에는 hash만 저장한다.
+- `saveToHistory=true`는 로그인 사용자와 유효한 `SEARCH_HISTORY` 동의를 요구한다. guest 검색 결과는 응답·idempotency TTL 동안만 보유하고 이력 목록에 넣지 않는다.
+- preference GET은 version ETag를 반환하며, first-party update는 `If-Match`로 충돌을 검출한다. 1.0 consumer의 무조건 PUT은 migration window 동안만 허용한다.
+- saved place와 favorite journey의 update/delete는 owner 검증과 soft delete를 적용한다.
+- export와 deletion은 비동기 job이며 owner만 상태를 조회한다. export download URL은 짧은 수명이고 계정 삭제는 관련 위치·장소·검색·동의·feedback의 retention/backup 삭제 정책까지 추적한다.
+
 ### 7.7 운영
 
 | ID | 요구사항 | 우선순위 | 소유 |
@@ -210,6 +218,20 @@ GBIS 좌석 데이터가 없더라도 transit·taxi 경로를 `PARTIAL`로 제�
 | BR-008 | explain text는 reason/warning code와 수치에서 만들어야 한다. |
 | BR-009 | Service Backend는 Routing 결과의 시간·비용·순위를 재계산하지 않는다. |
 | BR-010 | Routing Server는 user ID·email·saved place label을 받지 않는다. |
+
+### 8.1 Public Service → Private Routing 변환 정책
+
+| Public 입력/출력 | Service 정책 |
+|---|---|
+| `departure.type=DEPART_AT` | `departure.time`을 Private `departureTime`으로 그대로 전달한다. timezone-aware 값만 허용한다. |
+| `departure.type=ARRIVE_BY` | Private 1.x가 해당 검색 유형을 표현하지 못하므로 `400 ARRIVE_BY_UNSUPPORTED`를 반환한다. 추정 출발시각으로 바꾸지 않는다. |
+| `arrivalDeadline` | 값이 있으면 그대로 전달하며 Service가 출발시각을 역산하지 않는다. |
+| `preferences.allowedModes` | 명시값을 Private `constraints.allowedModes`로 그대로 전달한다. 생략 시 canonical mode 전체를 사용하며 Service는 후보를 생성·제거하지 않는다. |
+| `avoidHighBusSeatRisk` | Private `preference.avoidHighBusSeatRisk`로 그대로 전달한다. Bus Intelligence 지원·순위 영향은 Routing 책임이다. |
+| `saveToHistory` | Service-local 저장·동의 정책에만 사용하고 Routing으로 전달하지 않는다. |
+| Private recommendation IDs | 동일 `routeId`를 가진 Private route를 public card로 projection한다. ID가 없거나 일치하지 않으면 `null`과 explicit warning/status를 유지한다. |
+| `baseline` | Private `publicTransitOnly` recommendation ID가 가리키는 route를 그대로 사용한다. Service가 baseline을 선택하거나 재계산하지 않는다. |
+| `support` | Routing capabilities의 동일 필드를 축약 projection한다. `busIntelligenceCoverage`가 없으면 `UNKNOWN`; Service가 상향 추정하지 않는다. |
 
 ## 9. Canonical 상태
 

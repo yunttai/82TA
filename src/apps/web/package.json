@@ -1,0 +1,39 @@
+{
+  "name": "@82ta/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "preview": "vite preview",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "pretest:e2e": "npm run build",
+    "test:e2e": "playwright test",
+    "pretest:e2e:chromium": "npm run build",
+    "test:e2e:chromium": "playwright test --project=mobile-chromium",
+    "pretest:e2e:webkit": "npm run build",
+    "test:e2e:webkit": "playwright test --project=mobile-webkit"
+  },
+  "dependencies": {
+    "@82ta/service-client": "file:../../generated/service-client-ts",
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "openapi-fetch": "0.17.0",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "latest",
+    "@playwright/test": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}

@@ -1,0 +1,30 @@
+service_image = "123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/82ta-staging/service-api@sha256:REPLACE"
+service_desired_count = 0 # bootstrap; set to 2 only after secrets + migration gate
+consent_document_version = "REPLACE_WITH_PUBLISHED_POLICY_VERSION"
+
+# Stub is the safe initial stage when the separately deployed private Routing
+# service is unavailable. HTTP mode requires both fields and a populated token.
+routing_gateway_mode      = "stub"
+routing_api_base_url      = ""
+routing_api_allowed_hosts = []
+
+# Django/Redis per-minute defense. WAF remains the independent five-minute
+# edge/IP ceiling; tune both from measured staging traffic and cost evidence.
+service_rate_limit_per_minute               = 60
+service_guest_session_rate_limit_per_minute = 10
+service_place_rate_limit_per_minute          = 60
+redis_key_prefix                            = "82ta:service:1.1"
+redis_socket_timeout_seconds                = 0.25
+rate_limit_cache_ttl_seconds                = 120
+idempotency_cache_ttl_seconds               = 600
+idempotency_lease_seconds                   = 15
+
+# Add only after DNS validation and certificate issuance.
+domain_names               = []
+cloudfront_certificate_arn = ""
+alb_certificate_arn        = ""
+alb_origin_domain_name     = "origin-api.staging.example.com"
+route53_zone_id            = "REPLACE_WITH_PUBLIC_ZONE_ID"
+github_repository          = "organization/repository"
+github_oidc_provider_arn   = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+alarm_sns_topic_arn        = "arn:aws:sns:ap-northeast-2:123456789012:REPLACE_WITH_ENCRYPTED_ONCALL_TOPIC"

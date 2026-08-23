@@ -1,4 +1,4 @@
-schemaVersion: '1.0'
+schemaVersion: '1.1'
 project: budget-route-platform
 sourceOfTruth: src/docs/shared/PRD.md
 requirements:
@@ -73,6 +73,61 @@ requirements:
       - src/services/service-api
     tests: [DATA-DELETE-001, SEC-IDOR-DELETE-001]
     releaseGate: deletion-runbook-and-evidence
+  FR-IAM-001:
+    title: 비회원 즉시 검색과 guest ownership
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1guest-sessions
+      - src/contracts/database/service-db.dbml
+    implementationPaths:
+      - src/services/service-api
+      - src/apps/web
+    tests: [CT-SVC-GUEST-001, SEC-GUEST-TOKEN-001, SEC-IDOR-SEARCH-001]
+    releaseGate: guest-token-expiry-ownership-and-redaction
+  FR-IAM-003:
+    title: 검색 기록·저장 장소·즐겨찾기
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml
+      - src/contracts/database/service-db.dbml
+    implementationPaths:
+      - src/services/service-api
+      - src/apps/web
+    tests: [CT-SVC-HISTORY-001, CT-SVC-SAVED-PLACE-001, CT-SVC-FAVORITE-001, SEC-IDOR-RESOURCE-001]
+    releaseGate: owner-scoped-history-and-resource-crud
+  FR-IAM-004:
+    title: 이동 선호 설정과 optimistic concurrency
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1me~1preferences
+      - src/contracts/database/service-db.dbml
+    implementationPaths:
+      - src/services/service-api
+      - src/apps/web
+    tests: [CT-SVC-PREFERENCE-001, API-PREFERENCE-CONFLICT-001]
+    releaseGate: preference-etag-conflict-detection
+  FR-IAM-006:
+    title: 사용자 데이터 export
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1me~1data-exports
+      - src/contracts/database/service-db.dbml
+    implementationPaths:
+      - src/services/service-api
+      - src/apps/web
+    tests: [DATA-EXPORT-001, SEC-IDOR-EXPORT-001, SEC-EXPORT-URL-001]
+    releaseGate: export-owner-expiry-and-audit
+  FR-IAM-007:
+    title: 위치·피드백 동의 기록
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1me~1consents
+      - src/contracts/database/service-db.dbml
+    implementationPaths:
+      - src/services/service-api
+      - src/apps/web
+    tests: [DATA-CONSENT-001, API-HISTORY-CONSENT-001]
+    releaseGate: versioned-consent-record-and-withdrawal
   FR-OPS-004:
     title: Public·Routing health·version endpoint
     owner: joint

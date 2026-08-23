@@ -1,0 +1,46 @@
+name: 82ta-service-product
+
+services:
+  service-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/service-api/Dockerfile
+    environment:
+      SERVICE_ENVIRONMENT: development
+      SERVICE_DEBUG: "false"
+      SERVICE_SECRET_KEY: local-compose-development-only
+      SERVICE_ALLOWED_HOSTS: service-api,localhost,127.0.0.1
+      SERVICE_ROUTING_GATEWAY: stub
+      DATABASE_URL: sqlite:////tmp/service-api.sqlite3
+      KAKAO_LOCAL_REST_KEY: ${KAKAO_LOCAL_REST_KEY:-}
+    command:
+      - /bin/sh
+      - -ec
+      - python manage.py migrate --noinput && exec python -m gunicorn service_wsgi:application --bind=0.0.0.0:8000 --workers=2 --threads=4 --timeout=10 --access-logfile /dev/null --error-logfile=-
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/infra/healthz', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web/Dockerfile
+      args:
+        VITE_KAKAO_MAP_APP_KEY: ${VITE_KAKAO_MAP_APP_KEY:-}
+        VITE_PRIVACY_DOCUMENT_VERSION: local-development
+    environment:
+      SERVICE_UPSTREAM: service-api:8000
+      CONTENT_SECURITY_POLICY: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self'; manifest-src 'self'"
+    depends_on:
+      service-api:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0755

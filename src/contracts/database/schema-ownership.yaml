@@ -1,4 +1,4 @@
-version: 1.0.0
+version: 1.1.0
 schemas:
   service:
     owner: service-product
@@ -12,10 +12,12 @@ schemas:
       - saved_place
       - favorite_journey
       - anonymous_session
+      - authenticated_session
       - route_search
       - route_search_result
       - route_feedback
       - consent_record
+      - data_rights_job
       - account_audit_event
   routing:
     owner: routing-intelligence
