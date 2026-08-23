@@ -233,46 +233,6 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
               <small>출발 시각을 역산하지 않고 Service를 통해 Routing에 그대로 전달합니다.</small>
             </label>
             <label className="field">
-              <span>출발 경도</span>
-              <input
-                name="originLongitude"
-                inputMode="decimal"
-                value={draft.originLongitude}
-                onChange={(event) => setDraft({ ...draft, originLongitude: event.currentTarget.value })}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>출발 위도</span>
-              <input
-                name="originLatitude"
-                inputMode="decimal"
-                value={draft.originLatitude}
-                onChange={(event) => setDraft({ ...draft, originLatitude: event.currentTarget.value })}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>도착 경도</span>
-              <input
-                name="destinationLongitude"
-                inputMode="decimal"
-                value={draft.destinationLongitude}
-                onChange={(event) => setDraft({ ...draft, destinationLongitude: event.currentTarget.value })}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>도착 위도</span>
-              <input
-                name="destinationLatitude"
-                inputMode="decimal"
-                value={draft.destinationLatitude}
-                onChange={(event) => setDraft({ ...draft, destinationLatitude: event.currentTarget.value })}
-                required
-              />
-            </label>
-            <label className="field">
               <span>최대 도보</span>
               <span className="input-suffix">
                 <input

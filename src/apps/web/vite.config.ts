@@ -2,6 +2,8 @@ import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
+
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "VITE_");
   const privacyDocumentVersion = env.VITE_PRIVACY_DOCUMENT_VERSION;
@@ -16,6 +18,10 @@ export default defineConfig(({ mode }) => {
       preserveSymlinks: true,
     },
     server: {
+      host: "0.0.0.0",
+      allowedHosts: [
+        "manatee-purposely-jingle.ngrok-free.dev",
+      ],
       proxy: {
         "/api": env.VITE_SERVICE_API_PROXY || "http://127.0.0.1:8000",
       },
@@ -27,3 +33,5 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+
+
