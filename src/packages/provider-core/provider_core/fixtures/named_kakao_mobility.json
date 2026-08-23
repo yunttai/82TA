@@ -20,7 +20,7 @@
                 "origin": {"name": "", "x": 127.1, "y": 37.39},
                 "destination": {"name": "", "x": 127.12, "y": 37.41},
                 "waypoints": [],
-                "priority": "RECOMMEND",
+                "priority": "TIME",
                 "bound": {"min_x": 127.1, "min_y": 37.39, "max_x": 127.12, "max_y": 37.41},
                 "fare": {"taxi": 7500, "toll": 300},
                 "distance": 5100,

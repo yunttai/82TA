@@ -45,7 +45,7 @@ KAKAO_OPERATIONS = (
     (
         "KAKAO_DIRECTIONS",
         "route_current",
-        "kakao-mobility.directions.v1.2026-08-24",
+        "kakao-directions.v1.current-route.20260824",
     ),
 )
 
@@ -358,12 +358,13 @@ class ProductionProviderHttpE2ETests(unittest.TestCase):
         response = self._post()
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
-        self.assertEqual(body["status"], "PARTIAL")
-        self.assertIn("BUS_MAPPING_LOW_CONFIDENCE", body["warnings"])
+        self.assertEqual(body["status"], "COMPLETE")
+        self.assertEqual(body["warnings"], [])
 
         routes = _public_routes(body)
         self.assertTrue(routes)
         self.assertTrue(any(route["taxiCost"]["upper"] > 0 for route in routes))
+        self.assertIsNotNone(body["recommendations"]["publicTransitOnly"])
         budget = self._payload()["taxiBudget"]["maxAmount"]
         for route in routes:
             self.assertGreaterEqual(
@@ -413,14 +414,14 @@ class ProductionProviderHttpE2ETests(unittest.TestCase):
         self.assertTrue(private["routes"])
         self.assertIsNone(private["computation"]["mappingVersion"])
         self.assertEqual(private["modelVersions"], [])
-        bus_legs = [
+        transit_legs = [
             leg
             for route in private["routes"]
             for leg in route["legs"]
-            if leg["mode"] == "BUS"
+            if leg["mode"] == "SUBWAY"
         ]
-        self.assertTrue(bus_legs)
-        for leg in bus_legs:
+        self.assertTrue(transit_legs)
+        for leg in transit_legs:
             self.assertIsNone(leg["transit"]["externalRouteId"])
             self.assertIsNone(leg["busIntelligence"])
         self.assertTrue(

@@ -209,6 +209,13 @@ class KakaoMobilityDirectionsTests(unittest.TestCase):
                 malformed_geometry
             )
 
+        mismatched_priority = fixture_body()
+        mismatched_priority["routes"][0]["summary"]["priority"] = "RECOMMEND"
+        with self.assertRaises(SchemaValidationError):
+            KakaoMobilityDirectionsAdapter.normalize_current_response(
+                mismatched_priority
+            )
+
     def test_live_malformed_and_http_auth_error_return_sanitized_statuses(self) -> None:
         malformed = fixture_body()
         del malformed["routes"][0]["summary"]["fare"]

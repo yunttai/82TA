@@ -6,6 +6,7 @@ import type {
   PublicProblem,
   PublicRouteSearchResponse,
   RouteCandidate,
+  RouteLeg,
 } from "../../shared/api/publicService";
 import { submitRouteFeedback } from "../../shared/api/publicService";
 import { currentGuestToken } from "../../shared/session/sessionMemory";
@@ -168,6 +169,31 @@ function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return remainder === 0 ? `${minutes}분` : `${minutes}분 ${remainder}초`;
+}
+
+function formatLegMinutes(seconds: number): string {
+  if (seconds <= 0) return "0분";
+  return `${Math.ceil(seconds / 60)}분`;
+}
+
+function transitText(leg: RouteLeg, key: "routeLabel" | "direction"): string | null {
+  const transit: unknown = leg.transit;
+  if (transit === null || typeof transit !== "object" || Array.isArray(transit)) return null;
+  const value = (transit as Record<string, unknown>)[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function routeLegLabel(leg: RouteLeg): string {
+  const routeLabel = transitText(leg, "routeLabel");
+  if (leg.mode === "TAXI") return "택시 (호출+주행)";
+  if (routeLabel === null) return modeMessages[leg.mode];
+  if (leg.mode === "BUS") {
+    return `버스 ${routeLabel.endsWith("번") ? routeLabel : `${routeLabel}번`}`;
+  }
+  if (leg.mode === "SUBWAY") return `지하철 ${routeLabel}`;
+  if (leg.mode === "GTX") return `GTX ${routeLabel}`;
+  if (leg.mode === "TRAIN") return `기차 ${routeLabel}`;
+  return modeMessages[leg.mode];
 }
 
 function formatMoney(amount: number): string {
@@ -360,6 +386,18 @@ function RouteCard({
         <span className="confidence-chip">신뢰도 {confidenceMessages[route.totalDuration.confidence.grade]}</span>
       </div>
       <p className="route-pattern">{patternMessages[route.pattern]}</p>
+      <ol className="route-leg-summary" aria-label="이동 구간 요약">
+        {route.legs.map((leg) => (
+          <li data-mode={leg.mode} title={`${leg.from.name} → ${leg.to.name}`} key={leg.legId}>
+            <span className="route-leg-summary-label">{routeLegLabel(leg)}</span>
+            <strong>{formatLegMinutes(leg.duration.p50Seconds)}</strong>
+            <span className="sr-only">{leg.from.name}에서 {leg.to.name}까지</span>
+          </li>
+        ))}
+      </ol>
+      {route.taxiLegCount > 0 && (
+        <p className="taxi-duration-note">택시 시간은 호출 대기와 해당 시각의 도로 주행을 합친 값입니다.</p>
+      )}
       <dl className="metric-grid metric-grid-primary">
         <div><dt>안정 도착 P90</dt><dd>{formatDuration(route.totalDuration.p90Seconds)}</dd></div>
         <div><dt>택시비 상한</dt><dd>{formatMoney(route.taxiCost.upper)}</dd></div>
@@ -390,7 +428,7 @@ function RouteCard({
         <ol>
           {route.legs.map((leg) => (
             <li className={leg.legId === selectedLegId ? "selected-leg" : undefined} aria-current={leg.legId === selectedLegId ? "step" : undefined} key={leg.legId}>
-              <strong>{modeMessages[leg.mode]}</strong>
+              <strong>{routeLegLabel(leg)}</strong>
               <span>{leg.from.name} → {leg.to.name}</span>
               <span>P50 {formatDuration(leg.duration.p50Seconds)} · P90 {formatDuration(leg.duration.p90Seconds)} · {leg.distanceMeters}m</span>
               <span>요금 {formatMoney(leg.fare.expected)}~{formatMoney(leg.fare.upper)} · {originLabel(leg.duration.origin)}</span>

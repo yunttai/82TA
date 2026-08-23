@@ -820,6 +820,76 @@ h2 {
   font-weight: 750;
 }
 
+.route-leg-summary {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  padding: 0 0 0.2rem;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.route-leg-summary li {
+  position: relative;
+  display: grid;
+  flex: 1 0 max-content;
+  min-width: 5.25rem;
+  gap: 0.12rem;
+  padding: 0.62rem 0.65rem 0.52rem;
+  overflow: hidden;
+  border: 1px solid #e2e9e5;
+  border-radius: 0.75rem;
+  color: var(--muted);
+  background: #f7f9f7;
+  font-size: 0.68rem;
+}
+
+.route-leg-summary li::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 0.25rem;
+  background: #76847e;
+  content: "";
+}
+
+.route-leg-summary li[data-mode="BUS"]::before,
+.route-leg-summary li[data-mode="SUBWAY"]::before,
+.route-leg-summary li[data-mode="GTX"]::before,
+.route-leg-summary li[data-mode="TRAIN"]::before {
+  background: var(--forest);
+}
+
+.route-leg-summary li[data-mode="TAXI"]::before {
+  background: #d6533b;
+}
+
+.route-leg-summary li[data-mode="WALK"]::before,
+.route-leg-summary li[data-mode="TRANSFER"]::before {
+  background: #879892;
+}
+
+.route-leg-summary-label {
+  padding-top: 0.12rem;
+  color: var(--ink);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.route-leg-summary strong {
+  color: var(--forest);
+  font-size: 0.82rem;
+}
+
+.taxi-duration-note {
+  margin: -0.25rem 0 0.75rem;
+  color: #765142;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

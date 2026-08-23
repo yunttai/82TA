@@ -92,6 +92,23 @@ class TimeReversalEvaluator:
         return cost(1_000 if elapsed < 100 else 100)
 
 
+class BusCatchEvaluator:
+    """Nine-minute bus: a ten-minute walk misses it, a six-minute Taxi catches it."""
+
+    def evaluate(self, leg: LegSpec, entry_at: datetime) -> LegCost:
+        if leg.evaluator_key == "catch-walk":
+            return cost(600)
+        if leg.evaluator_key == "catch-taxi":
+            # Dispatch wait and road travel are already included in this P50.
+            return cost(360, 480, upper=5_000)
+
+        elapsed = int((entry_at - DEPARTURE).total_seconds())
+        first_bus_at = 9 * 60
+        next_bus_at = 30 * 60
+        board_at = first_bus_at if elapsed < first_bus_at else next_bus_at
+        return cost(20 * 60, 22 * 60, wait=board_at - elapsed)
+
+
 def test_later_discovered_label_wins_after_downstream_time_band_reversal() -> None:
     graph = CanonicalRoutingGraph(
         (
@@ -111,6 +128,40 @@ def test_later_discovered_label_wins_after_downstream_time_band_reversal() -> No
     assert by_first_leg["early-access"].total_duration.p50_seconds == 1_050
     assert by_first_leg["late-access"].total_duration.p50_seconds == 300
     assert result.evaluated_candidates[0] == by_first_leg["late-access"]
+
+
+def test_taxi_is_selected_when_ten_minute_walk_misses_bus_arriving_in_nine() -> None:
+    graph = CanonicalRoutingGraph(
+        (
+            edge("catch-walk", "WALK", "origin", "stop"),
+            edge("catch-taxi", "TAXI", "origin", "stop"),
+            edge("catch-bus", "BUS", "stop", "destination"),
+        )
+    )
+
+    outcome = RouteOptimizer(
+        BusCatchEvaluator(), epsilon=ZERO_EPSILON
+    ).optimize_graph(
+        graph,
+        "origin",
+        "destination",
+        DEPARTURE,
+        constraints(),
+    )
+    routes = {
+        route.legs[0].leg_id: route for route in outcome.optimization.routes
+    }
+
+    # The walk reaches at +10m and must wait for the +30m service. The Taxi
+    # reaches at +6m, waits three minutes, and boards the +9m service.
+    assert routes["catch-walk"].total_duration.p50_seconds == 50 * 60
+    assert routes["catch-taxi"].total_duration.p50_seconds == 29 * 60
+    assert outcome.optimization.recommendations.fastest == routes["catch-taxi"].route_id
+    assert outcome.optimization.recommendations.efficient == routes["catch-taxi"].route_id
+    assert (
+        outcome.optimization.recommendations.public_transit_only
+        == routes["catch-walk"].route_id
+    )
 
 
 class ScheduledEvaluator:

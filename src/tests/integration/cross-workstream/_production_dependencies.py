@@ -24,8 +24,8 @@ from provider_core.capabilities import (
     ProductionState,
 )
 from provider_core.http import HttpRequest, HttpResponse, SensitiveValue
+from provider_core.kakao_mobility import KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION
 from provider_core.kakao_raw import (
-    KAKAO_DIRECTIONS_SCHEMA_VERSION,
     KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
     KAKAO_WALK_SCHEMA_VERSION,
 )
@@ -55,7 +55,11 @@ _OPERATIONS = (
         KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
     ),
     ("KAKAO_WALK", "route", KAKAO_WALK_SCHEMA_VERSION),
-    ("KAKAO_DIRECTIONS", "route_current", KAKAO_DIRECTIONS_SCHEMA_VERSION),
+    (
+        "KAKAO_DIRECTIONS",
+        "route_current",
+        KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION,
+    ),
 )
 _FAULT_ORIGIN_LON = 127.187459
 _RECORD_LOCK = threading.Lock()
@@ -149,15 +153,15 @@ def _transit_body(
         "status": "OK",
         "properties": {
             "total": 1,
-            "bus": 1,
-            "subway": 0,
+            "bus": 0,
+            "subway": 1,
             "busAndSubway": 0,
             "landingURL": "https://example.invalid/sanitized-transit",
         },
         "routes": [
             {
                 "properties": {
-                    "type": "BUS",
+                    "type": "SUBWAY",
                     "totalDistance": 28_400,
                     "totalTime": 3_300,
                     "transfers": 0,
@@ -166,8 +170,8 @@ def _transit_body(
                 "steps": [
                     {
                         "properties": {
-                            "guidance": "sanitized vendor-raw bus leg",
-                            "type": "BUS",
+                            "guidance": "sanitized vendor-raw subway leg",
+                            "type": "SUBWAY",
                             "distance": 28_400,
                             "time": 3_300,
                             "stops": [
@@ -175,7 +179,7 @@ def _transit_body(
                                 {"name": "Sanitized North Destination"},
                             ],
                             "vehicles": [
-                                {"name": "SAN-701", "type": "SEAT_BUS"}
+                                {"name": "SAN-SUBWAY", "type": "SUBWAY"}
                             ],
                         },
                         "path": {"points": [list(origin), list(destination)]},
@@ -239,7 +243,13 @@ def _directions_body(
                         "y": destination[1],
                     },
                     "waypoints": [],
-                    "priority": "RECOMMEND",
+                    "priority": "TIME",
+                    "bound": {
+                        "min_x": min(origin[0], destination[0]),
+                        "min_y": min(origin[1], destination[1]),
+                        "max_x": max(origin[0], destination[0]),
+                        "max_y": max(origin[1], destination[1]),
+                    },
                     "fare": {"taxi": 7_000, "toll": 0},
                     "distance": 28_400,
                     "duration": 1_800,
@@ -248,6 +258,12 @@ def _directions_body(
                     {
                         "distance": 28_400,
                         "duration": 1_800,
+                        "bound": {
+                            "min_x": min(origin[0], destination[0]),
+                            "min_y": min(origin[1], destination[1]),
+                            "max_x": max(origin[0], destination[0]),
+                            "max_y": max(origin[1], destination[1]),
+                        },
                         "roads": [
                             {
                                 "name": "sanitized road",

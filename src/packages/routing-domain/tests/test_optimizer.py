@@ -164,6 +164,75 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(result.recommendations.efficient, selected.route_id)
         self.assertIn("NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET", selected.reason_codes)
 
+    def test_walk_weight_avoids_low_value_taxi_but_keeps_bus_catching_taxi(self) -> None:
+        short_walk = candidate(
+            "short-walk",
+            "TRANSIT_ONLY",
+            ("WALK", "BUS"),
+        )
+        marginal_taxi = candidate(
+            "marginal-taxi",
+            "TAXI_TRANSIT",
+            ("TAXI", "BUS"),
+            5_000,
+        )
+        marginal = RouteOptimizer(
+            StaticLegEvaluator(
+                {
+                    "short-walk-0": leg_cost(600, 600),
+                    "short-walk-1": leg_cost(1_200, 1_300),
+                    "marginal-taxi-0": leg_cost(540, 600, 5_000),
+                    "marginal-taxi-1": leg_cost(1_200, 1_300),
+                }
+            ),
+            epsilon=EpsilonPolicy(0, 0, 0, 0, 0.0),
+        ).optimize((marginal_taxi, short_walk), DEPARTURE, constraints())
+        marginal_by_key = {item.candidate_key: item for item in marginal.routes}
+
+        # Literal FASTEST stays an actual-arrival argmin. EFFICIENT treats a
+        # one-minute saving as too small to replace a comfortable walk with a
+        # Taxi call.
+        self.assertEqual(
+            marginal.recommendations.fastest,
+            marginal_by_key["marginal-taxi"].route_id,
+        )
+        self.assertEqual(
+            marginal.recommendations.efficient,
+            marginal_by_key["short-walk"].route_id,
+        )
+
+        missed_bus_walk = candidate(
+            "missed-bus-walk",
+            "TRANSIT_ONLY",
+            ("WALK", "BUS"),
+        )
+        catching_taxi = candidate(
+            "catching-taxi",
+            "TAXI_TRANSIT",
+            ("TAXI", "BUS"),
+            5_000,
+        )
+        catches_bus = RouteOptimizer(
+            StaticLegEvaluator(
+                {
+                    # The walking candidate reaches the stop after the current
+                    # vehicle and therefore includes the next-service wait.
+                    "missed-bus-walk-0": leg_cost(600, 650),
+                    "missed-bus-walk-1": leg_cost(2_100, 2_400),
+                    # Taxi reaches the same stop in time for the current vehicle.
+                    "catching-taxi-0": leg_cost(360, 480, 5_000),
+                    "catching-taxi-1": leg_cost(1_380, 1_600),
+                }
+            ),
+            epsilon=EpsilonPolicy(0, 0, 0, 0, 0.0),
+        ).optimize((missed_bus_walk, catching_taxi), DEPARTURE, constraints())
+        catching_by_key = {item.candidate_key: item for item in catches_bus.routes}
+
+        self.assertEqual(
+            catches_bus.recommendations.efficient,
+            catching_by_key["catching-taxi"].route_id,
+        )
+
     def test_exactly_dominated_candidate_is_removed_with_nonzero_epsilon(self) -> None:
         better = candidate("better", "TRANSIT_ONLY", ("BUS",))
         worse = candidate("worse", "TRANSIT_ONLY", ("BUS",))

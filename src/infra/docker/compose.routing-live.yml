@@ -41,6 +41,10 @@ services:
       - routing-private
 
   service-api:
+    environment:
+      # compose.service-product.yml defaults to the isolated stub. The live
+      # overlay must restore the real Service -> private Routing HTTP boundary.
+      SERVICE_ROUTING_GATEWAY: http
     networks:
       - routing-private
       - service-front
