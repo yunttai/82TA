@@ -53,7 +53,20 @@ class NamedProviderSuiteTests(unittest.TestCase):
         self.assertIsNone(lookup[("GITS", "traffic_context")])
         self.assertIsNone(lookup[("GBIS_V2", "locations")])
         self.assertIsNone(lookup[("GBIS_V2", "stations")])
-        self.assertTrue(all(not spec.response_schema_verified for spec in ENDPOINT_SPECS))
+        verified = {
+            (spec.provider, spec.operation): spec.response_schema_version
+            for spec in ENDPOINT_SPECS
+            if spec.response_schema_verified
+        }
+        self.assertEqual(
+            verified,
+            {
+                (
+                    "KAKAO_DIRECTIONS",
+                    "route_current",
+                ): "kakao-directions.v1.current-route.20260824"
+            },
+        )
 
     def test_all_named_operations_are_disabled_by_default_and_burn_zero_quota(self) -> None:
         suite = ProviderAdapterSuite(

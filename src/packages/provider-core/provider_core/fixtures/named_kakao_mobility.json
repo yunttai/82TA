@@ -1,9 +1,165 @@
 {
-  "fixtureVersion":"1.0","provider":"KAKAO_MOBILITY","operations":{"*":{
-    "success":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":"2026-08-24T08:10:00+09:00","schemaVersion":"kakao-mobility.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[{"id":"sanitized-kakao-driving-route","origin":{"lon":127.10,"lat":37.39},"destination":{"lon":127.12,"lat":37.41},"durationSeconds":720,"p90Seconds":960,"distanceMeters":5100,"fareKrw":7800,"routeId":null,"routeLabel":null,"direction":null,"geometry":[{"lon":127.10,"lat":37.39},{"lon":127.11,"lat":37.40},{"lon":127.12,"lat":37.41}]}]}},
-    "empty":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":"2026-08-24T08:10:00+09:00","schemaVersion":"kakao-mobility.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"routes":[]}},
-    "error":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":null,"schemaVersion":"kakao-mobility.fixture.v1","httpStatus":503,"contentType":"application/json","body":{"error":"sanitized unavailable"}},
-    "rate_limited":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":null,"schemaVersion":"kakao-mobility.fixture.v1","httpStatus":429,"contentType":"application/json","body":{"error":"sanitized rate limit"}},
-    "schema_drift":{"fetchedAt":"2026-08-24T08:10:01+09:00","receivedAt":"2026-08-24T08:10:01+09:00","observedAt":"2026-08-24T08:10:00+09:00","schemaVersion":"kakao-mobility.drift","httpStatus":200,"contentType":"application/json","body":{"routes":{"unexpected":true}}}
-  }}
+  "fixtureVersion": "1.0",
+  "provider": "KAKAO_MOBILITY",
+  "operations": {
+    "route_current": {
+      "success": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": null,
+        "schemaVersion": "kakao-directions.v1.current-route.20260824",
+        "httpStatus": 200,
+        "contentType": "application/json",
+        "body": {
+          "trans_id": "sanitized-kakao-current-001",
+          "routes": [
+            {
+              "result_code": 0,
+              "result_msg": "sanitized success",
+              "summary": {
+                "origin": {"name": "", "x": 127.1, "y": 37.39},
+                "destination": {"name": "", "x": 127.12, "y": 37.41},
+                "waypoints": [],
+                "priority": "RECOMMEND",
+                "bound": {"min_x": 127.1, "min_y": 37.39, "max_x": 127.12, "max_y": 37.41},
+                "fare": {"taxi": 7500, "toll": 300},
+                "distance": 5100,
+                "duration": 720
+              },
+              "sections": [
+                {
+                  "distance": 5100,
+                  "duration": 720,
+                  "bound": {"min_x": 127.1, "min_y": 37.39, "max_x": 127.12, "max_y": 37.41},
+                  "roads": [
+                    {
+                      "name": "sanitized road one",
+                      "distance": 2400,
+                      "duration": 300,
+                      "traffic_speed": 28.8,
+                      "traffic_state": 4,
+                      "vertexes": [127.1, 37.39, 127.11, 37.4]
+                    },
+                    {
+                      "name": "sanitized road two",
+                      "distance": 2700,
+                      "duration": 420,
+                      "traffic_speed": 23.1,
+                      "traffic_state": 3,
+                      "vertexes": [127.11, 37.4, 127.12, 37.41]
+                    }
+                  ],
+                  "guides": [
+                    {
+                      "name": "sanitized origin guide",
+                      "x": 127.1,
+                      "y": 37.39,
+                      "distance": 0,
+                      "duration": 0,
+                      "type": 100,
+                      "guidance": "sanitized departure",
+                      "road_index": 0
+                    },
+                    {
+                      "name": "sanitized destination guide",
+                      "x": 127.12,
+                      "y": 37.41,
+                      "distance": 5100,
+                      "duration": 720,
+                      "type": 101,
+                      "guidance": "sanitized arrival",
+                      "road_index": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "empty": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": null,
+        "schemaVersion": "kakao-directions.v1.current-route.20260824",
+        "httpStatus": 200,
+        "contentType": "application/json",
+        "body": {"trans_id": "sanitized-kakao-empty-001", "routes": []}
+      },
+      "error": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": null,
+        "schemaVersion": "kakao-directions.v1.current-route.20260824",
+        "httpStatus": 503,
+        "contentType": "application/json",
+        "body": {"error": "sanitized unavailable"}
+      },
+      "rate_limited": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": null,
+        "schemaVersion": "kakao-directions.v1.current-route.20260824",
+        "httpStatus": 429,
+        "contentType": "application/json",
+        "body": {"error": "sanitized rate limit"}
+      },
+      "schema_drift": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": null,
+        "schemaVersion": "kakao-directions.v1.current-route.drift",
+        "httpStatus": 200,
+        "contentType": "application/json",
+        "body": {"trans_id": "sanitized-kakao-drift-001", "routes": {}}
+      }
+    },
+    "*": {
+      "success": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": "2026-08-24T08:10:00+09:00",
+        "schemaVersion": "kakao-mobility.fixture.v1",
+        "httpStatus": 200,
+        "contentType": "application/json",
+        "body": {"routes": [{"id": "sanitized-kakao-driving-route", "origin": {"lon": 127.1, "lat": 37.39}, "destination": {"lon": 127.12, "lat": 37.41}, "durationSeconds": 720, "p90Seconds": 960, "distanceMeters": 5100, "fareKrw": 7800, "routeId": null, "routeLabel": null, "direction": null, "geometry": [{"lon": 127.1, "lat": 37.39}, {"lon": 127.11, "lat": 37.4}, {"lon": 127.12, "lat": 37.41}]}]}
+      },
+      "empty": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": "2026-08-24T08:10:00+09:00",
+        "schemaVersion": "kakao-mobility.fixture.v1",
+        "httpStatus": 200,
+        "contentType": "application/json",
+        "body": {"routes": []}
+      },
+      "error": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": null,
+        "schemaVersion": "kakao-mobility.fixture.v1",
+        "httpStatus": 503,
+        "contentType": "application/json",
+        "body": {"error": "sanitized unavailable"}
+      },
+      "rate_limited": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": null,
+        "schemaVersion": "kakao-mobility.fixture.v1",
+        "httpStatus": 429,
+        "contentType": "application/json",
+        "body": {"error": "sanitized rate limit"}
+      },
+      "schema_drift": {
+        "fetchedAt": "2026-08-24T08:10:01+09:00",
+        "receivedAt": "2026-08-24T08:10:01+09:00",
+        "observedAt": "2026-08-24T08:10:00+09:00",
+        "schemaVersion": "kakao-mobility.drift",
+        "httpStatus": 200,
+        "contentType": "application/json",
+        "body": {"routes": {"unexpected": true}}
+      }
+    }
+  }
 }

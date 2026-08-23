@@ -32,6 +32,10 @@ from .context_queries import (
 )
 from .envelope import Freshness, ProviderEnvelope, ProviderStatus, QualityFlag, classify_freshness
 from .http import AuthInjection, BoundedHttpTransport, HttpRequest, SensitiveValue
+from .kakao_mobility import (
+    KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION,
+    normalize_current_directions,
+)
 from .requests import TransitSearchRequest
 from .resilience import (
     CircuitBreaker, CircuitOpenError, Deadline, DeadlineExceeded,
@@ -79,7 +83,17 @@ class EndpointSpec:
 ENDPOINT_SPECS: tuple[EndpointSpec, ...] = (
     EndpointSpec("KAKAO_PUBLIC_TRANSIT", "search_current", "GET", "https://dapi.kakao.com/v2/routing/publictraffic", 1800, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
     EndpointSpec("KAKAO_WALK", "route", "GET", "https://dapi.kakao.com/v2/routing/walk", 900, 512_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
-    EndpointSpec("KAKAO_DIRECTIONS", "route_current", "GET", "https://apis-navi.kakaomobility.com/v1/directions", 1000, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
+    EndpointSpec(
+        "KAKAO_DIRECTIONS",
+        "route_current",
+        "GET",
+        "https://apis-navi.kakaomobility.com/v1/directions",
+        1000,
+        1_000_000,
+        auth=AuthInjection("header", "Authorization", "KakaoAK "),
+        response_schema_verified=True,
+        response_schema_version=KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION,
+    ),
     EndpointSpec("KAKAO_MULTI_DESTINATION", "many_destinations", "POST", "https://apis-navi.kakaomobility.com/v1/destinations/directions", 1000, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
     EndpointSpec("KAKAO_MULTI_ORIGIN", "many_origins", "POST", "https://apis-navi.kakaomobility.com/v1/origins/directions", 1000, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
     EndpointSpec("KAKAO_FUTURE_DIRECTIONS", "route_future", "GET", "https://apis-navi.kakaomobility.com/v1/future/directions", 1000, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
@@ -245,6 +259,12 @@ class _TransientHttpError(RuntimeError):
         self.status_code = status_code
 
 
+class _ProviderHttpError(RuntimeError):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"provider rejected request with HTTP {status_code}")
+        self.status_code = status_code
+
+
 class NamedProviderAdapter:
     fixture_file: str
     provider: str
@@ -349,7 +369,7 @@ class NamedProviderAdapter:
                 if response.status_code == 429 or response.status_code >= 500:
                     raise _TransientHttpError(response.status_code)
                 if response.status_code < 200 or response.status_code >= 300:
-                    raise SchemaValidationError(f"provider HTTP {response.status_code}")
+                    raise _ProviderHttpError(response.status_code)
                 return response
 
             try:
@@ -379,6 +399,25 @@ class NamedProviderAdapter:
                     message_code="RATE_LIMITED" if exc.status_code == 429 else None,
                 )
                 self._record(spec, envelope, calls=attempts, retries=max(0, attempts - 1), response_bytes=response_bytes)
+                return envelope
+            except _ProviderHttpError:
+                self.breaker.record_failure()
+                now = self.clock()
+                envelope = ProviderEnvelope(
+                    provider=spec.provider, operation=operation,
+                    fingerprint=call.fingerprint,
+                    fetched_at=now, received_at=now, observed_at=None,
+                    status=ProviderStatus.UNAVAILABLE, schema_version=None,
+                    freshness=Freshness.UNKNOWN, normalized_count=0,
+                    quality_flags=(), payload=None,
+                )
+                self._record(
+                    spec,
+                    envelope,
+                    calls=attempts,
+                    retries=max(0, attempts - 1),
+                    response_bytes=response_bytes,
+                )
                 return envelope
             except TransportNetworkError:
                 self.breaker.record_failure()
@@ -477,6 +516,8 @@ class NamedProviderAdapter:
         except (SchemaValidationError, ValueError, KeyError, TypeError):
             return self._fixture_bad(spec, operation, fingerprint, fetched, received)
         flags = [QualityFlag.SCHEMA_VALIDATED, QualityFlag.SANITIZED_FIXTURE]
+        if observed is None:
+            flags.append(QualityFlag.OBSERVED_AT_MISSING)
         if len(payload) == 0:
             flags.append(QualityFlag.EMPTY_RESULT)
         return ProviderEnvelope(
@@ -511,12 +552,15 @@ class NamedProviderAdapter:
     def _ok_envelope(self, spec: EndpointSpec, operation: str, fingerprint: str, now: datetime, observed: datetime | None, payload: tuple[Any, ...]) -> ProviderEnvelope[Any]:
         if not spec.response_schema_verified or spec.response_schema_version is None:
             raise SchemaValidationError("verified response schema version is required")
+        quality_flags = [QualityFlag.SCHEMA_VALIDATED]
+        if observed is None:
+            quality_flags.append(QualityFlag.OBSERVED_AT_MISSING)
         return ProviderEnvelope(
             provider=spec.provider, operation=operation, fingerprint=fingerprint,
             fetched_at=now, received_at=now, observed_at=observed,
             status=ProviderStatus.OK, schema_version=spec.response_schema_version,
             freshness=classify_freshness(received_at=now, observed_at=observed, maximum_age_seconds=120),
-            normalized_count=len(payload), quality_flags=(QualityFlag.SCHEMA_VALIDATED,), payload=payload,
+            normalized_count=len(payload), quality_flags=tuple(quality_flags), payload=payload,
         )
 
     def _unavailable(self, spec: EndpointSpec, operation: str, fingerprint: str) -> ProviderEnvelope[Any]:
@@ -675,6 +719,9 @@ class KakaoMobilityDirectionsAdapter(NamedProviderAdapter):
     fixture_file = "named_kakao_mobility.json"
     provider = "KAKAO_MOBILITY"
     operations = ("route_current", "many_destinations", "many_origins", "route_future")
+    fixture_schema_versions = MappingProxyType(
+        {"route_current": KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION}
+    )
     _providers = {
         "route_current": "KAKAO_DIRECTIONS",
         "many_destinations": "KAKAO_MULTI_DESTINATION",
@@ -686,7 +733,7 @@ class KakaoMobilityDirectionsAdapter(NamedProviderAdapter):
         return self._providers[operation]
 
     def route(self, request: TransitSearchRequest, *, deadline: Deadline) -> ProviderEnvelope[Any]:
-        return self.invoke("route_current", self._single_call(request), deadline=deadline)
+        return self.invoke("route_current", self._current_call(request), deadline=deadline)
 
     def many_destinations(self, origin: Coordinate, destinations: tuple[Coordinate, ...], *, deadline: Deadline) -> ProviderEnvelope[Any]:
         _bounded_coordinates(destinations)
@@ -706,6 +753,29 @@ class KakaoMobilityDirectionsAdapter(NamedProviderAdapter):
         return self.invoke("route_future", self._single_call(request), deadline=deadline)
 
     @staticmethod
+    def _current_call(request: TransitSearchRequest) -> ProviderCall:
+        return ProviderCall(
+            request.fingerprint(),
+            query=(
+                ("origin", f"{request.origin.lon},{request.origin.lat}"),
+                (
+                    "destination",
+                    f"{request.destination.lon},{request.destination.lat}",
+                ),
+                ("priority", "RECOMMEND"),
+                ("car_fuel", "GASOLINE"),
+                ("car_hipass", "false"),
+                ("alternatives", "false"),
+                ("road_details", "false"),
+                ("summary", "false"),
+            ),
+            # Current Directions has no response observation timestamp.  Departure
+            # time remains in the request fingerprint but is not falsely presented as
+            # Provider observation time.
+            observed_hint=None,
+        )
+
+    @staticmethod
     def _single_call(request: TransitSearchRequest) -> ProviderCall:
         return ProviderCall(
             request.fingerprint(),
@@ -714,7 +784,15 @@ class KakaoMobilityDirectionsAdapter(NamedProviderAdapter):
         )
 
     def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
+        if operation == "route_current":
+            return self.normalize_current_response(body)
         return _route_payload(body, mode=TravelMode.TAXI, provider=self.provider_for(operation), observed=observed)
+
+    @staticmethod
+    def normalize_current_response(body: Any) -> tuple[CanonicalItinerary, ...]:
+        """Normalize a decoded response without performing HTTP or promoting gates."""
+
+        return normalize_current_directions(body)
 
 
 def _bounded_coordinates(values: tuple[Coordinate, ...]) -> None:
