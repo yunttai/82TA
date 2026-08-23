@@ -28,7 +28,7 @@ class Command(BaseCommand):
                 Coordinate(
                     options["destination_lon"], options["destination_lat"]
                 ),
-                settings.KAKAO_MOBILITY_REST_API_KEY,
+                settings.KAKAO_REST_API_KEY,
             )
         except (ValueError, ProviderProbeError) as exc:
             raise CommandError(str(exc)) from None

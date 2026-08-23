@@ -1,0 +1,175 @@
+name: 82ta-gce
+
+x-service-environment: &service-environment
+  SERVICE_ENVIRONMENT: production
+  SERVICE_DEBUG: "false"
+  SERVICE_SECRET_KEY: ${SERVICE_SECRET_KEY:?set SERVICE_SECRET_KEY}
+  SERVICE_ALLOWED_HOSTS: service-api,${DOMAIN:?set DOMAIN}
+  SERVICE_CSRF_TRUSTED_ORIGINS: https://${DOMAIN}
+  SERVICE_TRUST_PROXY_HEADERS: "true"
+  SERVICE_TRUSTED_PROXY_IPS: 172.30.10.0/24
+  SERVICE_CONSENT_DOCUMENT_VERSION: ${PRIVACY_DOCUMENT_VERSION:?set PRIVACY_DOCUMENT_VERSION}
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+  SERVICE_REDIS_URL: ${SERVICE_REDIS_URL:?set SERVICE_REDIS_URL}
+  SERVICE_REDIS_KEY_DERIVATION_SECRET: ${SERVICE_REDIS_KEY_DERIVATION_SECRET:?set SERVICE_REDIS_KEY_DERIVATION_SECRET}
+  SERVICE_ROUTING_GATEWAY: http
+  SERVICE_ROUTING_API_BASE_URL: https://routing.internal:8443
+  SERVICE_ROUTING_API_ALLOWED_HOSTS: routing.internal
+  SERVICE_ROUTING_VERIFY_SSL: "true"
+  SERVICE_ROUTING_JWT_SECRET: ${SERVICE_ROUTING_JWT_SECRET:?set SERVICE_ROUTING_JWT_SECRET}
+  SERVICE_ROUTING_JWT_ISSUER: service-api
+  SERVICE_ROUTING_JWT_AUDIENCE: routing-api
+  SERVICE_ROUTING_JWT_TTL_SECONDS: "60"
+  SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS: "7000"
+  SERVICE_ROUTING_DEADLINE_MILLISECONDS: "6500"
+  SERVICE_DATA_RIGHTS_ARTIFACT_BACKEND: ${SERVICE_DATA_RIGHTS_ARTIFACT_BACKEND:-disabled}
+  SERVICE_DATA_RIGHTS_ARTIFACT_DIRECTORY: ${SERVICE_DATA_RIGHTS_ARTIFACT_DIRECTORY:-}
+  SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY: ${SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY:-}
+  KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:?set KAKAO_REST_API_KEY}
+  SSL_CERT_FILE: /run/82ta-certs/routing-ca-bundle.pem
+
+x-routing-environment: &routing-environment
+  ROUTING_RUNTIME_ENVIRONMENT: PRODUCTION
+  ROUTING_DJANGO_SECRET_KEY: ${ROUTING_DJANGO_SECRET_KEY:?set ROUTING_DJANGO_SECRET_KEY}
+  ROUTING_ALLOWED_HOSTS: routing-api
+  ROUTING_SECURE_SSL_REDIRECT: "true"
+  ROUTING_TRUST_X_FORWARDED_PROTO: "true"
+  ROUTING_SERVICE_JWT_SECRET: ${SERVICE_ROUTING_JWT_SECRET:?set SERVICE_ROUTING_JWT_SECRET}
+  ROUTING_SERVICE_JWT_ISSUER: service-api
+  ROUTING_SERVICE_JWT_AUDIENCE: routing-api
+  ROUTING_DB_NAME: ${ROUTING_DB_NAME:?set ROUTING_DB_NAME}
+  ROUTING_DB_USER: ${ROUTING_DB_USER:?set ROUTING_DB_USER}
+  ROUTING_DB_PASSWORD: ${ROUTING_DB_PASSWORD:?set ROUTING_DB_PASSWORD}
+  ROUTING_DB_HOST: ${ROUTING_DB_HOST:?set ROUTING_DB_HOST}
+  ROUTING_DB_PORT: ${ROUTING_DB_PORT:-5432}
+  ROUTING_DB_SSLMODE: verify-full
+  ROUTING_REDIS_URL: ${ROUTING_REDIS_URL:?set ROUTING_REDIS_URL}
+  ROUTING_ALLOW_FIXTURE_BACKEND: "false"
+  ROUTING_PRODUCTION_DEPENDENCIES_FACTORY: ${ROUTING_PRODUCTION_DEPENDENCIES_FACTORY:-routing_deployment.baseline:build_dependencies}
+  ROUTING_PROVIDER_CONFIG_FACTORY: ${ROUTING_PROVIDER_CONFIG_FACTORY:-provider_core.production:build_kakao_baseline_config}
+  ROUTING_PROVIDER_EVIDENCE_JSON: ${ROUTING_PROVIDER_EVIDENCE_JSON:?set ROUTING_PROVIDER_EVIDENCE_JSON}
+  ROUTING_PROVIDER_HTTPS_PROXY_URL: ${ROUTING_PROVIDER_HTTPS_PROXY_URL:-}
+  KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:?set KAKAO_REST_API_KEY}
+  GBIS_SERVICE_KEY: ${GBIS_SERVICE_KEY:-}
+  GITS_API_KEY: ${GITS_API_KEY:-}
+  TMAP_APP_KEY: ${TMAP_APP_KEY:-}
+  ODSAY_API_KEY: ${ODSAY_API_KEY:-}
+
+services:
+  nginx:
+    image: nginx:1.27.5-alpine
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certbot/config:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/internal:/run/82ta-certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      service-front: {}
+      routing-private:
+        aliases:
+          - routing.internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  certbot:
+    image: certbot/certbot:v5.7.0
+    profiles: ["tools"]
+    volumes:
+      - ./certbot/config:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/logs:/var/log/letsencrypt
+    networks:
+      - service-front
+
+  web:
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/82ta-web:${IMAGE_TAG:?set IMAGE_TAG}
+    environment:
+      SERVICE_UPSTREAM: service-api:8000
+      CONTENT_SECURITY_POLICY: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://dapi.kakao.com; connect-src 'self' https://dapi.kakao.com; img-src 'self' data: blob: https://*.daumcdn.net; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self'; manifest-src 'self'"
+    networks:
+      - service-front
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
+
+  service-api:
+    image: ${DOCKERHUB_USERNAME}/82ta-service-api:${IMAGE_TAG}
+    environment: *service-environment
+    volumes:
+      - ./certbot/internal/routing-ca-bundle.pem:/run/82ta-certs/routing-ca-bundle.pem:ro
+    networks:
+      - service-front
+      - routing-private
+    depends_on:
+      routing-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  routing-api:
+    image: ${DOCKERHUB_USERNAME}/82ta-routing-api:${IMAGE_TAG}
+    environment: *routing-environment
+    networks:
+      - routing-private
+      - provider-egress
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          request=urllib.request.Request('http://127.0.0.1:8000/v1/health/live',headers={'Host':'routing-api','X-Forwarded-Proto':'https'});
+          urllib.request.urlopen(request,timeout=2).read()
+      interval: 10s
+      timeout: 3s
+      retries: 18
+
+  service-migrate:
+    profiles: ["tools"]
+    image: ${DOCKERHUB_USERNAME}/82ta-service-api:${IMAGE_TAG}
+    environment:
+      <<: *service-environment
+      DATABASE_URL: ${SERVICE_MIGRATION_DATABASE_URL:?set SERVICE_MIGRATION_DATABASE_URL}
+    volumes:
+      - ./certbot/internal/routing-ca-bundle.pem:/run/82ta-certs/routing-ca-bundle.pem:ro
+    networks:
+      - service-front
+    command: ["python", "manage.py", "migrate", "--noinput"]
+
+  routing-migrate:
+    profiles: ["tools"]
+    image: ${DOCKERHUB_USERNAME}/82ta-routing-api:${IMAGE_TAG}
+    environment:
+      <<: *routing-environment
+      ROUTING_TASK_MODE: migration
+      ROUTING_DB_USER: ${ROUTING_DB_MIGRATION_USER:?set ROUTING_DB_MIGRATION_USER}
+      ROUTING_DB_PASSWORD: ${ROUTING_DB_MIGRATION_PASSWORD:?set ROUTING_DB_MIGRATION_PASSWORD}
+    networks:
+      - provider-egress
+    command: ["python", "manage.py", "migrate", "--noinput"]
+
+networks:
+  service-front:
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  routing-private:
+    internal: true
+  provider-egress: {}

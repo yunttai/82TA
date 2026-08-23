@@ -15,14 +15,14 @@ class PlaceApiTests(SimpleTestCase):
         reset_rate_limits()
         views._place_cache.clear()
 
-    @override_settings(KAKAO_LOCAL_REST_KEY="")
+    @override_settings(KAKAO_REST_API_KEY="")
     def test_missing_key_uses_safe_empty_suggest_stub(self) -> None:
         response = self.client.get("/api/v1/places/suggest", {"query": "판교"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"items": []})
         self.assertEqual(response["Cache-Control"], "no-store")
 
-    @override_settings(KAKAO_LOCAL_REST_KEY="")
+    @override_settings(KAKAO_REST_API_KEY="")
     def test_missing_key_reverse_preserves_only_user_coordinate(self) -> None:
         response = self.client.get(
             "/api/v1/places/reverse-geocode",
@@ -135,7 +135,7 @@ class PlaceApiTests(SimpleTestCase):
         ):
             adapter.suggest("판교")
 
-    @override_settings(KAKAO_LOCAL_REST_KEY="", PLACE_RATE_LIMIT_PER_MINUTE=2)
+    @override_settings(KAKAO_REST_API_KEY="", PLACE_RATE_LIMIT_PER_MINUTE=2)
     def test_rotating_place_queries_share_a_bounded_client_bucket(self) -> None:
         first = self.client.get("/api/v1/places/suggest", {"query": "판교역"}, REMOTE_ADDR="198.51.100.20")
         second = self.client.get("/api/v1/places/suggest", {"query": "광교역"}, REMOTE_ADDR="198.51.100.20")
@@ -148,7 +148,7 @@ class PlaceApiTests(SimpleTestCase):
         self.assertEqual(limited["Retry-After"], "60")
         self.assertNotIn("강남역", limited.content.decode())
 
-    @override_settings(KAKAO_LOCAL_REST_KEY="", PLACE_RATE_LIMIT_PER_MINUTE=1)
+    @override_settings(KAKAO_REST_API_KEY="", PLACE_RATE_LIMIT_PER_MINUTE=1)
     def test_suggest_and_reverse_share_the_same_place_budget(self) -> None:
         first = self.client.get("/api/v1/places/suggest", {"query": "판교역"}, REMOTE_ADDR="198.51.100.21")
         limited = self.client.get(

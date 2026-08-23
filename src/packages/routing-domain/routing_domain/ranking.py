@@ -48,14 +48,22 @@ def select_recommendations(
     frontier: tuple[EvaluatedCandidate, ...],
     constraints: RouteConstraints,
     policy: RankingPolicy,
+    *,
+    exact_feasible: tuple[EvaluatedCandidate, ...] | None = None,
 ) -> tuple[tuple[EvaluatedCandidate, ...], RecommendationSet]:
-    if not frontier:
+    eligible = exact_feasible if exact_feasible is not None else frontier
+    if not eligible:
         return frontier, RecommendationSet(None, None, None, None)
+    if not frontier:
+        raise ValueError("non-empty exact feasible pool requires a frontier")
 
-    fastest = min(frontier, key=_fastest_key)
+    # FASTEST and PUBLIC_TRANSIT_ONLY are canonical exact anchors. Epsilon
+    # representative pruning is a display/frontier policy and must never change
+    # either exact feasible argmin.
+    fastest = min(eligible, key=_fastest_key)
     reliable = tuple(item for item in frontier if item.reliability_score >= policy.reliability_floor)
     stable = min(reliable or frontier, key=_stable_key)
-    public_candidates = tuple(item for item in frontier if item.taxi_cost.upper_krw == 0)
+    public_candidates = tuple(item for item in eligible if item.taxi_cost.upper_krw == 0)
     public = min(public_candidates, key=_fastest_key) if public_candidates else None
 
     cost_tiers: dict[int, EvaluatedCandidate] = {}
@@ -107,7 +115,14 @@ def select_recommendations(
         efficient,
         "BEST_MARGINAL_TIME_SAVING" if positive_gain else "NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET",
     )
-    updated = _with_reasons(frontier, reasons)
+    by_route_id = {item.route_id: item for item in frontier}
+    by_route_id[fastest.route_id] = fastest
+    if public is not None:
+        by_route_id[public.route_id] = public
+    updated = _with_reasons(
+        tuple(sorted(by_route_id.values(), key=lambda item: item.route_id)),
+        reasons,
+    )
     return updated, RecommendationSet(
         fastest=fastest.route_id,
         stable=stable.route_id,

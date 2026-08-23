@@ -179,10 +179,20 @@ SECURE_HSTS_PRELOAD = ENVIRONMENT == "production"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if TRUST_PROXY_HEADERS else None
 
 _configured_gateway_mode = os.environ.get("SERVICE_ROUTING_GATEWAY")
-if ENVIRONMENT == "production" and not _configured_gateway_mode:
+if ENVIRONMENT == "production" and not (_configured_gateway_mode or "").strip():
     raise RuntimeError("SERVICE_ROUTING_GATEWAY is required in production")
-ROUTING_GATEWAY_MODE = _configured_gateway_mode or "stub"
-ROUTING_API_BASE_URL = os.environ.get("SERVICE_ROUTING_API_BASE_URL", "http://127.0.0.1:8001")
+ROUTING_GATEWAY_MODE = (_configured_gateway_mode or "stub").strip().lower()
+if ROUTING_GATEWAY_MODE not in {"stub", "replay", "http"}:
+    raise RuntimeError("SERVICE_ROUTING_GATEWAY must be stub, replay, or http")
+if ENVIRONMENT == "production" and ROUTING_GATEWAY_MODE != "http":
+    raise RuntimeError("SERVICE_ROUTING_GATEWAY must be http in production")
+
+_configured_routing_api_base_url = os.environ.get("SERVICE_ROUTING_API_BASE_URL")
+if ENVIRONMENT == "production" and not (_configured_routing_api_base_url or "").strip():
+    raise RuntimeError("SERVICE_ROUTING_API_BASE_URL is required in production")
+ROUTING_API_BASE_URL = (
+    _configured_routing_api_base_url or "http://127.0.0.1:8001"
+).strip()
 ROUTING_SERVICE_JWT_SECRET = os.environ.get("SERVICE_ROUTING_JWT_SECRET", "")
 _configured_routing_jwt_issuer = os.environ.get("SERVICE_ROUTING_JWT_ISSUER")
 _configured_routing_jwt_audience = os.environ.get("SERVICE_ROUTING_JWT_AUDIENCE")
@@ -194,10 +204,74 @@ _routing_service_auth_identifier = re.compile(
 )
 ROUTING_VERIFY_SSL = os.environ.get("SERVICE_ROUTING_VERIFY_SSL", "true").lower() == "true"
 ROUTING_API_ALLOWED_HOSTS = tuple(
-    host.strip().lower().rstrip(".")
+    host.strip()
     for host in os.environ.get("SERVICE_ROUTING_API_ALLOWED_HOSTS", "").split(",")
     if host.strip()
 )
+_routing_dns_label = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)\Z")
+
+
+def _normalize_routing_hostname(raw: str, *, setting: str) -> str:
+    candidate = raw.strip()
+    if candidate.startswith("[") and candidate.endswith("]"):
+        candidate = candidate[1:-1]
+    try:
+        host = candidate.encode("idna").decode("ascii").lower().rstrip(".")
+    except UnicodeError as exc:
+        raise RuntimeError(f"{setting} contains an invalid host") from exc
+    if not host or any(character in host for character in "*/@?#[]"):
+        raise RuntimeError(f"{setting} contains an invalid host")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        if len(host) > 253 or any(
+            _routing_dns_label.fullmatch(label) is None for label in host.split(".")
+        ):
+            raise RuntimeError(f"{setting} contains an invalid host") from None
+    return host
+
+
+def _routing_origin_hostname(raw: str) -> tuple[str, str]:
+    try:
+        parsed = urlsplit(raw)
+        host = _normalize_routing_hostname(
+            parsed.hostname or "",
+            setting="SERVICE_ROUTING_API_BASE_URL",
+        )
+        port = parsed.port
+    except (UnicodeError, ValueError) as exc:
+        raise RuntimeError("SERVICE_ROUTING_API_BASE_URL is invalid") from exc
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not host
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError("SERVICE_ROUTING_API_BASE_URL must be an HTTP(S) origin")
+    default_port = 443 if parsed.scheme == "https" else 80
+    authority = f"[{host}]" if ":" in host else host
+    if port is not None and port != default_port:
+        authority = f"{authority}:{port}"
+    return f"{parsed.scheme}://{authority}", host
+
+
+if ROUTING_GATEWAY_MODE == "http":
+    ROUTING_API_BASE_URL, _routing_api_hostname = _routing_origin_hostname(
+        ROUTING_API_BASE_URL
+    )
+    ROUTING_API_ALLOWED_HOSTS = tuple(
+        _normalize_routing_hostname(
+            host,
+            setting="SERVICE_ROUTING_API_ALLOWED_HOSTS",
+        )
+        for host in ROUTING_API_ALLOWED_HOSTS
+    )
+    if ROUTING_API_ALLOWED_HOSTS and _routing_api_hostname not in ROUTING_API_ALLOWED_HOSTS:
+        raise RuntimeError("SERVICE_ROUTING_API_BASE_URL host is not allowed")
+
 if ENVIRONMENT == "production" and ROUTING_GATEWAY_MODE == "http":
     _routing_jwt_secret = ROUTING_SERVICE_JWT_SECRET.encode("utf-8")
     if (
@@ -216,6 +290,8 @@ if ENVIRONMENT == "production" and ROUTING_GATEWAY_MODE == "http":
         raise RuntimeError("Routing service JWT issuer and audience are invalid")
     if not ROUTING_API_ALLOWED_HOSTS:
         raise RuntimeError("SERVICE_ROUTING_API_ALLOWED_HOSTS is required for the HTTP RoutingGateway")
+    if not ROUTING_API_BASE_URL.startswith("https://"):
+        raise RuntimeError("SERVICE_ROUTING_API_BASE_URL must use HTTPS in production")
     if not ROUTING_VERIFY_SSL:
         raise RuntimeError("SERVICE_ROUTING_VERIFY_SSL must be true in production")
 PUBLIC_RATE_LIMIT_PER_MINUTE = int(os.environ.get("SERVICE_RATE_LIMIT_PER_MINUTE", "60"))
@@ -345,9 +421,9 @@ DATA_RIGHTS_EXPORT_TTL_SECONDS = int(
 )
 if DATA_RIGHTS_EXPORT_TTL_SECONDS <= 0:
     raise RuntimeError("SERVICE_DATA_RIGHTS_EXPORT_TTL_SECONDS must be positive")
-KAKAO_LOCAL_REST_KEY = os.environ.get("KAKAO_LOCAL_REST_KEY", "")
-if ENVIRONMENT == "production" and not KAKAO_LOCAL_REST_KEY:
-    raise RuntimeError("KAKAO_LOCAL_REST_KEY is required in production")
+KAKAO_REST_API_KEY = os.environ.get("KAKAO_REST_API_KEY", "")
+if ENVIRONMENT == "production" and not KAKAO_REST_API_KEY:
+    raise RuntimeError("KAKAO_REST_API_KEY is required in production")
 KAKAO_LOCAL_BASE_URL = "https://dapi.kakao.com"
 KAKAO_LOCAL_TIMEOUT_SECONDS = float(os.environ.get("KAKAO_LOCAL_TIMEOUT_SECONDS", "2.0"))
 KAKAO_LOCAL_MAX_RESPONSE_BYTES = int(

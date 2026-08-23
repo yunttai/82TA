@@ -21,7 +21,7 @@ describe("map-first home current location", () => {
   });
 
   it("requests one foreground position after the user action and only centers the Kakao browser map", async () => {
-    vi.stubEnv("VITE_KAKAO_MAP_APP_KEY", "browser-domain-key");
+    vi.stubEnv("KAKAO_JS_API_KEY", "browser-domain-key");
     vi.stubGlobal("isSecureContext", true);
     const setCenter = vi.fn();
     const setMarkerPosition = vi.fn();

@@ -22,6 +22,7 @@ class ProductionSettingsTests(SimpleTestCase):
         "SERVICE_SECRET_KEY",
         "SERVICE_DEBUG",
         "SERVICE_ROUTING_GATEWAY",
+        "SERVICE_ROUTING_API_BASE_URL",
         "SERVICE_ROUTING_JWT_SECRET",
         "SERVICE_ROUTING_JWT_ISSUER",
         "SERVICE_ROUTING_JWT_AUDIENCE",
@@ -29,6 +30,7 @@ class ProductionSettingsTests(SimpleTestCase):
         "SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS",
         "SERVICE_ROUTING_DEADLINE_MILLISECONDS",
         "SERVICE_ROUTING_API_ALLOWED_HOSTS",
+        "SERVICE_ROUTING_VERIFY_SSL",
         "SERVICE_CSRF_TRUSTED_ORIGINS",
         "SERVICE_TRUST_PROXY_HEADERS",
         "SERVICE_TRUSTED_PROXY_IPS",
@@ -42,7 +44,7 @@ class ProductionSettingsTests(SimpleTestCase):
         "SERVICE_DATA_RIGHTS_ARTIFACT_DIRECTORY",
         "SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY",
         "SERVICE_REDIS_URL",
-        "KAKAO_LOCAL_REST_KEY",
+        "KAKAO_REST_API_KEY",
         "SERVICE_RATE_LIMIT_PER_MINUTE",
         "SERVICE_GUEST_SESSION_RATE_LIMIT_PER_MINUTE",
         "SERVICE_PLACE_RATE_LIMIT_PER_MINUTE",
@@ -62,11 +64,17 @@ class ProductionSettingsTests(SimpleTestCase):
             {
                 "SERVICE_ENVIRONMENT": "production",
                 "SERVICE_SECRET_KEY": "production-settings-test-secret-abcdefghijklmnopqrstuvwxyz",
-                "SERVICE_ROUTING_GATEWAY": "stub",
+                "SERVICE_ROUTING_GATEWAY": "http",
+                "SERVICE_ROUTING_API_BASE_URL": "https://routing.internal",
+                "SERVICE_ROUTING_API_ALLOWED_HOSTS": "routing.internal",
+                "SERVICE_ROUTING_VERIFY_SSL": "true",
+                "SERVICE_ROUTING_JWT_SECRET": SERVICE_JWT_SECRET,
+                "SERVICE_ROUTING_JWT_ISSUER": "service-api",
+                "SERVICE_ROUTING_JWT_AUDIENCE": "routing-api",
                 "SERVICE_CONSENT_DOCUMENT_VERSION": "privacy-test-current",
                 "SERVICE_DATA_RIGHTS_ARTIFACT_BACKEND": "disabled",
                 "SERVICE_REDIS_URL": "rediss://redis.internal:6379/0",
-                "KAKAO_LOCAL_REST_KEY": "production-kakao-test-key",
+                "KAKAO_REST_API_KEY": "production-kakao-test-key",
                 **values,
             }
         )
@@ -96,6 +104,75 @@ class ProductionSettingsTests(SimpleTestCase):
         result = self._import_settings(DATABASE_URL="postgresql://service:secret@db.internal/service")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("django.db.backends.postgresql", result.stdout)
+
+    def test_production_requires_explicit_http_routing_gateway(self) -> None:
+        common = {"DATABASE_URL": "postgresql://service:secret@db.internal/service"}
+        for mode in ("", "stub", "replay", "unknown"):
+            with self.subTest(mode=mode):
+                result = self._import_settings(**common, SERVICE_ROUTING_GATEWAY=mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("SERVICE_ROUTING_GATEWAY", result.stderr)
+
+    def test_production_validates_routing_origin_tls_and_allowed_host(self) -> None:
+        common = {"DATABASE_URL": "postgresql://service:secret@db.internal/service"}
+        cases = (
+            ({"SERVICE_ROUTING_API_BASE_URL": ""}, "BASE_URL is required"),
+            (
+                {"SERVICE_ROUTING_API_BASE_URL": "http://routing.internal"},
+                "must use HTTPS",
+            ),
+            (
+                {"SERVICE_ROUTING_API_BASE_URL": "https://user:secret@routing.internal"},
+                "must be an HTTP(S) origin",
+            ),
+            (
+                {"SERVICE_ROUTING_API_BASE_URL": "https://routing.internal/v1"},
+                "must be an HTTP(S) origin",
+            ),
+            (
+                {"SERVICE_ROUTING_API_ALLOWED_HOSTS": "other.internal"},
+                "host is not allowed",
+            ),
+            (
+                {"SERVICE_ROUTING_API_ALLOWED_HOSTS": "*.internal"},
+                "contains an invalid host",
+            ),
+            (
+                {"SERVICE_ROUTING_API_ALLOWED_HOSTS": "routing.internal:443"},
+                "contains an invalid host",
+            ),
+            (
+                {
+                    "SERVICE_ROUTING_API_BASE_URL": "https://routing internal",
+                    "SERVICE_ROUTING_API_ALLOWED_HOSTS": "routing internal",
+                },
+                "contains an invalid host",
+            ),
+            (
+                {"SERVICE_ROUTING_VERIFY_SSL": "false"},
+                "VERIFY_SSL must be true",
+            ),
+        )
+        for values, message in cases:
+            with self.subTest(values=values):
+                result = self._import_settings(**common, **values)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
+
+    def test_production_normalizes_explicit_routing_origin_and_host(self) -> None:
+        result = self._import_settings(
+            code=(
+                "import service_api.settings as s; "
+                "print(s.ROUTING_GATEWAY_MODE, s.ROUTING_API_BASE_URL, "
+                "s.ROUTING_API_ALLOWED_HOSTS)"
+            ),
+            DATABASE_URL="postgresql://service:secret@db.internal/service",
+            SERVICE_ROUTING_GATEWAY=" HTTP ",
+            SERVICE_ROUTING_API_BASE_URL="https://ROUTING.INTERNAL:443/",
+            SERVICE_ROUTING_API_ALLOWED_HOSTS="ROUTING.INTERNAL.",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("http https://routing.internal ('routing.internal',)", result.stdout)
 
     def test_production_requires_tls_redis_coordination(self) -> None:
         missing = self._import_settings(
@@ -142,10 +219,10 @@ class ProductionSettingsTests(SimpleTestCase):
     def test_production_requires_kakao_local_capability_key(self) -> None:
         result = self._import_settings(
             DATABASE_URL="postgresql://service:secret@db.internal/service",
-            KAKAO_LOCAL_REST_KEY="",
+            KAKAO_REST_API_KEY="",
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("KAKAO_LOCAL_REST_KEY is required in production", result.stderr)
+        self.assertIn("KAKAO_REST_API_KEY is required in production", result.stderr)
 
     def test_http_gateway_requires_strong_short_lived_service_jwt_and_deadline_margin(self) -> None:
         common = {
@@ -155,13 +232,15 @@ class ProductionSettingsTests(SimpleTestCase):
             "SERVICE_ROUTING_JWT_ISSUER": "service-api",
             "SERVICE_ROUTING_JWT_AUDIENCE": "routing-api",
         }
-        missing = self._import_settings(**common)
+        missing = self._import_settings(**common, SERVICE_ROUTING_JWT_SECRET="")
         weak = self._import_settings(**common, SERVICE_ROUTING_JWT_SECRET="x" * 32)
         missing_identity = self._import_settings(
             DATABASE_URL="postgresql://service:secret@db.internal/service",
             SERVICE_ROUTING_GATEWAY="http",
             SERVICE_ROUTING_API_ALLOWED_HOSTS="routing.internal",
             SERVICE_ROUTING_JWT_SECRET=SERVICE_JWT_SECRET,
+            SERVICE_ROUTING_JWT_ISSUER="",
+            SERVICE_ROUTING_JWT_AUDIENCE="",
         )
         invalid_ttl = self._import_settings(
             **common,

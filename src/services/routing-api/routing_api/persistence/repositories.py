@@ -177,7 +177,13 @@ class DjangoOptimizationResultRepository:
                     ],
                 )
                 for item in record.legs
-            ]
+            ],
+            # Django 5.2's PostgreSQL bulk-insert UNNEST optimization serializes
+            # multiple GeographyField WKT values as one malformed geography[]
+            # literal.  A one-row batch keeps GeoDjango's scalar geography
+            # adapter in control while preserving deterministic returned order.
+            # Result legs are already bounded by the optimizer's hard caps.
+            batch_size=1,
         )
         by_leg = {
             (item.route_key, item.sequence): value

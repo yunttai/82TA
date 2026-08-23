@@ -1,5 +1,26 @@
 # Contract Changelog
 
+## Routing policy provenance activation — 2026-08-24
+
+- Accepted the implemented minimum-arrival correction only for the finite canonical
+  graph constructed from the admitted Provider payload. Within that bounded graph,
+  `FASTEST` is the deterministic exact P50 anchor and `PUBLIC_TRANSIT_ONLY` is the
+  deterministic exact zero-Taxi-upper-cost anchor; epsilon dominance remains a
+  display/frontier compression policy. This is not a network-global optimality
+  claim.
+- Assigned immutable executable-policy identifiers `rank-0.2.0` and
+  `strategy-2.0.0`. The latter identifies the combined finite-payload admission,
+  strategy generation, exactification, and graph-search policy. Historical
+  `rank-0.1.1` and `strategy-1.0.0` results remain historical and must not be
+  relabeled or replayed under the new identifiers.
+- Kept every uncertified candidate, exactification, and graph-search hard-cap path
+  fail-closed through the existing capacity/error boundary. No completeness field,
+  status, warning/error code, OpenAPI schema, DBML, event, or generated-client change
+  is approved by this entry.
+- Deferred the `transferCount`/`maxTransfers` meaning (CCR-008 Finding A) and additive
+  search-completeness wire proposal (Finding C). Contract/context versions remain
+  `1.3.0`; this is an opaque policy-provenance and deterministic-result update.
+
 ## 1.3.0 — 2026-08-24
 
 - Extended email registration with a required profile nickname, an explicit current

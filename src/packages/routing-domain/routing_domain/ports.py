@@ -18,3 +18,15 @@ class LegEvaluator(Protocol):
 
     def evaluate(self, leg: LegSpec, entry_at: datetime) -> LegCost:
         ...
+
+
+class TravelPhaseLegEvaluator(Protocol):
+    """Optional explicit movement-phase hook for phase-aware adapters."""
+
+    def evaluate_travel(
+        self,
+        leg: LegSpec,
+        start_at: datetime,
+        ready_cost: LegCost | None,
+    ) -> LegCost:
+        ...

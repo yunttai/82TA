@@ -1,0 +1,92 @@
+name: routing-staging-database-bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type BOOTSTRAP-ROUTING-STAGING after the secret and snapshot gates pass"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: routing-staging-database-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap-and-migrate:
+    runs-on: ubuntu-latest
+    environment: staging-routing-database
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ROUTING_ECS_CLUSTER }}
+      ECS_SUBNETS: ${{ vars.ROUTING_ECS_SUBNETS }}
+      ECS_SECURITY_GROUP: ${{ vars.ROUTING_ECS_SECURITY_GROUP }}
+      BOOTSTRAP_TASK_DEFINITION: ${{ vars.ROUTING_DATABASE_BOOTSTRAP_TASK_DEFINITION }}
+      MIGRATION_TASK_DEFINITION: ${{ vars.ROUTING_MIGRATION_TASK_DEFINITION }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require explicit protected-environment confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: test "$CONFIRMATION" = "BOOTSTRAP-ROUTING-STAGING"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROUTING_AWS_DATABASE_BOOTSTRAP_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify immutable and matching candidate images
+        run: |
+          set -euo pipefail
+          bootstrap_image="$(aws ecs describe-task-definition --task-definition "$BOOTSTRAP_TASK_DEFINITION" --query 'taskDefinition.containerDefinitions[0].image' --output text)"
+          migration_image="$(aws ecs describe-task-definition --task-definition "$MIGRATION_TASK_DEFINITION" --query 'taskDefinition.containerDefinitions[0].image' --output text)"
+          test "$bootstrap_image" = "$migration_image"
+          printf '%s' "$bootstrap_image" | grep -Eq '@sha256:[0-9a-f]{64}$'
+
+      - name: Run least-privilege role and PostGIS bootstrap
+        env:
+          TASK_DEFINITION: ${{ env.BOOTSTRAP_TASK_DEFINITION }}
+          CONTAINER_NAME: routing-database-bootstrap
+        run: |
+          set -euo pipefail
+          network="awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=DISABLED}"
+          task="$(aws ecs run-task --cluster "$ECS_CLUSTER" --task-definition "$TASK_DEFINITION" --launch-type FARGATE --network-configuration "$network" --query 'tasks[0].taskArn' --output text)"
+          test "$task" != "None"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task"
+          exit_code="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task" --query "tasks[0].containers[?name=='${CONTAINER_NAME}'].exitCode | [0]" --output text)"
+          test "$exit_code" = "0"
+
+      - name: Run Routing-owned migrations as routing_migrator
+        env:
+          TASK_DEFINITION: ${{ env.MIGRATION_TASK_DEFINITION }}
+          CONTAINER_NAME: routing-migration
+        run: |
+          set -euo pipefail
+          network="awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=DISABLED}"
+          task="$(aws ecs run-task --cluster "$ECS_CLUSTER" --task-definition "$TASK_DEFINITION" --launch-type FARGATE --network-configuration "$network" --query 'tasks[0].taskArn' --output text)"
+          test "$task" != "None"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task"
+          exit_code="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task" --query "tasks[0].containers[?name=='${CONTAINER_NAME}'].exitCode | [0]" --output text)"
+          test "$exit_code" = "0"
+
+      - name: Finalize runtime grants and revoke migrator schema creation
+        env:
+          TASK_DEFINITION: ${{ env.BOOTSTRAP_TASK_DEFINITION }}
+          CONTAINER_NAME: routing-database-bootstrap
+        run: |
+          set -euo pipefail
+          network="awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=DISABLED}"
+          task="$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_DEFINITION" \
+            --launch-type FARGATE \
+            --network-configuration "$network" \
+            --overrides '{"containerOverrides":[{"name":"routing-database-bootstrap","environment":[{"name":"ROUTING_DB_BOOTSTRAP_ACTION","value":"finalize"}]}]}' \
+            --query 'tasks[0].taskArn' --output text)"
+          test "$task" != "None"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task"
+          exit_code="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task" --query "tasks[0].containers[?name=='${CONTAINER_NAME}'].exitCode | [0]" --output text)"
+          test "$exit_code" = "0"

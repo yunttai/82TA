@@ -149,6 +149,11 @@ def _service_auth_identifier(name: str, *, deployment: bool, local_default: str)
 
 ROUTING_RUNTIME_ENVIRONMENT = _runtime_environment()
 _DEPLOYMENT = ROUTING_RUNTIME_ENVIRONMENT in {"STAGING", "PRODUCTION"}
+ROUTING_LOCAL_LIVE_E2E = _strict_boolean("ROUTING_LOCAL_LIVE_E2E", default=False)
+if ROUTING_LOCAL_LIVE_E2E and ROUTING_RUNTIME_ENVIRONMENT != "DEVELOPMENT":
+    raise ImproperlyConfigured(
+        "ROUTING_LOCAL_LIVE_E2E is accepted only in DEVELOPMENT"
+    )
 
 if _DEPLOYMENT:
     SECRET_KEY = _strong_secret()
@@ -163,6 +168,8 @@ else:
     # Explicit TEST/DEVELOPMENT only. Never accepted in a deployment runtime.
     SECRET_KEY = "routing-api-test-development-only-9fW3@qL8!vT6#kR2$zN7&xP4"
     ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1", "[::1]"]
+    if ROUTING_LOCAL_LIVE_E2E:
+        ALLOWED_HOSTS.append("routing-api")
 
 DEBUG = False
 ROOT_URLCONF = "routing_api.urls"
@@ -251,11 +258,7 @@ ROUTING_ALLOW_FIXTURE_BACKEND = _strict_boolean(
 # KEY_VERIFIED or PRODUCTION_APPROVED; provider-core's independent capability and
 # runtime-evidence gates still decide whether an operation may execute.
 KAKAO_REST_API_KEY = _optional_provider_credential("KAKAO_REST_API_KEY")
-KAKAO_MOBILITY_REST_API_KEY = _optional_provider_credential(
-    "KAKAO_MOBILITY_REST_API_KEY"
-)
 GBIS_SERVICE_KEY = _optional_provider_credential("GBIS_SERVICE_KEY")
-KMA_SERVICE_KEY = _optional_provider_credential("KMA_SERVICE_KEY")
 GITS_API_KEY = _optional_provider_credential("GITS_API_KEY")
 TMAP_APP_KEY = _optional_provider_credential("TMAP_APP_KEY")
 ODSAY_API_KEY = _optional_provider_credential("ODSAY_API_KEY")

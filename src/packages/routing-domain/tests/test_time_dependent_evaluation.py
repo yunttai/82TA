@@ -20,8 +20,20 @@ KST = timezone(timedelta(hours=9))
 ZERO = MoneyRange.zero()
 
 
-def cost(p50: int, p90: int, fare: MoneyRange | None = ZERO, wait50: int = 0, wait90: int = 0) -> LegCost:
-    return LegCost(TimeEstimate(wait50, wait90), TimeEstimate(p50, p90), fare)
+def cost(
+    p50: int,
+    p90: int,
+    fare: MoneyRange | None = ZERO,
+    wait50: int = 0,
+    wait90: int = 0,
+    next_service_wait: TimeEstimate | None = None,
+) -> LegCost:
+    return LegCost(
+        TimeEstimate(wait50, wait90),
+        TimeEstimate(p50, p90),
+        fare,
+        next_service_wait=next_service_wait,
+    )
 
 
 class RecordingEntryTimeEvaluator:
@@ -242,7 +254,7 @@ class TimeDependentEvaluationTests(unittest.TestCase):
         self.assertEqual(result.legs[1].start_at_p50, departure + timedelta(seconds=1500))
         self.assertIn("TRANSFER_MARGIN_LOW", result.warning_codes)
 
-    def test_negative_p90_transfer_margin_is_infeasible(self) -> None:
+    def test_p50_catch_with_p90_miss_uses_next_service_wait(self) -> None:
         departure = datetime(2026, 8, 23, 7, 0, tzinfo=KST)
         seed = CandidateSeed(
             "missed",
@@ -263,8 +275,26 @@ class TimeDependentEvaluationTests(unittest.TestCase):
             2000,
             0,
         )
-        with self.assertRaisesRegex(CandidateEvaluationError, "TRANSFER_INFEASIBLE"):
-            CandidateEvaluator(StaticLegEvaluator({"first": cost(700, 900), "second": cost(400, 500)})).evaluate(seed, departure)
+        result = CandidateEvaluator(
+            StaticLegEvaluator(
+                {
+                    "first": cost(700, 900),
+                    "second": cost(
+                        400,
+                        500,
+                        next_service_wait=TimeEstimate(0, 0),
+                    ),
+                }
+            )
+        ).evaluate(seed, departure)
+        margin = result.legs[1].transfer_margin
+        self.assertIsNotNone(margin)
+        assert margin is not None
+        self.assertEqual((margin.p50_seconds, margin.p90_seconds), (240, -20))
+        self.assertEqual(result.legs[1].start_at_p50, departure + timedelta(seconds=1000))
+        self.assertEqual(result.legs[1].start_at_p90, departure + timedelta(seconds=1020))
+        self.assertEqual(result.total_duration, TimeEstimate(1400, 1520))
+        self.assertIn("TRANSFER_MARGIN_LOW", result.warning_codes)
 
     def test_unknown_taxi_upper_is_not_fabricated(self) -> None:
         seed = CandidateSeed(

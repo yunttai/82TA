@@ -123,6 +123,8 @@ class HttpsConnection(Protocol):
 
 
 class HttpsConnectionFactory(Protocol):
+    external_target_resolution: bool
+
     def open(
         self,
         *,
@@ -164,6 +166,8 @@ class _PinnedHttpsConnection:
 class PinnedHttpsConnectionFactory:
     """System-TLS connection pinned to the already validated DNS address."""
 
+    external_target_resolution = False
+
     def __init__(
         self,
         *,
@@ -202,6 +206,125 @@ class PinnedHttpsConnectionFactory:
         )
         connection.sock = tls_socket
         return _PinnedHttpsConnection(connection, tls_socket)
+
+
+class HttpsConnectProxyConnectionFactory:
+    """Create a hostname-verified TLS tunnel through one fixed HTTP CONNECT proxy.
+
+    The proxy is deployment infrastructure, not a caller-selected destination.  It
+    receives only the fixed Provider hostname and port; Provider paths, query values,
+    credentials, and bodies remain inside the end-to-end TLS tunnel.
+    """
+
+    _MAXIMUM_PROXY_RESPONSE_BYTES = 4_096
+    # The attested CONNECT proxy resolves the exact allowlisted hostname and rejects
+    # every private/special answer. This also permits a Routing-only internal Docker
+    # network whose local resolver deliberately has no internet DNS path.
+    external_target_resolution = True
+
+    def __init__(
+        self,
+        proxy_url: str,
+        *,
+        socket_opener: Callable[[tuple[str, int], float], Any] | None = None,
+        tls_context_factory: Callable[[], ssl.SSLContext] = ssl.create_default_context,
+    ) -> None:
+        try:
+            parts = urlsplit(proxy_url)
+            port = parts.port or 3128
+        except ValueError:
+            raise ValueError("Provider HTTPS proxy URL is invalid") from None
+        if (
+            parts.scheme != "http"
+            or not parts.hostname
+            or parts.username is not None
+            or parts.password is not None
+            or parts.path not in {"", "/"}
+            or parts.query
+            or parts.fragment
+            or not 1 <= port <= 65_535
+        ):
+            raise ValueError("Provider HTTPS proxy must be one credential-free HTTP origin")
+        try:
+            parts.hostname.encode("ascii", "strict")
+        except UnicodeEncodeError:
+            raise ValueError("Provider HTTPS proxy hostname must be canonical ASCII") from None
+        self._proxy_host = parts.hostname
+        self._proxy_port = port
+        self._socket_opener = socket_opener or (
+            lambda address, timeout: socket.create_connection(address, timeout=timeout)
+        )
+        self._tls_context_factory = tls_context_factory
+
+    def open(
+        self,
+        *,
+        hostname: str,
+        port: int,
+        resolved_ip: str,
+        connect_timeout_seconds: float,
+    ) -> HttpsConnection:
+        # StrictHttpsTransport already validated the endpoint hostname, its exact URL,
+        # and every DNS answer.  CONNECT intentionally uses that hostname so the
+        # external allowlist proxy can enforce the same provider boundary.
+        del resolved_ip
+        context = self._tls_context_factory()
+        if not context.check_hostname or context.verify_mode != ssl.CERT_REQUIRED:
+            raise TransportSecurityError("TLS hostname and certificate verification are required")
+        raw_socket = self._socket_opener(
+            (self._proxy_host, self._proxy_port), connect_timeout_seconds
+        )
+        try:
+            raw_socket.settimeout(connect_timeout_seconds)
+            authority = f"{hostname}:{port}"
+            request = (
+                f"CONNECT {authority} HTTP/1.1\r\n"
+                f"Host: {authority}\r\n"
+                "Connection: keep-alive\r\n\r\n"
+            ).encode("ascii", "strict")
+            raw_socket.sendall(request)
+            response = self._read_proxy_response(raw_socket)
+            status_line = response.split(b"\r\n", 1)[0]
+            fields = status_line.split(b" ", 2)
+            if (
+                len(fields) < 2
+                or fields[0] not in {b"HTTP/1.0", b"HTTP/1.1"}
+                or fields[1] != b"200"
+            ):
+                raise TransportSecurityError("Provider HTTPS proxy rejected the tunnel")
+            tls_socket = context.wrap_socket(raw_socket, server_hostname=hostname)
+            tls_socket.settimeout(connect_timeout_seconds)
+        except BaseException:
+            raw_socket.close()
+            raise
+        connection = http.client.HTTPSConnection(
+            hostname,
+            port=port,
+            timeout=connect_timeout_seconds,
+            context=context,
+        )
+        connection.sock = tls_socket
+        return _PinnedHttpsConnection(connection, tls_socket)
+
+    @classmethod
+    def _read_proxy_response(cls, raw_socket: Any) -> bytes:
+        value = bytearray()
+        while b"\r\n\r\n" not in value:
+            remaining = cls._MAXIMUM_PROXY_RESPONSE_BYTES + 1 - len(value)
+            if remaining <= 0:
+                raise TransportSecurityError("Provider HTTPS proxy response is oversized")
+            chunk = raw_socket.recv(min(1_024, remaining))
+            if not isinstance(chunk, bytes) or not chunk:
+                raise TransportSecurityError("Provider HTTPS proxy response is incomplete")
+            value.extend(chunk)
+        header, separator, trailing = bytes(value).partition(b"\r\n\r\n")
+        if not separator or trailing:
+            raise TransportSecurityError("Provider HTTPS proxy response is malformed")
+        try:
+            header.decode("ascii", "strict")
+        except UnicodeDecodeError:
+            raise TransportSecurityError("Provider HTTPS proxy response is malformed") from None
+        return header + separator
 
 
 class StrictHttpsTransport:
@@ -273,14 +396,17 @@ class StrictHttpsTransport:
         if request.maximum_response_bytes > self._maximum_response_bytes:
             raise InputValidationError("provider response bound exceeds transport maximum")
 
-        try:
-            addresses = tuple(dict.fromkeys(self._resolver.resolve(parts.hostname, 443)))
-        except OSError:
-            raise TransportNetworkError("provider DNS resolution failed") from None
-        if not addresses:
-            raise TransportSecurityError("provider DNS returned no addresses")
-        for address in addresses:
-            _require_global_address(address)
+        if getattr(self._connection_factory, "external_target_resolution", False):
+            addresses: tuple[str, ...] = ()
+        else:
+            try:
+                addresses = tuple(dict.fromkeys(self._resolver.resolve(parts.hostname, 443)))
+            except OSError:
+                raise TransportNetworkError("provider DNS resolution failed") from None
+            if not addresses:
+                raise TransportSecurityError("provider DNS returned no addresses")
+            for address in addresses:
+                _require_global_address(address)
 
         deadline_at = self._monotonic() + request.timeout_ms / 1000.0
         connect_seconds = _remaining_seconds(deadline_at, self._monotonic)
@@ -290,7 +416,7 @@ class StrictHttpsTransport:
             connection = self._connection_factory.open(
                 hostname=parts.hostname,
                 port=443,
-                resolved_ip=addresses[0],
+                resolved_ip=addresses[0] if addresses else "",
                 connect_timeout_seconds=connect_seconds,
             )
             read_seconds = _remaining_seconds(deadline_at, self._monotonic)

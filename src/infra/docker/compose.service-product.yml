@@ -13,7 +13,7 @@ services:
       SERVICE_CSRF_TRUSTED_ORIGINS: ${SERVICE_CSRF_TRUSTED_ORIGINS:-}
       SERVICE_ROUTING_GATEWAY: stub
       DATABASE_URL: sqlite:////tmp/service-api.sqlite3
-      KAKAO_LOCAL_REST_KEY: ${KAKAO_LOCAL_REST_KEY:-}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}
     command:
       - /bin/sh
       - -ec
@@ -29,7 +29,7 @@ services:
       context: ../..
       dockerfile: infra/docker/web/Dockerfile
       args:
-        VITE_KAKAO_MAP_APP_KEY: ${VITE_KAKAO_MAP_APP_KEY:-}
+        KAKAO_JS_API_KEY: ${KAKAO_JS_API_KEY:-}
         VITE_PRIVACY_DOCUMENT_VERSION: local-development
     environment:
       SERVICE_UPSTREAM: service-api:8000

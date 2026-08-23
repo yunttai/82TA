@@ -17,9 +17,7 @@ Routing은 다음 환경변수를 exact Provider operation credential로 읽는�
 
 ```text
 KAKAO_REST_API_KEY
-KAKAO_MOBILITY_REST_API_KEY
 GBIS_SERVICE_KEY
-KMA_SERVICE_KEY
 GITS_API_KEY
 TMAP_APP_KEY
 ODSAY_API_KEY

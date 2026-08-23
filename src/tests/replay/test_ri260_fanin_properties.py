@@ -120,21 +120,31 @@ def test_exact_r1_r4_request_keeps_only_causally_resolved_api_patterns(
     assert set(trace.exact_patterns) == {"TRANSIT_ONLY"}
     assert trace.exact_plan
     assert len(trace.exact_plan) == len({request_key for request_key, _ in trace.exact_plan})
-    assert {kind for _, kind in trace.exact_plan} >= {
-        "WALK",
-        "TAXI",
-        "MAPPING",
-        "BUS_INTELLIGENCE",
-    }
+    exact_kinds = {kind for _, kind in trace.exact_plan}
+    assert exact_kinds >= {"WALK", "TAXI", "TRANSIT", "BUS_INTELLIGENCE"}
+    # Official Kakao route/stop labels and geometry are useful graph evidence,
+    # but the documented shape has no external route ID or direction. Replay
+    # must prove that an opaque graph identity never starts canonical mapping.
+    assert "MAPPING" not in exact_kinds
     assert trace.provider_call_count == body["computation"]["cache"]["providerCallCount"]
     assert trace.provider_call_count <= 64
     assert body["computation"]["cache"]["exactEnrichmentResolved"] is True
-    assert body["computation"]["cache"]["strategyPolicyVersion"] == "strategy-1.0.0"
+    assert body["computation"]["cache"]["strategyPolicyVersion"] == "strategy-2.0.0"
+    assert "COARSE_TAXI_BUDGET" not in trace.rejected_reasons
     assert {
-        "COARSE_TAXI_BUDGET",
         "TAXI_BRIDGE_CONNECTION_INFEASIBLE",
         "UPSTREAM_ROUTE_DIRECTION_MISMATCH",
     } <= set(trace.rejected_reasons)
+    budget = payload["constraints"]["taxiBudget"]["maxAmount"]
+    assert all(
+        sum(
+            leg["fare"]["upper"]
+            for leg in route["legs"]
+            if leg["mode"] == "TAXI"
+        )
+        <= budget
+        for route in body["routes"]
+    )
 
     returned = {route["routeId"] for route in body["routes"]}
     assert all(

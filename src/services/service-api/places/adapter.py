@@ -139,7 +139,7 @@ class KakaoLocalAdapter:
 
 def configured_adapter() -> KakaoLocalAdapter:
     return KakaoLocalAdapter(
-        rest_key=settings.KAKAO_LOCAL_REST_KEY,
+        rest_key=settings.KAKAO_REST_API_KEY,
         base_url=settings.KAKAO_LOCAL_BASE_URL,
         timeout_seconds=settings.KAKAO_LOCAL_TIMEOUT_SECONDS,
         max_response_bytes=settings.KAKAO_LOCAL_MAX_RESPONSE_BYTES,

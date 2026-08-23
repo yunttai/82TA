@@ -36,6 +36,12 @@ from .kakao_mobility import (
     KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION,
     normalize_current_directions,
 )
+from .kakao_raw import (
+    KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION,
+    KAKAO_WALK_SCHEMA_VERSION,
+    parse_kakao_public_transit,
+    parse_kakao_walk,
+)
 from .requests import TransitSearchRequest
 from .resilience import (
     CircuitBreaker, CircuitOpenError, Deadline, DeadlineExceeded,
@@ -81,8 +87,8 @@ class EndpointSpec:
 
 
 ENDPOINT_SPECS: tuple[EndpointSpec, ...] = (
-    EndpointSpec("KAKAO_PUBLIC_TRANSIT", "search_current", "GET", "https://dapi.kakao.com/v2/routing/publictraffic", 1800, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
-    EndpointSpec("KAKAO_WALK", "route", "GET", "https://dapi.kakao.com/v2/routing/walk", 900, 512_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
+    EndpointSpec("KAKAO_PUBLIC_TRANSIT", "search_current", "GET", "https://dapi.kakao.com/v2/routing/publictraffic", 1800, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK "), response_schema_verified=True, response_schema_version=KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION),
+    EndpointSpec("KAKAO_WALK", "route", "GET", "https://dapi.kakao.com/v2/routing/walk", 900, 512_000, auth=AuthInjection("header", "Authorization", "KakaoAK "), response_schema_verified=True, response_schema_version=KAKAO_WALK_SCHEMA_VERSION),
     EndpointSpec(
         "KAKAO_DIRECTIONS",
         "route_current",
@@ -245,12 +251,26 @@ class ProviderCall:
     query: tuple[tuple[str, str | int | float | bool], ...] = ()
     json_body: dict[str, Any] | None = None
     observed_hint: datetime | None = None
+    effective_at: datetime | None = None
+    origin: Coordinate | None = field(default=None, repr=False)
+    destination: Coordinate | None = field(default=None, repr=False)
+    maximum_items: int | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not self.fingerprint:
             raise ValueError("provider call fingerprint is required")
         if self.observed_hint is not None:
             require_aware(self.observed_hint, "observed_hint")
+        if self.effective_at is not None:
+            require_aware(self.effective_at, "effective_at")
+        if (self.origin is None) != (self.destination is None):
+            raise ValueError("provider normalization endpoints must be paired")
+        if self.maximum_items is not None and (
+            not isinstance(self.maximum_items, int)
+            or isinstance(self.maximum_items, bool)
+            or not 1 <= self.maximum_items <= 10
+        ):
+            raise ValueError("provider normalization item bound is invalid")
 
 
 class _TransientHttpError(RuntimeError):
@@ -382,7 +402,12 @@ class NamedProviderAdapter:
                 )
                 body = response.json_object(maximum_bytes=spec.maximum_response_bytes)
                 now = self.clock()
-                payload = self._parse(operation, body, call.observed_hint)
+                payload = self._parse_call(
+                    operation,
+                    body,
+                    call.effective_at or call.observed_hint,
+                    call,
+                )
                 envelope = self._ok_envelope(spec, operation, call.fingerprint, now, call.observed_hint, payload)
                 self.breaker.record_success()
                 self.cache.put((spec.provider, operation, call.fingerprint), envelope, ttl_seconds=30, stale_seconds=30)
@@ -598,6 +623,16 @@ class NamedProviderAdapter:
     def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
         raise NotImplementedError
 
+    def _parse_call(
+        self,
+        operation: str,
+        body: Any,
+        observed: datetime | None,
+        call: ProviderCall,
+    ) -> tuple[Any, ...]:
+        del call
+        return self._parse(operation, body, observed)
+
 
 def _time(value: Any) -> datetime:
     if not isinstance(value, str):
@@ -686,33 +721,71 @@ class KakaoTransitAdapter(NamedProviderAdapter):
     fixture_file = "named_kakao_transit.json"
     provider = "KAKAO_PUBLIC_TRANSIT"
     operations = ("search_current",)
+    fixture_schema_versions = MappingProxyType(
+        {"search_current": KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION}
+    )
 
     def search(self, request: TransitSearchRequest, *, deadline: Deadline) -> ProviderEnvelope[Any]:
         call = ProviderCall(
             request.fingerprint(),
-            query=(("x", request.origin.lon), ("y", request.origin.lat), ("ex", request.destination.lon), ("ey", request.destination.lat)),
-            observed_hint=request.departure_time,
+            query=(
+                ("start_x", request.origin.lon),
+                ("start_y", request.origin.lat),
+                ("end_x", request.destination.lon),
+                ("end_y", request.destination.lat),
+                ("input_coord", "WGS84"),
+                ("output_coord", "WGS84"),
+            ),
+            effective_at=request.departure_time,
+            origin=request.origin,
+            destination=request.destination,
+            maximum_items=request.max_itineraries,
         )
         return self.invoke("search_current", call, deadline=deadline)
 
     def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
-        return _route_payload(body, mode=TravelMode.BUS, provider=self.provider, observed=observed)
+        return parse_kakao_public_transit(body, effective_at=observed)
+
+    def _parse_call(
+        self,
+        operation: str,
+        body: Any,
+        observed: datetime | None,
+        call: ProviderCall,
+    ) -> tuple[Any, ...]:
+        del operation
+        return parse_kakao_public_transit(
+            body,
+            effective_at=observed,
+            origin=call.origin,
+            destination=call.destination,
+            maximum_itineraries=call.maximum_items,
+        )
 
 
 class KakaoWalkAdapter(NamedProviderAdapter):
     fixture_file = "named_kakao_walk.json"
     provider = "KAKAO_WALK"
     operations = ("route",)
+    fixture_schema_versions = MappingProxyType({"route": KAKAO_WALK_SCHEMA_VERSION})
 
     def route(self, request: TransitSearchRequest, *, deadline: Deadline) -> ProviderEnvelope[Any]:
         return self.invoke("route", ProviderCall(
             request.fingerprint(),
-            query=(("x", request.origin.lon), ("y", request.origin.lat), ("ex", request.destination.lon), ("ey", request.destination.lat)),
-            observed_hint=request.departure_time,
+            query=(
+                ("start_x", request.origin.lon),
+                ("start_y", request.origin.lat),
+                ("end_x", request.destination.lon),
+                ("end_y", request.destination.lat),
+                ("input_coord", "WGS84"),
+                ("output_coord", "WGS84"),
+                ("route_mode", "BROAD_FIRST"),
+            ),
+            effective_at=request.departure_time,
         ), deadline=deadline)
 
     def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
-        return _route_payload(body, mode=TravelMode.WALK, provider=self.provider, observed=observed)
+        return parse_kakao_walk(body, effective_at=observed)
 
 
 class KakaoMobilityDirectionsAdapter(NamedProviderAdapter):
@@ -762,7 +835,7 @@ class KakaoMobilityDirectionsAdapter(NamedProviderAdapter):
                     "destination",
                     f"{request.destination.lon},{request.destination.lat}",
                 ),
-                ("priority", "RECOMMEND"),
+                ("priority", "TIME"),
                 ("car_fuel", "GASOLINE"),
                 ("car_hipass", "false"),
                 ("alternatives", "false"),
@@ -773,14 +846,21 @@ class KakaoMobilityDirectionsAdapter(NamedProviderAdapter):
             # time remains in the request fingerprint but is not falsely presented as
             # Provider observation time.
             observed_hint=None,
+            effective_at=request.departure_time,
         )
 
     @staticmethod
     def _single_call(request: TransitSearchRequest) -> ProviderCall:
         return ProviderCall(
             request.fingerprint(),
-            query=(("origin", f"{request.origin.lon},{request.origin.lat}"), ("destination", f"{request.destination.lon},{request.destination.lat}")),
-            observed_hint=request.departure_time,
+            query=(
+                ("origin", f"{request.origin.lon},{request.origin.lat}"),
+                ("destination", f"{request.destination.lon},{request.destination.lat}"),
+                ("priority", "TIME"),
+                ("alternatives", True),
+                ("summary", False),
+            ),
+            effective_at=request.departure_time,
         )
 
     def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
@@ -1030,8 +1110,26 @@ class TmapTransitAdapter(KakaoTransitAdapter):
         return self.invoke("search", ProviderCall(
             request.fingerprint(),
             json_body={"startX": str(request.origin.lon), "startY": str(request.origin.lat), "endX": str(request.destination.lon), "endY": str(request.destination.lat), "count": request.max_itineraries, "format": "json"},
-            observed_hint=request.departure_time,
+            effective_at=request.departure_time,
         ), deadline=deadline)
+
+    def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
+        return _route_payload(
+            body, mode=TravelMode.BUS, provider=self.provider, observed=observed
+        )
+
+    def _parse_call(
+        self,
+        operation: str,
+        body: Any,
+        observed: datetime | None,
+        call: ProviderCall,
+    ) -> tuple[Any, ...]:
+        # This adapter intentionally consumes its own locked normalized schema.
+        # Do not inherit Kakao's raw response parser merely because the adapters
+        # share transit request/envelope behavior.
+        del call
+        return self._parse(operation, body, observed)
 
 
 class OdsayTransitAdapter(KakaoTransitAdapter):
@@ -1043,8 +1141,25 @@ class OdsayTransitAdapter(KakaoTransitAdapter):
         return self.invoke("search", ProviderCall(
             request.fingerprint(),
             query=(("SX", request.origin.lon), ("SY", request.origin.lat), ("EX", request.destination.lon), ("EY", request.destination.lat), ("OPT", 0), ("SearchType", 0)),
-            observed_hint=request.departure_time,
+            effective_at=request.departure_time,
         ), deadline=deadline)
+
+    def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
+        return _route_payload(
+            body, mode=TravelMode.BUS, provider=self.provider, observed=observed
+        )
+
+    def _parse_call(
+        self,
+        operation: str,
+        body: Any,
+        observed: datetime | None,
+        call: ProviderCall,
+    ) -> tuple[Any, ...]:
+        # ODsay has a different response contract from Kakao even though both
+        # expose the same transit port.
+        del call
+        return self._parse(operation, body, observed)
 
 
 def _integer(value: Any, name: str, *, minimum: int) -> int:

@@ -55,6 +55,7 @@ SECRET = "cross-workstream-load-secret-7Vq!4xP@9mK#2sL%6wN&8cR"
 class ThreadingWsgiServer(ThreadingMixIn, WSGIServer):
     daemon_threads = True
     allow_reuse_address = True
+    request_queue_size = 128
 
 
 class QuietHandler(WSGIRequestHandler):

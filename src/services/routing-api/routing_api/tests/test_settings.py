@@ -189,10 +189,10 @@ def test_provider_credentials_are_optional_bounded_configuration_only() -> None:
     secret = "provider-credential-test-value"
     completed = _settings_process(
         "import routing_api.settings as s; "
-        "assert s.KAKAO_MOBILITY_REST_API_KEY == 'provider-credential-test-value'; "
+        "assert s.KAKAO_REST_API_KEY == 'provider-credential-test-value'; "
         "assert s.GBIS_SERVICE_KEY == ''",
         ROUTING_RUNTIME_ENVIRONMENT="TEST",
-        KAKAO_MOBILITY_REST_API_KEY=secret,
+        KAKAO_REST_API_KEY=secret,
     )
     assert completed.returncode == 0, completed.stderr
     assert secret not in completed.stdout + completed.stderr
@@ -200,11 +200,35 @@ def test_provider_credentials_are_optional_bounded_configuration_only() -> None:
     invalid = _settings_process(
         "import routing_api.settings",
         ROUTING_RUNTIME_ENVIRONMENT="TEST",
-        KAKAO_MOBILITY_REST_API_KEY=" credential-with-spaces ",
+        KAKAO_REST_API_KEY=" credential-with-spaces ",
     )
     assert invalid.returncode != 0
-    assert "KAKAO_MOBILITY_REST_API_KEY" in invalid.stderr
+    assert "KAKAO_REST_API_KEY" in invalid.stderr
     assert "credential-with-spaces" not in invalid.stdout + invalid.stderr
+
+
+def test_local_live_e2e_adds_only_the_private_compose_hostname() -> None:
+    completed = _settings_process(
+        "import routing_api.settings as s; "
+        "assert s.ROUTING_RUNTIME_ENVIRONMENT == 'DEVELOPMENT'; "
+        "assert s.ROUTING_LOCAL_LIVE_E2E is True; "
+        "assert s.ALLOWED_HOSTS == "
+        "['testserver', 'localhost', '127.0.0.1', '[::1]', 'routing-api']; "
+        "assert s.SECURE_SSL_REDIRECT is False",
+        ROUTING_RUNTIME_ENVIRONMENT="DEVELOPMENT",
+        ROUTING_LOCAL_LIVE_E2E="true",
+    )
+    assert completed.returncode == 0, completed.stderr
+
+    rejected = _settings_process(
+        "import routing_api.settings",
+        **{
+            **_deployment_values(),
+            "ROUTING_LOCAL_LIVE_E2E": "true",
+        },
+    )
+    assert rejected.returncode != 0
+    assert "accepted only in DEVELOPMENT" in rejected.stderr
 
 
 def test_explicit_production_settings_trust_only_the_internal_alb_header_contract() -> None:

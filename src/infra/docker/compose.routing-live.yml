@@ -1,0 +1,56 @@
+name: 82ta-routing-live
+
+services:
+  routing-egress-proxy:
+    build:
+      context: ../..
+      dockerfile: infra/docker/provider-egress-proxy/Dockerfile
+    environment:
+      PROVIDER_EGRESS_ALLOWLIST: dapi.kakao.com,apis-navi.kakaomobility.com,apis.data.go.kr
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:13128:3128"
+    networks:
+      - routing-private
+      - provider-egress
+
+  routing-db:
+    networks:
+      - routing-private
+
+  routing-redis:
+    networks:
+      - routing-private
+
+  routing-api:
+    environment:
+      ROUTING_RUNTIME_ENVIRONMENT: DEVELOPMENT
+      ROUTING_LOCAL_LIVE_E2E: "true"
+      ROUTING_PRODUCTION_DEPENDENCIES_FACTORY: routing_deployment.baseline:build_dependencies
+      ROUTING_PROVIDER_CONFIG_FACTORY: provider_core.production:build_kakao_baseline_config
+      ROUTING_PROVIDER_HTTPS_PROXY_URL: http://routing-egress-proxy:3128
+      ROUTING_PROVIDER_EVIDENCE_JSON: ${ROUTING_PROVIDER_EVIDENCE_JSON:?run prepare_routing_docker_live.py first}
+    depends_on:
+      routing-egress-proxy:
+        condition: service_healthy
+    networks:
+      - routing-private
+
+  service-api:
+    networks:
+      - routing-private
+      - service-front
+
+  web:
+    networks:
+      - service-front
+
+networks:
+  routing-private:
+    internal: true
+  service-front:
+  provider-egress:

@@ -184,7 +184,7 @@ class StrategyGenerationTests(unittest.TestCase):
                 "TRANSIT_TAXI_BRIDGE_TRANSIT",
             },
         )
-        self.assertEqual(batch.policy_version, "strategy-1.0.0")
+        self.assertEqual(batch.policy_version, "strategy-2.0.0")
         self.assertTrue(all(item.seed.coarse_taxi_upper_krw <= 20_000 for item in batch.candidates))
 
     def test_generation_is_deterministic_under_input_reversal(self) -> None:
@@ -690,7 +690,7 @@ class StrategyGenerationTests(unittest.TestCase):
             4,
         )
 
-    def test_coarse_time_bound_prevents_unbounded_slow_options(self) -> None:
+    def test_uncertified_coarse_time_slack_does_not_prune_slow_option(self) -> None:
         baseline = TransitBaseline(
             "quick-public",
             (transit("quick", "BUS", "quick-route", ORIGIN, DESTINATION, 1, 2, 600),),
@@ -702,8 +702,11 @@ class StrategyGenerationTests(unittest.TestCase):
             StrategyGenerationInput(ORIGIN, DESTINATION, DEPARTURE, (baseline,), taxi_only_quotes=(slow,)),
             constraints(),
         )
-        self.assertEqual({item.seed.pattern for item in batch.candidates}, {"TRANSIT_ONLY"})
-        self.assertIn("COARSE_TIME_BOUND", {item.reason for item in batch.rejected})
+        self.assertEqual(
+            {item.seed.pattern for item in batch.candidates},
+            {"TRANSIT_ONLY", "TAXI_ONLY"},
+        )
+        self.assertNotIn("COARSE_TIME_BOUND", {item.reason for item in batch.rejected})
 
     def test_candidate_and_call_bounds_hold_across_dense_input_sizes(self) -> None:
         caps = CandidateCaps(

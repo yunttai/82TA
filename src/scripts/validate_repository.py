@@ -7,7 +7,7 @@ from typing import Any
 import yaml
 from _contract_utils import canonical_files, project_root
 
-ROOT_ALLOWLIST={'.codex','.agents','.codegraph','_workspace','src','AGENTS.md','README.md','.gitignore','.git'}
+ROOT_ALLOWLIST={'.codex','.agents','.codegraph','.github','_workspace','src','AGENTS.md','README.md','.gitignore','.git'}
 REQUIRED={
  'AGENTS.md','.codex/config.toml',
  '.codex/agents/service-product-lead.toml','.codex/agents/routing-technical-lead.toml','.codex/agents/contract-steward.toml','.codex/agents/integration-qa.toml',
@@ -43,6 +43,13 @@ def parse_agent(path:Path)->dict[str,Any]:
 def errors(root:Path)->list[str]:
  out=[]
  for name in sorted({p.name for p in root.iterdir()}-ROOT_ALLOWLIST): out.append(f'root item violates src-only/Codex policy: {name}')
+ github=root/'.github'
+ if github.exists():
+  for p in github.rglob('*'):
+   rel=p.relative_to(github)
+   if p.is_symlink(): out.append(f'GitHub control path must not be a symlink: {p.relative_to(root)}')
+   elif p.is_file() and (not rel.parts or rel.parts[0]!='workflows' or p.suffix.lower() not in {'.yml','.yaml'}):
+    out.append(f'unsupported root GitHub control file: {p.relative_to(root)}')
  for rel in sorted(REQUIRED):
   if not (root/rel).exists(): out.append(f'required file missing: {rel}')
  if (root/'.claude').exists() or (root/'CLAUDE.md').exists(): out.append('active legacy Claude control files remain')
@@ -105,6 +112,11 @@ def syntax(root:Path)->list[str]:
   for p in sorted((root/'src').rglob(pat)):
    try: yaml.safe_load(p.read_text(encoding='utf-8'))
    except Exception as e: out.append(f'invalid YAML {p.relative_to(root)}: {e}')
+  workflows=root/'.github/workflows'
+  if workflows.exists():
+   for p in sorted(workflows.glob(pat)):
+    try: yaml.safe_load(p.read_text(encoding='utf-8'))
+    except Exception as e: out.append(f'invalid YAML {p.relative_to(root)}: {e}')
  for p in sorted((root/'.codex/agents').glob('*.toml')):
   try: tomllib.loads(p.read_text(encoding='utf-8'))
   except Exception as e: out.append(f'invalid TOML {p.relative_to(root)}: {e}')

@@ -47,6 +47,7 @@ from routing_api.fanin_integration import (
     CanonicalTransitEvidence,
     FanInDependencies,
     BusContextProviderPort,
+    BusWaitEstimator,
     TaxiDispatchEstimator,
 )
 from routing_api.persistence.ports import OptimizationResultRepository
@@ -215,6 +216,35 @@ class PostgisMappingResolver:
         return result, target
 
 
+class UnavailableMappingResolver:
+    """Explicit zero-I/O mapping port for the live Provider baseline.
+
+    The fan-in boundary already converts a mapping-port failure into its canonical
+    UNKNOWN/UNSUPPORTED result.  Raising here is deliberate: this object must never
+    manufacture a route, stop, direction, mapping version or confidence score.
+    """
+
+    def __call__(self, evidence: CanonicalTransitEvidence, evaluated_at: datetime):
+        del evidence, evaluated_at
+        raise RuntimeError("transport mapping enrichment is unavailable")
+
+
+class UnavailableEtaPredictor:
+    """Model port that has no version, artifact or prediction to project."""
+
+    def predict(self, value):
+        del value
+        return None
+
+
+class UnavailableSeatRiskPredictor:
+    """Seat-risk port that preserves unknown as missing rather than numeric zero."""
+
+    def predict(self, value):
+        del value
+        return None
+
+
 class ProductionOptimizeRouteUseCase(CanonicalFanInOptimizeRouteUseCase):
     """Generic production-shaped use case; construction requires durable ports."""
 
@@ -227,6 +257,7 @@ class ProductionOptimizeRouteUseCase(CanonicalFanInOptimizeRouteUseCase):
         executable_operations: frozenset[tuple[str, str]],
         model_projection: tuple[Mapping[str, str], ...],
         deployment_environment: str,
+        baseline_degraded: bool = False,
     ) -> None:
         if dependencies.persistence is None:
             raise ValueError("production optimization persistence is required")
@@ -235,17 +266,30 @@ class ProductionOptimizeRouteUseCase(CanonicalFanInOptimizeRouteUseCase):
             for provider, operation in _TRANSIT_ROUTE_OPERATIONS
         ):
             raise ValueError("required production provider runtime gate is disabled")
-        expected_models = _verified_model_projection(
-            dependencies.eta_predictor,
-            dependencies.seat_predictor,
-            deployment_environment,
-        )
-        if expected_models is None or tuple(map(dict, expected_models)) != tuple(
-            map(dict, model_projection)
-        ):
-            raise ValueError("production model projection is not attested")
+        if baseline_degraded:
+            if (
+                type(dependencies.mapping) is not UnavailableMappingResolver
+                or type(dependencies.eta_predictor) is not UnavailableEtaPredictor
+                or type(dependencies.seat_predictor)
+                is not UnavailableSeatRiskPredictor
+                or model_projection
+            ):
+                raise ValueError("production baseline enrichment boundary is invalid")
+            expected_models: tuple[Mapping[str, str], ...] = ()
+        else:
+            verified_models = _verified_model_projection(
+                dependencies.eta_predictor,
+                dependencies.seat_predictor,
+                deployment_environment,
+            )
+            if verified_models is None or tuple(map(dict, verified_models)) != tuple(
+                map(dict, model_projection)
+            ):
+                raise ValueError("production model projection is not attested")
+            expected_models = verified_models
         self.capability_registry = capability_registry
         self.executable_operations = executable_operations
+        self.baseline_degraded = baseline_degraded
         # Store only the immutable projection freshly derived from exact Bus-core
         # attestations; never retain a caller-owned mutable mapping.
         self.model_projection = expected_models
@@ -254,6 +298,19 @@ class ProductionOptimizeRouteUseCase(CanonicalFanInOptimizeRouteUseCase):
             clock,
             dependencies=dependencies,
         )
+
+    def _composition_is_verified(self, composition, optimized) -> bool:
+        # Internal Alpha may route from verified live Provider schedules while
+        # mapping/GBIS/models are unavailable.  This degrades only results that
+        # actually contain a BUS leg; subway/train/taxi-only routes do not require
+        # Bus Intelligence and may remain COMPLETE when their used Providers are OK.
+        if self.baseline_degraded and any(
+            leg.mode == "BUS"
+            for candidate in optimized.routes
+            for leg in candidate.legs
+        ):
+            return False
+        return super()._composition_is_verified(composition, optimized)
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +328,7 @@ class ProductionCompositionDependencies:
     eta_predictor: EtaPredictor | None = None
     seat_predictor: SeatRiskPredictor | None = None
     taxi_dispatch: TaxiDispatchEstimator | None = None
+    bus_wait: BusWaitEstimator | None = None
     capability_registry: CapabilityRegistry | None = None
     deployment_environment: str | None = None
 
@@ -413,24 +471,36 @@ def build_injected_production_use_case(
         for provider, operation in _TRANSIT_ROUTE_OPERATIONS
     ):
         return UnavailableOptimizeRouteUseCase()
-    if any(
-        value is None
-        for value in (
-            dependencies.provider_config,
-            dependencies.mapping_database,
-            dependencies.persistence,
-            dependencies.eta_predictor,
-            dependencies.seat_predictor,
-        )
+    if (
+        dependencies.provider_config is None
+        or dependencies.persistence is None
+        or dependencies.deployment_environment not in {"dev", "staging", "prod"}
     ):
         return UnavailableOptimizeRouteUseCase()
-    model_projection = _verified_model_projection(
+
+    enrichment_values = (
+        dependencies.mapping_database,
         dependencies.eta_predictor,
         dependencies.seat_predictor,
-        dependencies.deployment_environment,
     )
-    if model_projection is None:
+    baseline_degraded = all(value is None for value in enrichment_values)
+    full_enrichment = all(value is not None for value in enrichment_values)
+    if not baseline_degraded and not full_enrichment:
         return UnavailableOptimizeRouteUseCase()
+    if dependencies.deployment_environment == "dev" and not baseline_degraded:
+        # Local live E2E may exercise verified Provider routing, but may not pose as
+        # an attested staging/prod model deployment.
+        return UnavailableOptimizeRouteUseCase()
+    if baseline_degraded:
+        model_projection: tuple[Mapping[str, str], ...] = ()
+    else:
+        model_projection = _verified_model_projection(
+            dependencies.eta_predictor,
+            dependencies.seat_predictor,
+            dependencies.deployment_environment,
+        )
+        if model_projection is None:
+            return UnavailableOptimizeRouteUseCase()
     assert dependencies.provider_config is not None
     suite = ProviderAdapterSuite.from_config(dependencies.provider_config)
     executable_operations = _executable_provider_operations(
@@ -439,6 +509,13 @@ def build_injected_production_use_case(
     if not any(
         operation in executable_operations for operation in _TRANSIT_ROUTE_OPERATIONS
     ):
+        return UnavailableOptimizeRouteUseCase()
+    if (
+        dependencies.mapping_database is None
+        and ("GITS", "traffic_context") in executable_operations
+    ):
+        # GITS traffic identity is meaningful only through its reviewed PostGIS
+        # mapping.  Do not advertise or call it when that durable boundary is absent.
         return UnavailableOptimizeRouteUseCase()
     context_operations = frozenset(
         operation
@@ -456,16 +533,33 @@ def build_injected_production_use_case(
         if ("GITS", "traffic_context") in executable_operations
         else DisabledGitsRoadLinkIdentityRepository()
     )
-    fan_in = FanInDependencies(
-        providers=NamedProductionProviderPorts(suite),
-        mapping=PostgisMappingResolver(
+    mapping = (
+        UnavailableMappingResolver()
+        if baseline_degraded
+        else PostgisMappingResolver(
             dependencies.mapping_database,
             gits_identity_repository=gits_identity_repository,
-        ),
-        eta_predictor=dependencies.eta_predictor,
-        seat_predictor=dependencies.seat_predictor,
+        )
+    )
+    eta_predictor = (
+        UnavailableEtaPredictor()
+        if baseline_degraded
+        else dependencies.eta_predictor
+    )
+    seat_predictor = (
+        UnavailableSeatRiskPredictor()
+        if baseline_degraded
+        else dependencies.seat_predictor
+    )
+    fan_in = FanInDependencies(
+        providers=NamedProductionProviderPorts(suite),
+        mapping=mapping,
+        eta_predictor=eta_predictor,
+        seat_predictor=seat_predictor,
         context=context_port,
         taxi_dispatch=dependencies.taxi_dispatch,
+        bus_wait=dependencies.bus_wait,
+        bus_intelligence_enabled=not baseline_degraded,
         persistence=dependencies.persistence,
         fixture_only=False,
     )
@@ -476,6 +570,7 @@ def build_injected_production_use_case(
         executable_operations=executable_operations,
         model_projection=model_projection,
         deployment_environment=dependencies.deployment_environment,
+        baseline_degraded=baseline_degraded,
     )
 
 

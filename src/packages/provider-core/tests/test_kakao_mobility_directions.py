@@ -156,7 +156,7 @@ class KakaoMobilityDirectionsTests(unittest.TestCase):
             {
                 "origin": "127.1,37.39",
                 "destination": "127.12,37.41",
-                "priority": "RECOMMEND",
+                "priority": "TIME",
                 "car_fuel": "GASOLINE",
                 "car_hipass": "false",
                 "alternatives": "false",

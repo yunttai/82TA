@@ -7,7 +7,17 @@ from pathlib import Path
 
 from _contract_utils import project_root
 
-SKIP_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules"}
+SKIP_PARTS = {
+    ".codegraph",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".terraform",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+}
 
 
 def main() -> int:

@@ -63,7 +63,7 @@ class EpsilonPolicy:
 
 @dataclass(frozen=True, slots=True)
 class RankingPolicy:
-    version: str = "rank-0.1.1"
+    version: str = "rank-0.2.0"
     reliability_floor: float = 0.5
     low_transfer_margin_seconds: int = 180
     budget_near_limit_ratio: float = 0.9

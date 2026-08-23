@@ -69,7 +69,7 @@ def _optimization_record() -> OptimizationResultRecord:
             departure_time=NOW,
             constraints={"taxiBudget": {"maxAmount": 10_000}},
             status="COMPLETE",
-            ranking_policy_version="rank-0.1.1",
+            ranking_policy_version="rank-0.2.0",
             duration_ms=120,
             provider_summary={"GBIS_V2": "OK"},
             created_at=NOW,
@@ -281,7 +281,7 @@ def test_full_optimization_subtree_is_built_in_one_atomic_adapter() -> None:
     record = _optimization_record()
     run = models.RouteOptimizationRun()
     candidate_bulk = MagicMock(side_effect=lambda values: values)
-    leg_bulk = MagicMock(side_effect=lambda values: values)
+    leg_bulk = MagicMock(side_effect=lambda values, **_kwargs: values)
     bus_bulk = MagicMock(side_effect=lambda values: values)
     transfer_bulk = MagicMock(side_effect=lambda values: values)
     run_query = MagicMock()
@@ -308,6 +308,7 @@ def test_full_optimization_subtree_is_built_in_one_atomic_adapter() -> None:
     assert persisted_leg.from_stop_id == record.legs[0].from_stop_id
     assert persisted_leg.to_stop_id == record.legs[0].to_stop_id
     assert persisted_leg.geometry == record.legs[0].geometry_wkt
+    assert leg_bulk.call_args.kwargs["batch_size"] == 1
     assert persisted_bus.no_seat_probability is None
     assert persisted_bus.entity_mapping_id == record.bus_enrichments[0].entity_mapping_id
     assert persisted_transfer.margin_p90_seconds == -20

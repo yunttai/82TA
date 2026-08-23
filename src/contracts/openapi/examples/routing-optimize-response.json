@@ -6,7 +6,7 @@
   "expiresAt": "2026-08-23T00:02:00+00:00",
   "computation": {
     "durationMs": 0,
-    "rankingPolicyVersion": "rank-0.1.1",
+    "rankingPolicyVersion": "rank-0.2.0",
     "mappingVersion": "0.1.0-planned",
     "candidateCounts": {
       "generated": 1,
@@ -16,9 +16,9 @@
     },
     "cache": {
       "fixture": false,
-      "strategyPolicyVersion": "strategy-1.0.0",
+      "strategyPolicyVersion": "strategy-2.0.0",
       "exactEnrichmentResolved": true,
-      "providerCallCount": 10,
+      "providerCallCount": 11,
       "optimizationPersistence": "NOT_CONFIGURED"
     }
   },
@@ -64,7 +64,7 @@
       },
       "legs": [
         {
-          "legId": "transit:mapped-public:0:provider-transit:sanitized-r1-itinerary:0",
+          "legId": "transit:mapped-public:0:provider-transit:8317445fc73ee98de0c44e091478581a957d8544b42cbaa9017426803cbf18fa:0",
           "sequence": 0,
           "mode": "BUS",
           "from": {
@@ -295,6 +295,18 @@
           "fallbackLevel": 1
         },
         {
+          "provider": "FIXTURE::KAKAO_DIRECTIONS/route_current",
+          "origin": "PROVIDER_ESTIMATE",
+          "observedAt": "2026-08-23T00:00:00+00:00",
+          "receivedAt": "2026-08-23T00:00:00+00:00",
+          "ageSeconds": null,
+          "confidence": {
+            "score": 0.0,
+            "grade": "UNKNOWN"
+          },
+          "fallbackLevel": 1
+        },
+        {
           "provider": "FIXTURE::SANITIZED_TRANSIT_FIXTURE/search",
           "origin": "PROVIDER_ESTIMATE",
           "observedAt": "2026-08-23T00:00:00+00:00",
@@ -348,6 +360,14 @@
     {
       "provider": "FIXTURE::GBIS_V2",
       "operation": "locations",
+      "status": "OK",
+      "latencyMs": 0,
+      "cache": false,
+      "messageCode": null
+    },
+    {
+      "provider": "FIXTURE::KAKAO_DIRECTIONS",
+      "operation": "route_current",
       "status": "OK",
       "latencyMs": 0,
       "cache": false,

@@ -20,7 +20,12 @@ from provider_core.context import TrafficLinkContext, WeatherContext
 from provider_core.envelope import ProviderStatus
 from provider_core.requests import TransitSearchRequest
 from provider_core.resilience import Deadline
-from routing_api.application import OptimizeCommand, RequestContext, RoutingUnavailableError
+from routing_api.application import (
+    OptimizeCommand,
+    RequestContext,
+    RoutingCapacityExceeded,
+    RoutingUnavailableError,
+)
 from routing_api.fanin_integration import (
     BusObservationQuery,
     CanonicalFanInOptimizeRouteUseCase,
@@ -236,7 +241,7 @@ def test_context_operations_do_not_start_for_low_mapping_or_exhausted_cap() -> N
         dependencies=replace(high, context=blocked_port),
         provider_operation_cap=2,
     )
-    with pytest.raises(RoutingUnavailableError):
+    with pytest.raises(RoutingCapacityExceeded):
         blocked.execute(OptimizeCommand(_payload()), _request_context(clock))
     assert blocked_port.weather_queries == []
 

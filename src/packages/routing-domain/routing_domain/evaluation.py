@@ -9,6 +9,8 @@ from .models import (
     CandidateSeed,
     EvaluatedCandidate,
     EvaluatedLeg,
+    LegCost,
+    LegSpec,
     MoneyRange,
     TimeEstimate,
     TransferMargin,
@@ -45,54 +47,88 @@ class CandidateEvaluator:
 
         for sequence, leg in enumerate(seed.legs):
             requirement = leg.transfer_requirement
+            walk_seconds += requirement.connector_walk_seconds
             ready_p50 = current_p50 + timedelta(seconds=requirement.p50_seconds)
             ready_p90 = current_p90 + timedelta(seconds=requirement.p90_seconds)
             margin: TransferMargin | None = None
-            if leg.scheduled_departure_at is not None:
+            if leg.scheduled_departure_at is not None and leg.bus_wait is None:
                 margin = TransferMargin(
                     p50_seconds=_seconds(leg.scheduled_departure_at, ready_p50),
                     p90_seconds=_seconds(leg.scheduled_departure_at, ready_p90),
                 )
-                if margin.p50_seconds < 0 or margin.p90_seconds < 0:
-                    raise CandidateEvaluationError("TRANSFER_INFEASIBLE")
-                transfer_risks.append(1.0 / (1.0 + margin.p90_seconds / 60.0))
+                if margin.p90_seconds >= 0:
+                    transfer_risks.append(
+                        1.0 / (1.0 + margin.p90_seconds / 60.0)
+                    )
                 if margin.p90_seconds < self.policy.low_transfer_margin_seconds:
                     warning_codes.add("TRANSFER_MARGIN_LOW")
 
-            # Wait is evaluated at the propagated ready time. A scheduled
-            # departure already defines its wait and needs no port lookup here.
-            ready_p50_cost = (
-                None if margin is not None else self.leg_evaluator.evaluate(leg, ready_p50)
-            )
-            ready_p90_cost = (
-                None if margin is not None else self.leg_evaluator.evaluate(leg, ready_p90)
-            )
-
-            bus_p50 = leg.bus_wait.expected_wait_seconds if leg.bus_wait else 0
-            bus_p90 = leg.bus_wait.p90_wait_seconds if leg.bus_wait else 0
-            base_wait_p50 = (
-                margin.p50_seconds
-                if margin is not None
-                else ready_p50_cost.wait.p50_seconds
-            )
-            base_wait_p90 = (
-                margin.p90_seconds
-                if margin is not None
-                else ready_p90_cost.wait.p90_seconds
-            )
-            wait_p50 = base_wait_p50 + bus_p50
-            wait_p90 = base_wait_p90 + bus_p90
+            # Bus Intelligence wait is already an arrival-relative, multi-vehicle
+            # boarding wait. It replaces provider/schedule wait; adding either
+            # would count the same wait twice. Without Bus Intelligence, a fixed
+            # connection uses the schedule while a missed quantile asks the
+            # evaluator for explicit next-service evidence at its propagated
+            # ready time. Ordinary wait=0 is not proof of an immediate service.
+            if leg.bus_wait is not None:
+                ready_p50_cost = self.leg_evaluator.evaluate(leg, ready_p50)
+                ready_p90_cost = self.leg_evaluator.evaluate(leg, ready_p90)
+                wait_p50 = leg.bus_wait.expected_wait_seconds
+                wait_p90 = leg.bus_wait.p90_wait_seconds
+            elif margin is not None:
+                ready_p50_cost = (
+                    self.leg_evaluator.evaluate(leg, ready_p50)
+                    if margin.p50_seconds < 0
+                    else None
+                )
+                ready_p90_cost = (
+                    self.leg_evaluator.evaluate(leg, ready_p90)
+                    if margin.p90_seconds < 0
+                    else None
+                )
+                if (
+                    ready_p50_cost is not None
+                    and ready_p50_cost.next_service_wait is None
+                ) or (
+                    ready_p90_cost is not None
+                    and ready_p90_cost.next_service_wait is None
+                ):
+                    raise CandidateEvaluationError("TRANSFER_INFEASIBLE")
+                wait_p50 = (
+                    ready_p50_cost.next_service_wait.p50_seconds
+                    if ready_p50_cost is not None
+                    and ready_p50_cost.next_service_wait is not None
+                    else margin.p50_seconds
+                )
+                wait_p90 = (
+                    ready_p90_cost.next_service_wait.p90_seconds
+                    if ready_p90_cost is not None
+                    and ready_p90_cost.next_service_wait is not None
+                    else margin.p90_seconds
+                )
+            else:
+                ready_p50_cost = self.leg_evaluator.evaluate(leg, ready_p50)
+                ready_p90_cost = self.leg_evaluator.evaluate(leg, ready_p90)
+                wait_p50 = ready_p50_cost.wait.p50_seconds
+                wait_p90 = ready_p90_cost.wait.p90_seconds
             start_p50 = ready_p50 + timedelta(seconds=wait_p50)
-            # A later quantile must never imply an earlier movement start.
-            start_p90 = max(
-                ready_p90 + timedelta(seconds=wait_p90),
-                start_p50,
-            )
+            start_p90 = ready_p90 + timedelta(seconds=wait_p90)
+            if start_p90 < start_p50:
+                # Never repair a schedule contradiction by inventing a timestamp
+                # that was not returned as a boardable service.
+                raise CandidateEvaluationError("P90_START_PRECEDES_P50")
 
             # Time-dependent travel/fare/reliability are evaluated at the
             # actual movement start, after wait and transfer propagation.
-            travel_p50_cost = self.leg_evaluator.evaluate(leg, start_p50)
-            travel_p90_cost = self.leg_evaluator.evaluate(leg, start_p90)
+            travel_p50_cost = self._evaluate_travel(
+                leg,
+                start_p50,
+                ready_p50_cost,
+            )
+            travel_p90_cost = self._evaluate_travel(
+                leg,
+                start_p90,
+                ready_p90_cost,
+            )
             if travel_p50_cost.fare is None or travel_p90_cost.fare is None:
                 if leg.mode == "TAXI":
                     raise CandidateEvaluationError("TAXI_COST_UNKNOWN")
@@ -203,3 +239,14 @@ class CandidateEvaluator:
             legs=tuple(evaluated),
             warning_codes=tuple(sorted(warning_codes)),
         )
+
+    def _evaluate_travel(
+        self,
+        leg: LegSpec,
+        start_at: datetime,
+        ready_cost: LegCost | None,
+    ) -> LegCost:
+        hook = getattr(self.leg_evaluator, "evaluate_travel", None)
+        if hook is None:
+            return self.leg_evaluator.evaluate(leg, start_at)
+        return hook(leg, start_at, ready_cost)

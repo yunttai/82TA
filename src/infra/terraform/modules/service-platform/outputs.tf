@@ -8,6 +8,13 @@ output "ecs_service" { value = aws_ecs_service.service.name }
 output "task_definition_family" { value = aws_ecs_task_definition.service.family }
 output "service_subnet_ids" { value = aws_subnet.app[*].id }
 output "service_security_group_id" { value = aws_security_group.service.id }
+output "vpc_id" { value = aws_vpc.this.id }
+output "vpc_cidr" { value = aws_vpc.this.cidr_block }
+output "app_subnet_ids" { value = aws_subnet.app[*].id }
+output "data_subnet_ids" { value = aws_subnet.data[*].id }
+output "platform_kms_key_arn" { value = aws_kms_key.platform.arn }
+output "routing_auth_secret_arn" { value = aws_secretsmanager_secret.routing_token.arn }
+output "public_route_table_id" { value = aws_route_table.public.id }
 output "database_endpoint" { value = aws_db_instance.service.address }
 output "database_master_secret_arn" {
   value     = aws_db_instance.service.master_user_secret[0].secret_arn

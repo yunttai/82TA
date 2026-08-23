@@ -16,6 +16,7 @@ from provider_core.capabilities import (
 from provider_core.canonical import Coordinate
 from provider_core.envelope import ProviderStatus
 from provider_core.http import HttpResponse, SensitiveValue
+from provider_core.kakao_raw import KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION
 from provider_core.named import (
     ENDPOINT_SPECS,
     KakaoTransitAdapter,
@@ -25,6 +26,7 @@ from provider_core.named import (
     ProviderOperationBinding,
     ScopedProviderCredential,
     ScopedProviderTransport,
+    TmapTransitAdapter,
 )
 from provider_core.requests import TransitSearchRequest
 from provider_core.resilience import Deadline
@@ -37,7 +39,7 @@ from provider_core.runtime import (
 
 KST = timezone(timedelta(hours=9))
 NOW = datetime(2026, 8, 24, 7, 40, tzinfo=KST)
-SCHEMA_VERSION = "sanitized-live-contract-v1"
+SCHEMA_VERSION = KAKAO_PUBLIC_TRANSIT_SCHEMA_VERSION
 DIGEST = "c" * 64
 
 
@@ -47,7 +49,20 @@ class RecordingTransport:
 
     def send(self, request):
         self.calls.append(request)
-        body = {
+        if "dapi.kakao.com" in request.url:
+            body = {
+                "status": "OK",
+                "properties": {"total": 1, "bus": 1, "subway": 0, "busAndSubway": 0, "landingURL": "https://map.kakao.com/link/by/traffic/sanitized"},
+                "routes": [{
+                    "properties": {"type": "BUS", "totalDistance": 10000, "totalTime": 600, "transfers": 0, "fare": {"value": 2000}},
+                    "steps": [{
+                        "properties": {"guidance": "sanitized", "type": "BUS", "distance": 10000, "time": 600, "stops": [{"name": "Sanitized Start"}, {"name": "Sanitized End"}], "vehicles": [{"name": "SAN-1", "type": "직행"}]},
+                        "path": {"points": [[127.1, 37.3], [127.2, 37.4]]},
+                    }],
+                }],
+            }
+        else:
+            body = {
             "routes": [
                 {
                     "id": "sanitized-production-route",
@@ -66,7 +81,7 @@ class RecordingTransport:
                     ],
                 }
             ]
-        }
+            }
         return HttpResponse(
             200,
             "application/json",
@@ -145,6 +160,20 @@ class VerifiedOdsayTransitAdapter(OdsayTransitAdapter):
             item
             for item in ENDPOINT_SPECS
             if item.provider == "ODSAY" and item.operation == operation
+        )
+        return replace(
+            spec,
+            response_schema_verified=True,
+            response_schema_version=SCHEMA_VERSION,
+        )
+
+
+class VerifiedTmapTransitAdapter(TmapTransitAdapter):
+    def endpoint_spec(self, operation):
+        spec = next(
+            item
+            for item in ENDPOINT_SPECS
+            if item.provider == "TMAP_TRANSIT" and item.operation == operation
         )
         return replace(
             spec,
@@ -269,13 +298,19 @@ class ProductionAssemblyTests(unittest.TestCase):
             config.capabilities.enabled("KAKAO_PUBLIC_TRANSIT", "search_current")
         )
 
-    def test_promoted_state_and_evidence_still_cannot_bypass_live_schema_gate(self) -> None:
+    def test_promoted_state_cannot_bypass_mismatched_schema_evidence(self) -> None:
         transport = NoCallTransport()
         key = ("KAKAO_PUBLIC_TRANSIT", "search_current")
+        mismatched = tuple(
+            replace(item, version="mismatched-schema")
+            if item.kind is RuntimeEvidenceKind.RESPONSE_SCHEMA
+            else item
+            for item in evidence(*key)
+        )
         config = ProviderAdapterSuiteConfig(
             (binding(*key, transport, "configured-promoted-secret"),),
             capabilities=CapabilityRegistry((approved_capability(*key),)),
-            runtime_evidence=ProviderRuntimeEvidenceConfig(evidence(*key)),
+            runtime_evidence=ProviderRuntimeEvidenceConfig(mismatched),
             clock=lambda: NOW,
         )
         suite = ProviderAdapterSuite.from_config(config)
@@ -285,26 +320,36 @@ class ProductionAssemblyTests(unittest.TestCase):
 
     def test_exact_header_and_query_auth_use_only_their_scoped_transport_and_secret(self) -> None:
         kakao_transport = RecordingTransport()
+        tmap_transport = RecordingTransport()
         odsay_transport = RecordingTransport()
         kakao_key = ("KAKAO_PUBLIC_TRANSIT", "search_current")
+        tmap_key = ("TMAP_TRANSIT", "search")
         odsay_key = ("ODSAY", "search")
         config = ProviderAdapterSuiteConfig(
             (
                 binding(*kakao_key, kakao_transport, "kakao-only-secret"),
+                binding(*tmap_key, tmap_transport, "tmap-only-secret"),
                 binding(*odsay_key, odsay_transport, "odsay-only-secret"),
             ),
             capabilities=CapabilityRegistry(
                 (
                     approved_capability(*kakao_key),
+                    approved_capability(*tmap_key),
                     approved_capability(*odsay_key),
                 )
             ),
             runtime_evidence=ProviderRuntimeEvidenceConfig(
-                evidence(*kakao_key) + evidence(*odsay_key)
+                evidence(*kakao_key) + evidence(*tmap_key) + evidence(*odsay_key)
             ),
             clock=lambda: NOW,
         )
         kakao = VerifiedKakaoTransitAdapter(
+            capabilities=config.capabilities,
+            runtime_evidence=config.runtime_evidence,
+            operation_bindings=config.binding_map,
+            clock=lambda: NOW,
+        )
+        tmap = VerifiedTmapTransitAdapter(
             capabilities=config.capabilities,
             runtime_evidence=config.runtime_evidence,
             operation_bindings=config.binding_map,
@@ -322,13 +367,19 @@ class ProductionAssemblyTests(unittest.TestCase):
             ProviderStatus.OK,
         )
         self.assertEqual(
+            tmap.search(self.request, deadline=self.deadline).status,
+            ProviderStatus.OK,
+        )
+        self.assertEqual(
             odsay.search(self.request, deadline=self.deadline).status,
             ProviderStatus.OK,
         )
         self.assertEqual(len(kakao_transport.calls), 1)
+        self.assertEqual(len(tmap_transport.calls), 1)
         self.assertEqual(len(odsay_transport.calls), 1)
 
         kakao_request = kakao_transport.calls[0]
+        tmap_request = tmap_transport.calls[0]
         odsay_request = odsay_transport.calls[0]
         self.assertEqual(
             dict(kakao_request.headers)["Authorization"].reveal_for_transport(),
@@ -336,14 +387,21 @@ class ProductionAssemblyTests(unittest.TestCase):
         )
         self.assertNotIn("apiKey", dict(kakao_request.query))
         self.assertEqual(
+            dict(tmap_request.headers)["appKey"].reveal_for_transport(),
+            "tmap-only-secret",
+        )
+        self.assertNotIn("apiKey", dict(tmap_request.query))
+        self.assertEqual(
             dict(odsay_request.query)["apiKey"].reveal_for_transport(),
             "odsay-only-secret",
         )
         self.assertNotIn("Authorization", dict(odsay_request.headers))
         self.assertIn("dapi.kakao.com", kakao_request.url)
+        self.assertIn("apis.openapi.sk.com", tmap_request.url)
         self.assertIn("api.odsay.com", odsay_request.url)
-        rendered = repr((kakao_request, odsay_request, config))
+        rendered = repr((kakao_request, tmap_request, odsay_request, config))
         self.assertNotIn("kakao-only-secret", rendered)
+        self.assertNotIn("tmap-only-secret", rendered)
         self.assertNotIn("odsay-only-secret", rendered)
 
     def test_missing_exact_binding_is_disabled_even_with_promoted_evidence(self) -> None:

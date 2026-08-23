@@ -800,10 +800,17 @@ h2 {
 }
 
 .card-kicker {
-  margin: 0 0 0.3rem;
+  margin: 0;
   color: #b04a36;
   font-size: 0.7rem;
   font-weight: 850;
+}
+
+.card-kicker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.65rem;
+  margin: 0 0 0.3rem;
 }
 
 .route-pattern {

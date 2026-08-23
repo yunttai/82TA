@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Iterable
 
-from .candidate_generation import BoundedCandidateGenerator
-from .evaluation import CandidateEvaluationError, CandidateEvaluator
+from .candidate_generation import BoundedCandidateGenerator, OptimalityUncertifiedError
+from .evaluation import CandidateEvaluator
+from .graph_search import (
+    CanonicalRoutingGraph,
+    GraphSearchCaps,
+    GraphSearchResult,
+    TimeDependentGraphSearch,
+)
 from .models import (
     CandidateCounts,
     CandidateSeed,
@@ -15,10 +22,18 @@ from .models import (
     RejectedCandidate,
     RouteConstraints,
 )
-from .pareto import pareto_frontier
 from .policy import CandidateCaps, EpsilonPolicy, RankingPolicy
 from .ports import LegEvaluator
-from .ranking import select_recommendations
+from .patterns import validate_pattern
+from .search import SearchOutcome, TimeDependentCandidateSearch
+
+
+@dataclass(frozen=True, slots=True)
+class GraphOptimizationOutcome:
+    """Graph discovery evidence paired with its canonical ranked result."""
+
+    graph_search: GraphSearchResult
+    optimization: OptimizationResult
 
 
 class RouteOptimizer:
@@ -48,28 +63,175 @@ class RouteOptimizer:
             seeds,
             constraints,
             provider_call_count=provider_call_count,
+            # Exact domain evaluation performs no Provider work. Resource-heavy
+            # category/pre-Pareto caps belong to strategy exactification; applying
+            # them again here can discard the true exact argmin. The overall
+            # coarse-combination bound remains enforced.
+            exact_evaluation=True,
         )
-        rejected = [RejectedCandidate(key, reason) for key, reason in batch.rejected]
-        evaluated: list[EvaluatedCandidate] = []
-        for seed in batch.candidates:
-            try:
-                candidate = self.evaluator.evaluate(seed, departure_at)
-            except (CandidateEvaluationError, ValueError) as exc:
-                rejected.append(RejectedCandidate(seed.candidate_key, str(exc)))
-                continue
-            reason = self._constraint_rejection(candidate, constraints)
-            if reason is not None:
-                rejected.append(RejectedCandidate(seed.candidate_key, reason))
-                continue
-            evaluated.append(candidate)
-
-        deduped = self._dedupe(tuple(evaluated))
-        frontier = pareto_frontier(deduped, self.epsilon)
-        ranked_frontier, recommendations = select_recommendations(
-            frontier,
+        search = TimeDependentCandidateSearch(
+            batch.candidates,
+            departure_at,
             constraints,
-            self.ranking_policy,
+            self.evaluator,
+            epsilon=self.epsilon,
+            ranking_policy=self.ranking_policy,
+            hard_candidate_cap=self.caps.coarse_combinations,
         )
+        while search.has_pending_candidates:
+            search.evaluate_next()
+            if search.certificate().hard_cap_reached:
+                raise OptimalityUncertifiedError("EXACT_CANDIDATE_CAP_UNCERTIFIED")
+        outcome = search.finalize()
+
+        return self._build_result(
+            outcome,
+            supplied_count=batch.supplied_count,
+            generated_count=len(batch.candidates),
+            initial_rejected=(
+                RejectedCandidate(key, reason) for key, reason in batch.rejected
+            ),
+        )
+
+    def optimize_graph(
+        self,
+        graph: CanonicalRoutingGraph,
+        origin_ref: str,
+        destination_ref: str,
+        departure_at: datetime,
+        constraints: RouteConstraints,
+        *,
+        graph_caps: GraphSearchCaps | None = None,
+        pattern_hints: Iterable[CandidateSeed] = (),
+        provider_call_count: int = 0,
+    ) -> GraphOptimizationOutcome:
+        """Discover and rank the exact paths in one supplied canonical graph.
+
+        This entrypoint certifies only the supplied graph.  It neither claims that
+        a Provider exhausted the physical network nor turns a finite itinerary
+        payload into a network-global graph.  Graph discovery performs the exact
+        sequential leg evaluation once; its evaluated candidates are then recorded
+        into the same candidate-search/ranking pipeline used by ``optimize``.
+        """
+
+        if not 0 <= provider_call_count <= self.caps.provider_calls:
+            raise ValueError("provider call cap exceeded")
+        requested_caps = graph_caps or GraphSearchCaps()
+        effective_caps = replace(
+            requested_caps,
+            max_complete_paths=min(
+                requested_caps.max_complete_paths,
+                self.caps.coarse_combinations,
+            ),
+        )
+        graph_search = TimeDependentGraphSearch(
+            self.evaluator.leg_evaluator,
+            caps=effective_caps,
+            ranking_policy=self.ranking_policy,
+        ).search(
+            graph,
+            origin_ref,
+            destination_ref,
+            departure_at,
+            constraints,
+        )
+        graph_search = self._apply_graph_pattern_hints(graph_search, pattern_hints)
+        batch = self.generator.generate(
+            graph_search.seeds,
+            constraints,
+            provider_call_count=provider_call_count,
+            exact_evaluation=True,
+        )
+        evaluated_by_key = {
+            candidate.candidate_key: candidate
+            for candidate in graph_search.evaluated_candidates
+        }
+        search = TimeDependentCandidateSearch(
+            batch.candidates,
+            departure_at,
+            constraints,
+            self.evaluator,
+            epsilon=self.epsilon,
+            ranking_policy=self.ranking_policy,
+            hard_candidate_cap=self.caps.coarse_combinations,
+        )
+        while search.has_pending_candidates:
+            seed = search.pop_next_candidate()
+            if seed is None:
+                if search.certificate().hard_cap_reached:
+                    raise OptimalityUncertifiedError(
+                        "EXACT_CANDIDATE_CAP_UNCERTIFIED"
+                    )
+                continue
+            candidate = evaluated_by_key.get(seed.candidate_key)
+            if candidate is None:
+                raise RuntimeError("graph result lost an evaluated candidate")
+            search.record_evaluated(seed, candidate)
+        outcome = search.finalize()
+        optimization = self._build_result(
+            outcome,
+            supplied_count=batch.supplied_count,
+            generated_count=len(batch.candidates),
+            initial_rejected=(
+                RejectedCandidate(key, reason) for key, reason in batch.rejected
+            ),
+        )
+        return GraphOptimizationOutcome(graph_search, optimization)
+
+    @staticmethod
+    def _apply_graph_pattern_hints(
+        graph_search: GraphSearchResult,
+        pattern_hints: Iterable[CandidateSeed],
+    ) -> GraphSearchResult:
+        patterns: dict[tuple[str, ...], str] = {}
+        for hint in pattern_hints:
+            path = tuple(leg.leg_id for leg in hint.legs)
+            current = patterns.setdefault(path, hint.pattern)
+            if current != hint.pattern:
+                raise ValueError("conflicting graph pattern hints for the same path")
+
+        if not patterns:
+            return graph_search
+        seeds: list[CandidateSeed] = []
+        evaluated: list[EvaluatedCandidate] = []
+        for seed, candidate in zip(
+            graph_search.seeds,
+            graph_search.evaluated_candidates,
+            strict=True,
+        ):
+            pattern = patterns.get(tuple(leg.leg_id for leg in seed.legs))
+            if pattern is None or pattern == seed.pattern:
+                seeds.append(seed)
+                evaluated.append(candidate)
+                continue
+            restored_seed = replace(seed, pattern=pattern)
+            validate_pattern(restored_seed)
+            seeds.append(restored_seed)
+            evaluated.append(replace(candidate, pattern=pattern))
+        return GraphSearchResult(
+            seeds=tuple(seeds),
+            evaluated_candidates=tuple(evaluated),
+            expansion_count=graph_search.expansion_count,
+            rejected=graph_search.rejected,
+        )
+
+    def _build_result(
+        self,
+        outcome: SearchOutcome,
+        *,
+        supplied_count: int,
+        generated_count: int,
+        initial_rejected: Iterable[RejectedCandidate] = (),
+    ) -> OptimizationResult:
+
+        rejected = [
+            *initial_rejected,
+            *outcome.rejected,
+        ]
+        deduped = outcome.exact_feasible
+        frontier = outcome.epsilon_frontier
+        ranked_frontier = outcome.ranked_routes
+        recommendations = outcome.recommendations
         selected_ids = {
             item
             for item in (
@@ -85,13 +247,18 @@ class RouteOptimizer:
         )[: self.caps.user_results]
         return OptimizationResult(
             routes=selected,
-            # Only returned route IDs may appear in the API-facing Pareto list.
-            pareto_route_ids=tuple(item.route_id for item in selected),
+            # Epsilon Pareto membership and exact recommendation anchors are
+            # distinct. Only returned epsilon-frontier IDs appear in this list.
+            pareto_route_ids=tuple(
+                item.route_id
+                for item in selected
+                if item.route_id in {route.route_id for route in frontier}
+            ),
             recommendations=recommendations,
             counts=CandidateCounts(
-                supplied=batch.supplied_count,
-                generated=len(batch.candidates),
-                fully_evaluated=len(evaluated),
+                supplied=supplied_count,
+                generated=generated_count,
+                fully_evaluated=outcome.fully_evaluated_count,
                 feasible=len(deduped),
                 pareto=len(frontier),
             ),
@@ -121,15 +288,23 @@ class RouteOptimizer:
             current = by_topology.get(candidate.topology_key)
             key = (
                 candidate.total_duration.p50_seconds,
+                -candidate.reliability_score,
+                candidate.transfer_risk,
+                candidate.walk_seconds,
                 candidate.total_duration.p90_seconds,
                 candidate.taxi_cost.upper_krw,
                 candidate.route_id,
+                candidate.candidate_key,
             )
             if current is None or key < (
                 current.total_duration.p50_seconds,
+                -current.reliability_score,
+                current.transfer_risk,
+                current.walk_seconds,
                 current.total_duration.p90_seconds,
                 current.taxi_cost.upper_krw,
                 current.route_id,
+                current.candidate_key,
             ):
                 by_topology[candidate.topology_key] = candidate
         return tuple(sorted(by_topology.values(), key=lambda item: item.route_id))

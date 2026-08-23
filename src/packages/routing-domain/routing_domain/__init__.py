@@ -1,8 +1,20 @@
 """Framework-independent, deterministic multimodal routing domain."""
 
-from .candidate_generation import BoundedCandidateGenerator, CandidateBatch
+from .candidate_generation import (
+    BoundedCandidateGenerator,
+    CandidateBatch,
+    OptimalityUncertifiedError,
+)
 from .evaluation import CandidateEvaluator, CandidateEvaluationError
 from .evaluators import StaticLegEvaluator, TimeBand, TimeBandLegEvaluator
+from .graph_search import (
+    CanonicalRoutingGraph,
+    GraphPathRejection,
+    GraphSearchCaps,
+    GraphSearchResult,
+    GraphSearchUncertifiedError,
+    TimeDependentGraphSearch,
+)
 from .models import (
     BusWaitContribution,
     CandidateSeed,
@@ -17,8 +29,16 @@ from .models import (
     TimeEstimate,
     TransferRequirement,
 )
-from .optimizer import RouteOptimizer
+from .optimizer import GraphOptimizationOutcome, RouteOptimizer
 from .policy import CandidateCaps, EpsilonPolicy, RankingPolicy
+from .search import (
+    SearchCertificate,
+    SearchNotCertifiedError,
+    SearchObjective,
+    SearchOutcome,
+    SearchProtocolError,
+    TimeDependentCandidateSearch,
+)
 from .strategy_generation import (
     AccessHub,
     BoundedStrategyGenerator,
@@ -33,10 +53,13 @@ from .strategy_generation import (
     ExactQuoteIdentity,
     QuoteReadiness,
     StrategyCandidate,
+    StrategyExactificationBatch,
     StrategyGenerationBatch,
     StrategyGenerationInput,
     StrategyGenerationPolicy,
     StrategyRejection,
+    StrategySearchFrontier,
+    StrategySearchSpace,
     TaxiBridge,
     TaxiQuote,
     TransitBaseline,
@@ -55,6 +78,7 @@ __all__ = [
     "CandidateEvaluator",
     "CandidateExactificationPlan",
     "CandidateSeed",
+    "CanonicalRoutingGraph",
     "CanonicalTransitTopology",
     "AccessHub",
     "EgressHub",
@@ -69,23 +93,39 @@ __all__ = [
     "EvaluatedLeg",
     "LegCost",
     "LegSpec",
+    "GraphPathRejection",
+    "GraphSearchCaps",
+    "GraphSearchResult",
+    "GraphSearchUncertifiedError",
+    "GraphOptimizationOutcome",
     "MoneyRange",
     "OptimizationResult",
+    "OptimalityUncertifiedError",
     "RankingPolicy",
     "QuoteReadiness",
     "RecommendationSet",
     "RouteConstraints",
     "RouteOptimizer",
+    "SearchCertificate",
+    "SearchNotCertifiedError",
+    "SearchObjective",
+    "SearchOutcome",
+    "SearchProtocolError",
     "StaticLegEvaluator",
     "StrategyCandidate",
+    "StrategyExactificationBatch",
     "StrategyGenerationBatch",
     "StrategyGenerationInput",
     "StrategyGenerationPolicy",
     "StrategyRejection",
+    "StrategySearchFrontier",
+    "StrategySearchSpace",
     "TaxiBridge",
     "TaxiQuote",
     "TimeBand",
     "TimeBandLegEvaluator",
+    "TimeDependentCandidateSearch",
+    "TimeDependentGraphSearch",
     "TimeEstimate",
     "TransitBaseline",
     "TransitLegInput",
