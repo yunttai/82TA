@@ -1,6 +1,6 @@
 # Generated Artifacts
 
-Locked OpenAPI 1.1.0에서 생성한 Service consumer artifacts다. Private request의 `contractVersion: "1.0"`은 1.x wire compatibility family로 유지한다.
+Public Service OpenAPI 1.3.0과 Private Routing OpenAPI 1.1.0에서 생성한 consumer artifacts다. Private request의 `contractVersion: "1.0"`은 1.x wire compatibility family로 유지한다.
 
 - `service-client-ts/`: Public Service API TypeScript schema와 `openapi-fetch` client
 - `routing-client-python/`: Private Routing API Python models와 sync/async `httpx` client

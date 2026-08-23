@@ -1,0 +1,9 @@
+{
+  "fixtureVersion":"1.0","provider":"GITS","operations":{"traffic_context":{
+    "success":{"fetchedAt":"2026-08-24T09:00:01+09:00","receivedAt":"2026-08-24T09:00:01+09:00","observedAt":"2026-08-24T09:00:00+09:00","schemaVersion":"gits.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"data":[{"linkId":"sanitized-gits-link-a","speedKph":42,"travelTimeSeconds":65.5,"createdAt":"2026-08-24T09:00:00+09:00"}]}},
+    "empty":{"fetchedAt":"2026-08-24T09:00:01+09:00","receivedAt":"2026-08-24T09:00:01+09:00","observedAt":"2026-08-24T09:00:00+09:00","schemaVersion":"gits.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"data":[]}},
+    "error":{"fetchedAt":"2026-08-24T09:00:01+09:00","receivedAt":"2026-08-24T09:00:01+09:00","observedAt":null,"schemaVersion":"gits.fixture.v1","httpStatus":503,"contentType":"application/json","body":{"error":"sanitized unavailable"}},
+    "rate_limited":{"fetchedAt":"2026-08-24T09:00:01+09:00","receivedAt":"2026-08-24T09:00:01+09:00","observedAt":null,"schemaVersion":"gits.fixture.v1","httpStatus":429,"contentType":"application/json","body":{"error":"sanitized rate limit"}},
+    "schema_drift":{"fetchedAt":"2026-08-24T09:00:01+09:00","receivedAt":"2026-08-24T09:00:01+09:00","observedAt":"2026-08-24T09:00:00+09:00","schemaVersion":"gits.drift","httpStatus":200,"contentType":"application/json","body":{"data":[{"linkId":"sanitized","speedKph":"42","travelTimeSeconds":65.5,"createdAt":"2026-08-24T09:00:00+09:00"}]}}
+  }}
+}

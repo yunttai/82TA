@@ -107,9 +107,8 @@ class InitialVerticalSliceIntegrationTests(TestCase):
     def test_locked_public_request_replays_private_fixture_and_safe_projection(self) -> None:
         client, csrf_token = self.csrf_client()
         payload = self.fixtures.get("public_request")
-        # The canonical request demonstrates the authenticated history opt-in.
-        # This guest replay verifies the same Routing payload without attempting
-        # to persist account history, which is a Service-local concern.
+        # The canonical integration chain is deliberately an unsaved guest search;
+        # account history/consent remains a separate Service-local concern.
         payload["saveToHistory"] = False
         response = self.post(
             client,

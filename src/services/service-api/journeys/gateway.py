@@ -20,6 +20,7 @@ from routing_client.models.problem_details import ProblemDetails
 
 from .contracts import CanonicalContracts, ContractError, LockedFixtures
 from .http_safety import buffer_bounded_response
+from .service_auth import Hs256ServiceJwtIssuer
 
 
 class ReplayMiss(Exception):
@@ -48,6 +49,14 @@ class RoutingGateway(Protocol):
 
 ALL_MODES = ["WALK", "WAIT", "TRANSFER", "TAXI", "BUS", "SUBWAY", "GTX", "TRAIN"]
 SAFE_ERROR_CODE = re.compile(r"^[A-Z][A-Z0-9_]{0,99}$")
+PUBLIC_ROUTING_PROBLEM_ALLOWLIST = {
+    400: frozenset({"INVALID_COORDINATE", "UNSUPPORTED_TIME", "CONSTRAINT_OUT_OF_RANGE"}),
+    409: frozenset({"IDEMPOTENCY_CONFLICT", "CONTRACT_VERSION_CONFLICT"}),
+    422: frozenset({"UNSUPPORTED_REGION"}),
+    429: frozenset({"RATE_LIMITED"}),
+    503: frozenset({"TRANSIT_PROVIDER_UNAVAILABLE", "MODEL_NOT_READY"}),
+    504: frozenset({"ROUTING_DEADLINE_EXCEEDED"}),
+}
 
 
 def _bounded_generated_call(
@@ -55,10 +64,12 @@ def _bounded_generated_call(
     *,
     client: AuthenticatedClient,
     max_bytes: int,
+    authorization: str,
     **operation_kwargs: Any,
 ) -> Any:
     request_kwargs = operation._get_kwargs(**operation_kwargs)
     request_kwargs.setdefault("headers", {})["Accept-Encoding"] = "identity"
+    request_kwargs["headers"]["Authorization"] = authorization
     with client.get_httpx_client().stream(**request_kwargs) as streamed:
         response = buffer_bounded_response(streamed, max_bytes=max_bytes)
     return operation._build_response(client=client, response=response)
@@ -154,7 +165,9 @@ class ReplayRoutingGateway:
 
         self.last_envelope = envelope
         self.last_forwarded_request = public_to_private(public_request, envelope)
-        return self.fixtures.get("routing_response")
+        response = self.fixtures.get("routing_response")
+        response["requestId"] = self.last_forwarded_request["requestId"]
+        return response
 
     def capabilities(self, *, allow_network: bool = True) -> dict[str, Any]:
         return self.fixtures.get("public_response")["support"]
@@ -171,7 +184,28 @@ class StubRoutingGateway:
     def optimize(self, public_request: dict[str, Any], envelope: RoutingEnvelope) -> dict[str, Any]:
         self.last_envelope = envelope
         self.last_forwarded_request = public_to_private(public_request, envelope)
-        return self.fixtures.get("routing_response")
+        response = self.fixtures.get("routing_response")
+        response.update(
+            {
+                "requestId": self.last_forwarded_request["requestId"],
+                "status": "PARTIAL",
+                "recommendations": {
+                    "fastest": None,
+                    "stable": None,
+                    "efficient": None,
+                    "publicTransitOnly": None,
+                },
+                "routes": [],
+                "paretoRouteIds": [],
+                "warningCodes": ["PROVIDER_PARTIAL_FAILURE"],
+            }
+        )
+        computation = dict(response["computation"])
+        counts = dict(computation["candidateCounts"])
+        counts.update({"fullyEvaluated": 0, "pareto": 0})
+        computation["candidateCounts"] = counts
+        response["computation"] = computation
+        return response
 
     def capabilities(self, *, allow_network: bool = True) -> dict[str, Any]:
         return self.fixtures.get("public_response")["support"]
@@ -187,9 +221,20 @@ class HttpRoutingGateway:
         self._capabilities_value: dict[str, Any] | None = None
         self._capabilities_expires_at = 0.0
         base_url = self._validated_base_url()
+        try:
+            self._service_jwt = Hs256ServiceJwtIssuer(
+                secret=settings.ROUTING_SERVICE_JWT_SECRET.encode("utf-8"),
+                issuer=settings.ROUTING_SERVICE_JWT_ISSUER,
+                audience=settings.ROUTING_SERVICE_JWT_AUDIENCE,
+                ttl_seconds=settings.ROUTING_SERVICE_JWT_TTL_SECONDS,
+            )
+        except (UnicodeEncodeError, ValueError) as exc:
+            raise ContractError("invalid Routing service JWT configuration") from exc
         self.client = AuthenticatedClient(
             base_url=base_url,
-            token=settings.ROUTING_SERVICE_TOKEN,
+            # The actual bearer is request-scoped and never retained in the
+            # generated client's repr or long-lived base headers.
+            token="",
             timeout=httpx.Timeout(settings.ROUTING_DEADLINE_MILLISECONDS / 1000),
             verify_ssl=settings.ROUTING_VERIFY_SSL,
             follow_redirects=False,
@@ -234,6 +279,7 @@ class HttpRoutingGateway:
                 optimize_routes,
                 client=self.client,
                 max_bytes=settings.ROUTING_MAX_RESPONSE_BYTES,
+                authorization=self._service_jwt.authorization_header(),
                 body=OptimizeRouteRequest.from_dict(private),
                 x_correlation_id=envelope.correlation_id,
                 x_request_deadline=envelope.request_deadline,
@@ -274,6 +320,16 @@ class HttpRoutingGateway:
                     or not isinstance(retryable, bool)
                 ):
                     raise RoutingGatewayError(502, "PROVIDER_BAD_RESPONSE", True)
+                if status == 401:
+                    # Workload-auth failures are an internal availability concern;
+                    # never expose SERVICE_AUTH_REQUIRED on the guest-capable API.
+                    raise RoutingGatewayError(
+                        503,
+                        "TRANSIT_PROVIDER_UNAVAILABLE",
+                        True,
+                    )
+                if code not in PUBLIC_ROUTING_PROBLEM_ALLOWLIST.get(status, frozenset()):
+                    raise RoutingGatewayError(502, "PROVIDER_BAD_RESPONSE", True)
                 raise RoutingGatewayError(
                     status,
                     code,
@@ -296,6 +352,7 @@ class HttpRoutingGateway:
                     get_routing_capabilities,
                     client=self.client,
                     max_bytes=settings.ROUTING_MAX_RESPONSE_BYTES,
+                    authorization=self._service_jwt.authorization_header(),
                 )
                 if response.parsed is None:
                     value = project_capabilities(None)

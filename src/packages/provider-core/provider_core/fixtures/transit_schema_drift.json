@@ -1,0 +1,32 @@
+{
+  "fixtureVersion": "1.0",
+  "scenario": "schema_drift",
+  "provider": "SANITIZED_TRANSIT_FIXTURE",
+  "operation": "search",
+  "fetchedAt": "2026-08-23T08:00:01+09:00",
+  "receivedAt": "2026-08-23T08:00:01+09:00",
+  "observedAt": "2026-08-23T08:00:00+09:00",
+  "schemaVersion": "fixture-transit.drifted",
+  "status": "OK",
+  "results": [
+    {
+      "id": "sanitized-drift-itinerary",
+      "legs": [
+        {
+          "id": "sanitized-drift-leg",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {"name": "Sanitized A", "lon": 127.1, "lat": 37.4},
+          "to": {"name": "Sanitized B", "lon": 127.2, "lat": 37.5},
+          "p50Seconds": "900",
+          "p90Seconds": 1080,
+          "distanceMeters": 6200,
+          "fareExpectedKrw": 2800,
+          "fareLowerKrw": 2800,
+          "fareUpperKrw": 2800,
+          "geometry": []
+        }
+      ]
+    }
+  ]
+}

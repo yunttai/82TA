@@ -7,7 +7,7 @@ from typing import Any
 import yaml
 from _contract_utils import canonical_files, project_root
 
-ROOT_ALLOWLIST={'.codex','.agents','_workspace','src','AGENTS.md','README.md','.gitignore','.git'}
+ROOT_ALLOWLIST={'.codex','.agents','.codegraph','_workspace','src','AGENTS.md','README.md','.gitignore','.git'}
 REQUIRED={
  'AGENTS.md','.codex/config.toml',
  '.codex/agents/service-product-lead.toml','.codex/agents/routing-technical-lead.toml','.codex/agents/contract-steward.toml','.codex/agents/integration-qa.toml',

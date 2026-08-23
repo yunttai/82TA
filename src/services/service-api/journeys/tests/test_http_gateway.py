@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -14,9 +17,33 @@ from journeys.gateway import (
     public_to_private,
 )
 from journeys.projection import project_public_response
+from journeys.service_auth import Hs256ServiceJwtIssuer
+
+
+SERVICE_JWT_SECRET = "service-routing-test-secret-7Vq!4xP@9mK#2sL%6wN&8cR"
 
 
 class HttpRoutingGatewayTests(SimpleTestCase):
+    def test_service_jwt_is_bounded_cached_rotated_and_redacted_from_repr(self) -> None:
+        current = [datetime(2026, 8, 23, 0, 0, tzinfo=UTC)]
+        issuer = Hs256ServiceJwtIssuer(
+            SERVICE_JWT_SECRET.encode("utf-8"),
+            "service-api",
+            "routing-api",
+            ttl_seconds=30,
+            now=lambda: current[0],
+        )
+
+        first = issuer.authorization_header()
+        current[0] += timedelta(seconds=19)
+        self.assertEqual(issuer.authorization_header(), first)
+        current[0] += timedelta(seconds=1)
+        rotated = issuer.authorization_header()
+
+        self.assertNotEqual(rotated, first)
+        self.assertNotIn(SERVICE_JWT_SECRET, repr(issuer))
+        self.assertNotIn(first.removeprefix("Bearer "), repr(issuer))
+
     def test_translation_is_contract_valid_and_drops_service_only_fields(self) -> None:
         public = LockedFixtures().get("public_request")
         private = public_to_private(
@@ -32,7 +59,10 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
+        ROUTING_SERVICE_JWT_ISSUER="service-api",
+        ROUTING_SERVICE_JWT_AUDIENCE="routing-api",
+        ROUTING_SERVICE_JWT_TTL_SECONDS=60,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
     )
@@ -56,7 +86,27 @@ class HttpRoutingGatewayTests(SimpleTestCase):
         )
 
         self.assertEqual(response["status"], "PARTIAL")
-        self.assertEqual(seen["headers"]["authorization"], "Bearer service-token")
+        authorization = seen["headers"]["authorization"]
+        self.assertTrue(authorization.startswith("Bearer "))
+        encoded_header, encoded_payload, encoded_signature = (
+            authorization.removeprefix("Bearer ").split(".")
+        )
+        payload = json.loads(
+            base64.urlsafe_b64decode(encoded_payload + "=" * (-len(encoded_payload) % 4))
+        )
+        supplied = base64.urlsafe_b64decode(
+            encoded_signature + "=" * (-len(encoded_signature) % 4)
+        )
+        expected = hmac.new(
+            SERVICE_JWT_SECRET.encode("utf-8"),
+            f"{encoded_header}.{encoded_payload}".encode("ascii"),
+            hashlib.sha256,
+        ).digest()
+        self.assertTrue(hmac.compare_digest(expected, supplied))
+        self.assertEqual((payload["iss"], payload["aud"]), ("service-api", "routing-api"))
+        self.assertGreater(payload["exp"], payload["iat"])
+        self.assertEqual(payload["nbf"], payload["iat"] - 5)
+        self.assertTrue(payload["jti"])
         self.assertEqual(seen["headers"]["x-correlation-id"], "corr-http")
         self.assertEqual(seen["headers"]["x-request-deadline"], deadline)
         self.assertEqual(seen["headers"]["idempotency-key"], "idempotency-http")
@@ -64,7 +114,7 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ENVIRONMENT="production",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
     )
@@ -87,7 +137,7 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
     )
@@ -121,7 +171,146 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
+        ROUTING_VERIFY_SSL=True,
+        ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
+    )
+    def test_internal_service_auth_failure_is_redacted_as_public_safe_503(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                401,
+                headers={"Content-Type": "application/problem+json"},
+                json={
+                    "type": "https://api.example.invalid/problems/service-auth-required",
+                    "title": "Service authentication required",
+                    "status": 401,
+                    "code": "SERVICE_AUTH_REQUIRED",
+                    "detail": None,
+                    "retryable": False,
+                    "correlationId": "private-correlation",
+                    "violations": [],
+                    "safeContext": {},
+                },
+            )
+
+        gateway = HttpRoutingGateway()
+        gateway.client._httpx_args["transport"] = httpx.MockTransport(handler)
+        with self.assertRaises(RoutingGatewayError) as raised:
+            gateway.optimize(
+                LockedFixtures().get("public_request"),
+                RoutingEnvelope(
+                    "corr-auth",
+                    "idempotency-auth",
+                    (datetime.now(UTC) + timedelta(seconds=5)).isoformat(),
+                ),
+            )
+
+        self.assertEqual(
+            (raised.exception.status, raised.exception.code, raised.exception.retryable),
+            (503, "TRANSIT_PROVIDER_UNAVAILABLE", True),
+        )
+
+    @override_settings(
+        ROUTING_API_BASE_URL="https://routing.internal",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
+        ROUTING_VERIFY_SSL=True,
+        ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
+    )
+    def test_registered_422_and_504_problems_are_preserved(self) -> None:
+        fixtures = LockedFixtures()
+        envelope = RoutingEnvelope(
+            "corr-problem",
+            "idempotency-problem",
+            (datetime.now(UTC) + timedelta(seconds=5)).isoformat(),
+        )
+        cases = (
+            (422, "UNSUPPORTED_REGION", False),
+            (504, "ROUTING_DEADLINE_EXCEEDED", True),
+        )
+        for status, code, retryable in cases:
+            with self.subTest(status=status, code=code):
+                def handler(
+                    request: httpx.Request,
+                    status: int = status,
+                    code: str = code,
+                    retryable: bool = retryable,
+                ) -> httpx.Response:
+                    return httpx.Response(
+                        status,
+                        headers={"Content-Type": "application/problem+json"},
+                        json={
+                            "type": f"https://api.example.invalid/problems/{code.lower()}",
+                            "title": "Routing request failed",
+                            "status": status,
+                            "code": code,
+                            "detail": None,
+                            "retryable": retryable,
+                            "correlationId": "corr-problem",
+                            "violations": [],
+                            "safeContext": {},
+                        },
+                    )
+
+                gateway = HttpRoutingGateway()
+                gateway.client._httpx_args["transport"] = httpx.MockTransport(handler)
+                with self.assertRaises(RoutingGatewayError) as raised:
+                    gateway.optimize(fixtures.get("public_request"), envelope)
+                self.assertEqual(
+                    (
+                        raised.exception.status,
+                        raised.exception.code,
+                        raised.exception.retryable,
+                    ),
+                    (status, code, retryable),
+                )
+
+    @override_settings(
+        ROUTING_API_BASE_URL="https://routing.internal",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
+        ROUTING_VERIFY_SSL=True,
+        ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
+    )
+    def test_unapproved_private_problem_code_is_redacted_as_safe_502(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                503,
+                headers={"Content-Type": "application/problem+json"},
+                json={
+                    "type": "https://routing.internal/problems/provider-secret",
+                    "title": "provider credential rejected",
+                    "status": 503,
+                    "code": "PROVIDER_CREDENTIAL_DETAIL",
+                    "detail": "upstream secret detail",
+                    "retryable": True,
+                    "correlationId": "private-correlation",
+                    "violations": [],
+                    "safeContext": {"upstream": "private-provider"},
+                },
+            )
+
+        gateway = HttpRoutingGateway()
+        gateway.client._httpx_args["transport"] = httpx.MockTransport(handler)
+        with self.assertRaises(RoutingGatewayError) as raised:
+            gateway.optimize(
+                LockedFixtures().get("public_request"),
+                RoutingEnvelope(
+                    "corr-unapproved",
+                    "idempotency-unapproved",
+                    (datetime.now(UTC) + timedelta(seconds=5)).isoformat(),
+                ),
+            )
+        self.assertEqual(
+            (
+                raised.exception.status,
+                raised.exception.code,
+                raised.exception.retryable,
+            ),
+            (502, "PROVIDER_BAD_RESPONSE", True),
+        )
+
+    @override_settings(
+        ROUTING_API_BASE_URL="https://routing.internal",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
         ROUTING_MAX_RESPONSE_BYTES=1024,
@@ -149,7 +338,7 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
         ROUTING_MAX_RESPONSE_BYTES=1024,
@@ -179,7 +368,7 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
         ROUTING_MAX_RESPONSE_BYTES=1024,
@@ -212,7 +401,7 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
     )
@@ -267,7 +456,7 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
     )
@@ -298,7 +487,7 @@ class HttpRoutingGatewayTests(SimpleTestCase):
 
     @override_settings(
         ROUTING_API_BASE_URL="https://routing.internal",
-        ROUTING_SERVICE_TOKEN="service-token",
+        ROUTING_SERVICE_JWT_SECRET=SERVICE_JWT_SECRET,
         ROUTING_VERIFY_SSL=True,
         ROUTING_API_ALLOWED_HOSTS=("routing.internal",),
     )

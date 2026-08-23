@@ -43,6 +43,8 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertNotIn("access_logs {", terraform)
         self.assertIn("redacted_fields {", terraform)
         self.assertIn("query_string {}", terraform)
+        self.assertIn('single_header { name = "x-guest-token" }', terraform)
+        self.assertIn('single_header { name = "x-csrftoken" }', terraform)
         self.assertNotIn("sampled_requests_enabled   = true", terraform)
         self.assertNotIn(marker, nginx + service_dockerfile + compose + terraform)
 
@@ -52,6 +54,12 @@ class InfrastructureContractTests(unittest.TestCase):
         for expected in (
             "SERVICE_DATABASE_PASSWORD",
             "SERVICE_ROUTING_API_ALLOWED_HOSTS",
+            "SERVICE_ROUTING_JWT_SECRET",
+            "SERVICE_ROUTING_JWT_ISSUER",
+            "SERVICE_ROUTING_JWT_AUDIENCE",
+            "SERVICE_ROUTING_JWT_TTL_SECONDS",
+            "SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS",
+            "SERVICE_ROUTING_DEADLINE_MILLISECONDS",
             "SERVICE_TRUST_PROXY_HEADERS",
             "SERVICE_TRUSTED_PROXY_IPS",
             "SERVICE_CSRF_TRUSTED_ORIGINS",
@@ -84,6 +92,7 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertNotIn('value = "1000000"', terraform)
         self.assertIn('value = "rediss://${aws_elasticache_replication_group.service.primary_endpoint_address}:6379/0"', terraform)
         self.assertIn("transit_encryption_enabled = true", terraform)
+        self.assertNotIn("SERVICE_ROUTING_SERVICE_TOKEN", terraform)
 
     def test_application_rate_limits_are_bounded_and_configurable(self) -> None:
         variables = self.read("terraform/modules/service-platform/variables.tf")

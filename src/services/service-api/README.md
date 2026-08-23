@@ -2,7 +2,7 @@
 
 사용자 인증, 장소 검색 proxy, 사용자 입력 검증, Routing Gateway, 검색 기록, 즐겨찾기, 설정, 개인정보 권리를 구현한다. 교통 Provider와 모델을 직접 호출하지 않는다.
 
-## Public Service API 1.1
+## Public Service API 1.3.0
 
 ```bash
 uv sync
@@ -10,7 +10,7 @@ uv run python manage.py test
 uv run python manage.py runserver
 ```
 
-The backend implements the Public 1.1 endpoint set for guest/session lifecycle,
+The backend implements the Public 1.3.0 endpoint set for guest/session lifecycle,
 place suggestion/reverse geocoding, route search/history/detail/feedback,
 preferences, saved places, favorite journeys, consents, data export/deletion
 jobs, capabilities, and health. Requests and Routing responses are validated
@@ -21,13 +21,15 @@ Development defaults to the canonical `stub` gateway so valid dynamic
 `SERVICE_ROUTING_GATEWAY=replay` for exact deterministic replay; a request that
 does not match the locked public fixture then returns an honest `503`.
 `SERVICE_ROUTING_GATEWAY=http` uses the generated Private Python client and
-requires `SERVICE_ROUTING_API_BASE_URL` and `SERVICE_ROUTING_SERVICE_TOKEN`.
+requires `SERVICE_ROUTING_API_BASE_URL`, an exact host allowlist, and a shared
+`SERVICE_ROUTING_JWT_SECRET`. Production also requires explicit
+`SERVICE_ROUTING_JWT_ISSUER` and `SERVICE_ROUTING_JWT_AUDIENCE` values matching
+the Routing deployment. Each request receives a short-lived HS256 JWT.
 It forwards only canonical coordinates/constraints plus correlation,
 idempotency, and deadline headers; user identity, guest credentials, place
 labels, and provider place IDs never cross the Routing boundary.
-The public correlation ID is reflected only after strict normalization; an
-independent opaque UUID is generated for the private Routing request so a
-browser-selected value cannot enter internal Routing logs.
+The public correlation ID is forwarded exactly only after strict syntax and
+length validation so one safe identifier traces the public and private hops.
 
 In production, `SERVICE_ROUTING_API_BASE_URL` must be an HTTPS origin without
 userinfo, path, query, or fragment. Its normalized hostname must exactly match
@@ -48,7 +50,7 @@ responses are schema-normalized before returning to the browser.
 Kakao responses use the same identity-encoding rule and a separate
 `SERVICE_KAKAO_LOCAL_MAX_RESPONSE_BYTES` bound (default 512 KiB).
 
-Public 1.2 provides CSRF-protected email registration and login backed by
+Public 1.3.0 provides CSRF-protected email registration and login backed by
 Django adaptive password hashing and an HttpOnly/SameSite session cookie.
 Authentication attempts are rate limited and login failure does not reveal
 whether an email exists. A route POST without a credential gets an ephemeral browser guest session;
@@ -56,16 +58,15 @@ explicit `POST /api/v1/guest-sessions` additionally returns a one-time opaque
 guest token whose hash alone is stored. `saveToHistory=true` remains restricted
 to an authenticated user with current `SEARCH_HISTORY` consent.
 
-Consent purposes use a server-owned current document registry. Development
-defaults every purpose to `local-development`. Production must set
-`SERVICE_CONSENT_DOCUMENT_VERSION`, or set all four purpose-specific variables:
-`SERVICE_CONSENT_SEARCH_HISTORY_DOCUMENT_VERSION`,
-`SERVICE_CONSENT_PRECISE_LOCATION_DOCUMENT_VERSION`,
-`SERVICE_CONSENT_PRODUCT_ANALYTICS_DOCUMENT_VERSION`, and
-`SERVICE_CONSENT_ROUTING_FEEDBACK_DOCUMENT_VERSION`. Submitted stale or unknown
-versions are rejected without recording them, and an older accepted record no
-longer authorizes history or feedback after a configured document rotation.
-The web build's `VITE_PRIVACY_DOCUMENT_VERSION` must match the Service version.
+Consent purposes use one server-owned current registration-document bundle.
+Development defaults the bundle to `local-development`; production must set
+`SERVICE_CONSENT_DOCUMENT_VERSION`. Purpose-specific version variables are
+rejected because the Public registration request and Web build intentionally send
+one `documentVersion` for all five purposes. Submitted stale or unknown versions
+are rejected without recording them, and an older accepted record no longer
+authorizes history or feedback after a configured document rotation. The Web
+build's `VITE_PRIVACY_DOCUMENT_VERSION` must exactly match the Service bundle
+version.
 
 Data export and deletion requests are consumed by the bounded command:
 
@@ -93,7 +94,7 @@ that account's export artifacts are physically removed. Deletion jobs remain
 removes the owner-bound job with the account and leaves a de-identified
 `DATA_DELETION_COMPLETED` audit event.
 
-Public 1.1 currently has no authenticated artifact-download operation, so
+Public 1.3.0 currently has no authenticated artifact-download operation, so
 `downloadUrl` intentionally remains `null`. Infrastructure wires the encrypted
 filesystem backend to private EFS and schedules both lifecycle commands, but a
 short-lived owner-bound delivery contract plus live worker, backup/analytics

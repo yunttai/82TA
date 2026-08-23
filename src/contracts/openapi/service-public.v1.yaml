@@ -15,7 +15,17 @@ paths:
         content:
           application/json:
             schema: {$ref: '#/components/schemas/EmailRegistrationInput'}
-            example: {email: user@example.com, password: correct-horse-battery-staple}
+            example:
+              email: user@example.com
+              password: correct-horse-battery-staple
+              nickname: 82TA 사용자
+              documentVersion: local-development
+              requiredPrivacyAccepted: true
+              optionalConsents:
+                SEARCH_HISTORY: false
+                PRECISE_LOCATION: false
+                PRODUCT_ANALYTICS: false
+                ROUTING_FEEDBACK: false
       responses:
         '201':
           description: Registered USER session
@@ -153,9 +163,11 @@ paths:
         '400': {$ref: '#/components/responses/Problem'}
         '403': {$ref: '#/components/responses/Problem'}
         '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
         '429': {$ref: '#/components/responses/Problem'}
         '502': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
+        '504': {$ref: '#/components/responses/Problem'}
     get:
       operationId: listRouteSearches
       security: [{sessionCookie: []}]

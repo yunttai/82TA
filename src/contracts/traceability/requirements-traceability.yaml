@@ -50,7 +50,7 @@ requirements:
       - src/contracts/openapi/routing-private.v1.yaml#/components/schemas/OptimizeRouteResponse
     implementationPaths:
       - src/packages/routing-domain
-    tests: [UT-PARETO-001, PROP-PARETO-001, REPLAY-R1-R4]
+    tests: [UT-PARETO-001, PROP-PARETO-001, REPLAY-R1-R4, CT-CANONICAL-R1-CHAIN, CT-CODE-REGISTRY-OUTPUT]
     releaseGate: deterministic-frontier-replay
   FR-UI-007:
     title: COMPLETE·PARTIAL·unsupported·expired 상태 표현
@@ -61,7 +61,7 @@ requirements:
     implementationPaths:
       - src/apps/web
       - src/services/service-api
-    tests: [CT-STATUS-001, E2E-PARTIAL-001, E2E-EXPIRED-001]
+    tests: [CT-STATUS-001, E2E-PARTIAL-001, E2E-EXPIRED-001, E2E-ERROR-MATRIX-422-504, CT-PUBLIC-PROJECTION-REDACTION]
     releaseGate: all-semantic-states-rendered
   FR-IAM-005:
     title: 검색 기록·장소·계정 삭제
@@ -150,5 +150,5 @@ requirements:
     implementationPaths:
       - src/services/service-api
       - src/services/routing-api
-    tests: [OPS-HEALTH-001, OPS-VERSION-001]
+    tests: [OPS-HEALTH-001, OPS-VERSION-001, CT-VERSION-PROVENANCE-001]
     releaseGate: readiness-and-version-observable

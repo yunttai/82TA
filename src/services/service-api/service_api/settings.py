@@ -18,6 +18,8 @@ if ENVIRONMENT == "production" and len(_configured_secret or "") < 32:
     raise RuntimeError("SERVICE_SECRET_KEY must contain at least 32 characters in production")
 SECRET_KEY = _configured_secret or "unsafe-development-only"
 DEBUG = os.environ.get("SERVICE_DEBUG", "true" if ENVIRONMENT == "development" else "false").lower() == "true"
+if ENVIRONMENT == "production" and DEBUG:
+    raise RuntimeError("SERVICE_DEBUG must be false in production")
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("SERVICE_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",")
@@ -63,21 +65,29 @@ CONSENT_PURPOSES = (
     "ROUTING_FEEDBACK",
 )
 _consent_version_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-_default_consent_document_version = os.environ.get("SERVICE_CONSENT_DOCUMENT_VERSION", "").strip()
-CONSENT_DOCUMENT_VERSIONS: dict[str, str] = {}
-for _consent_purpose in CONSENT_PURPOSES:
-    _purpose_env_name = f"SERVICE_CONSENT_{_consent_purpose}_DOCUMENT_VERSION"
-    _purpose_version = os.environ.get(_purpose_env_name, _default_consent_document_version).strip()
-    if not _purpose_version and ENVIRONMENT != "production":
-        _purpose_version = "local-development"
-    if not _purpose_version:
-        raise RuntimeError(
-            "A current consent document version is required in production; configure "
-            "SERVICE_CONSENT_DOCUMENT_VERSION or every purpose-specific variable"
-        )
-    if _consent_version_pattern.fullmatch(_purpose_version) is None:
-        raise RuntimeError(f"{_purpose_env_name} contains an invalid consent document version")
-    CONSENT_DOCUMENT_VERSIONS[_consent_purpose] = _purpose_version
+_consent_document_version = os.environ.get("SERVICE_CONSENT_DOCUMENT_VERSION", "").strip()
+if not _consent_document_version and ENVIRONMENT != "production":
+    _consent_document_version = "local-development"
+if not _consent_document_version:
+    raise RuntimeError(
+        "A current consent document version is required in production; configure "
+        "SERVICE_CONSENT_DOCUMENT_VERSION"
+    )
+if _consent_version_pattern.fullmatch(_consent_document_version) is None:
+    raise RuntimeError("SERVICE_CONSENT_DOCUMENT_VERSION contains an invalid consent document version")
+_purpose_specific_consent_variables = tuple(
+    name
+    for name in (f"SERVICE_CONSENT_{purpose}_DOCUMENT_VERSION" for purpose in CONSENT_PURPOSES)
+    if os.environ.get(name, "").strip()
+)
+if _purpose_specific_consent_variables:
+    raise RuntimeError(
+        "Purpose-specific consent document versions are unsupported; use one "
+        "SERVICE_CONSENT_DOCUMENT_VERSION registration bundle"
+    )
+CONSENT_DOCUMENT_VERSIONS = {
+    purpose: _consent_document_version for purpose in CONSENT_PURPOSES
+}
 
 TRUST_PROXY_HEADERS = os.environ.get("SERVICE_TRUST_PROXY_HEADERS", "false").lower() == "true"
 TRUSTED_PROXY_IPS = tuple(
@@ -173,7 +183,15 @@ if ENVIRONMENT == "production" and not _configured_gateway_mode:
     raise RuntimeError("SERVICE_ROUTING_GATEWAY is required in production")
 ROUTING_GATEWAY_MODE = _configured_gateway_mode or "stub"
 ROUTING_API_BASE_URL = os.environ.get("SERVICE_ROUTING_API_BASE_URL", "http://127.0.0.1:8001")
-ROUTING_SERVICE_TOKEN = os.environ.get("SERVICE_ROUTING_SERVICE_TOKEN", "")
+ROUTING_SERVICE_JWT_SECRET = os.environ.get("SERVICE_ROUTING_JWT_SECRET", "")
+_configured_routing_jwt_issuer = os.environ.get("SERVICE_ROUTING_JWT_ISSUER")
+_configured_routing_jwt_audience = os.environ.get("SERVICE_ROUTING_JWT_AUDIENCE")
+ROUTING_SERVICE_JWT_ISSUER = _configured_routing_jwt_issuer or "service-api"
+ROUTING_SERVICE_JWT_AUDIENCE = _configured_routing_jwt_audience or "routing-api"
+ROUTING_SERVICE_JWT_TTL_SECONDS = int(os.environ.get("SERVICE_ROUTING_JWT_TTL_SECONDS", "60"))
+_routing_service_auth_identifier = re.compile(
+    r"[A-Za-z0-9](?:[A-Za-z0-9._:/-]{0,126}[A-Za-z0-9])?\Z"
+)
 ROUTING_VERIFY_SSL = os.environ.get("SERVICE_ROUTING_VERIFY_SSL", "true").lower() == "true"
 ROUTING_API_ALLOWED_HOSTS = tuple(
     host.strip().lower().rstrip(".")
@@ -181,8 +199,21 @@ ROUTING_API_ALLOWED_HOSTS = tuple(
     if host.strip()
 )
 if ENVIRONMENT == "production" and ROUTING_GATEWAY_MODE == "http":
-    if not ROUTING_SERVICE_TOKEN:
-        raise RuntimeError("SERVICE_ROUTING_SERVICE_TOKEN is required for the HTTP RoutingGateway")
+    _routing_jwt_secret = ROUTING_SERVICE_JWT_SECRET.encode("utf-8")
+    if (
+        not 32 <= len(_routing_jwt_secret) <= 4096
+        or _routing_jwt_secret != _routing_jwt_secret.strip()
+        or any(value < 33 or value == 127 for value in _routing_jwt_secret)
+        or len(set(_routing_jwt_secret)) < 8
+    ):
+        raise RuntimeError("SERVICE_ROUTING_JWT_SECRET must be an explicit strong secret")
+    if not _configured_routing_jwt_issuer or not _configured_routing_jwt_audience:
+        raise RuntimeError("Routing service JWT issuer and audience must be explicit in production")
+    if (
+        _routing_service_auth_identifier.fullmatch(ROUTING_SERVICE_JWT_ISSUER) is None
+        or _routing_service_auth_identifier.fullmatch(ROUTING_SERVICE_JWT_AUDIENCE) is None
+    ):
+        raise RuntimeError("Routing service JWT issuer and audience are invalid")
     if not ROUTING_API_ALLOWED_HOSTS:
         raise RuntimeError("SERVICE_ROUTING_API_ALLOWED_HOSTS is required for the HTTP RoutingGateway")
     if not ROUTING_VERIFY_SSL:
@@ -196,7 +227,27 @@ AUTH_SESSION_TTL_SECONDS = int(os.environ.get("SERVICE_AUTH_SESSION_TTL_SECONDS"
 if not 300 <= AUTH_SESSION_TTL_SECONDS <= 2_592_000:
     raise RuntimeError("SERVICE_AUTH_SESSION_TTL_SECONDS must be between 300 and 2592000")
 PLACE_RATE_LIMIT_PER_MINUTE = int(os.environ.get("SERVICE_PLACE_RATE_LIMIT_PER_MINUTE", "60"))
+PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS = int(
+    os.environ.get("SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS", "7000")
+)
 ROUTING_DEADLINE_MILLISECONDS = int(os.environ.get("SERVICE_ROUTING_DEADLINE_MILLISECONDS", "6500"))
+ROUTING_NETWORK_MARGIN_MILLISECONDS = (
+    PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS - ROUTING_DEADLINE_MILLISECONDS
+)
+if not 15 <= ROUTING_SERVICE_JWT_TTL_SECONDS <= 300:
+    raise RuntimeError("SERVICE_ROUTING_JWT_TTL_SECONDS must be between 15 and 300")
+if not 1 <= PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS <= 7000:
+    raise RuntimeError(
+        "SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS must be between 1 and 7000"
+    )
+if not 1 <= ROUTING_DEADLINE_MILLISECONDS <= 6500:
+    raise RuntimeError(
+        "SERVICE_ROUTING_DEADLINE_MILLISECONDS must be between 1 and 6500"
+    )
+if ROUTING_NETWORK_MARGIN_MILLISECONDS < 500:
+    raise RuntimeError(
+        "Service route-search budget must preserve at least 500ms after the Routing deadline"
+    )
 ROUTING_CAPABILITIES_CACHE_TTL_SECONDS = int(
     os.environ.get("SERVICE_ROUTING_CAPABILITIES_CACHE_TTL_SECONDS", "60")
 )

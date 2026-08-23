@@ -200,7 +200,7 @@ describe("route search vertical slice", () => {
     expect(selectedPreset).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("posts only to the public route-search endpoint and preserves a partial null result", async () => {
+  it("posts only to the public route-search endpoint and renders the partial canonical recommendations", async () => {
     document.cookie = "csrftoken=csrf-test-token; Path=/; SameSite=Lax";
     const fetchMock = successfulFetch();
     vi.stubGlobal("fetch", fetchMock);
@@ -211,8 +211,11 @@ describe("route search vertical slice", () => {
 
     expect(await screen.findAllByText("일부 정보 제한")).toHaveLength(1);
     expect(screen.getByText("일부 정보 없이 계산한 결과입니다.")).toBeInTheDocument();
-    expect(screen.getAllByText("추천 경로 없음")).toHaveLength(4);
-    expect(screen.getByText("일부 교통 정보가 빠진 상태로 계산했습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("추천 경로 없음")).not.toBeInTheDocument();
+    for (const label of ["가장 빠른 경로", "가장 안정적인 경로", "비용 효율 경로", "대중교통만 이용"]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getAllByText("버스 실시간 정보를 사용할 수 없습니다.")).toHaveLength(5);
 
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (input instanceof Request ? input.url : input.toString()).endsWith("/api/v1/route-searches"))).toBe(true));
     const healthCall = fetchMock.mock.calls.find(([input]) => (input instanceof Request ? input.url : input.toString()).endsWith("/api/v1/health"));

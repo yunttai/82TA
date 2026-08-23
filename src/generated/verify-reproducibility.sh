@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# This script is LF-only so Git Bash can execute it on Windows.
+
 generated_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_dir="$(cd "${generated_dir}/../.." && pwd)"
 temporary_dir="$(mktemp -d /tmp/82ta-generated-verification.XXXXXX)"

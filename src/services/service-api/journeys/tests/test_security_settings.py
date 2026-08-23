@@ -12,18 +12,28 @@ from journeys.middleware import TrustedProxyHeadersMiddleware
 from journeys.proxy import client_ip
 
 
+SERVICE_JWT_SECRET = "service-routing-test-secret-7Vq!4xP@9mK#2sL%6wN&8cR"
+
+
 class ProductionSettingsTests(SimpleTestCase):
     _production_keys: ClassVar[set[str]] = {
         "DATABASE_URL",
         "SERVICE_ENVIRONMENT",
         "SERVICE_SECRET_KEY",
+        "SERVICE_DEBUG",
         "SERVICE_ROUTING_GATEWAY",
-        "SERVICE_ROUTING_SERVICE_TOKEN",
+        "SERVICE_ROUTING_JWT_SECRET",
+        "SERVICE_ROUTING_JWT_ISSUER",
+        "SERVICE_ROUTING_JWT_AUDIENCE",
+        "SERVICE_ROUTING_JWT_TTL_SECONDS",
+        "SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS",
+        "SERVICE_ROUTING_DEADLINE_MILLISECONDS",
         "SERVICE_ROUTING_API_ALLOWED_HOSTS",
         "SERVICE_CSRF_TRUSTED_ORIGINS",
         "SERVICE_TRUST_PROXY_HEADERS",
         "SERVICE_TRUSTED_PROXY_IPS",
         "SERVICE_CONSENT_DOCUMENT_VERSION",
+        "SERVICE_CONSENT_SERVICE_PRIVACY_DOCUMENT_VERSION",
         "SERVICE_CONSENT_SEARCH_HISTORY_DOCUMENT_VERSION",
         "SERVICE_CONSENT_PRECISE_LOCATION_DOCUMENT_VERSION",
         "SERVICE_CONSENT_PRODUCT_ANALYTICS_DOCUMENT_VERSION",
@@ -137,6 +147,54 @@ class ProductionSettingsTests(SimpleTestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("KAKAO_LOCAL_REST_KEY is required in production", result.stderr)
 
+    def test_http_gateway_requires_strong_short_lived_service_jwt_and_deadline_margin(self) -> None:
+        common = {
+            "DATABASE_URL": "postgresql://service:secret@db.internal/service",
+            "SERVICE_ROUTING_GATEWAY": "http",
+            "SERVICE_ROUTING_API_ALLOWED_HOSTS": "routing.internal",
+            "SERVICE_ROUTING_JWT_ISSUER": "service-api",
+            "SERVICE_ROUTING_JWT_AUDIENCE": "routing-api",
+        }
+        missing = self._import_settings(**common)
+        weak = self._import_settings(**common, SERVICE_ROUTING_JWT_SECRET="x" * 32)
+        missing_identity = self._import_settings(
+            DATABASE_URL="postgresql://service:secret@db.internal/service",
+            SERVICE_ROUTING_GATEWAY="http",
+            SERVICE_ROUTING_API_ALLOWED_HOSTS="routing.internal",
+            SERVICE_ROUTING_JWT_SECRET=SERVICE_JWT_SECRET,
+        )
+        invalid_ttl = self._import_settings(
+            **common,
+            SERVICE_ROUTING_JWT_SECRET=SERVICE_JWT_SECRET,
+            SERVICE_ROUTING_JWT_TTL_SECONDS="301",
+        )
+        missing_margin = self._import_settings(
+            **common,
+            SERVICE_ROUTING_JWT_SECRET=SERVICE_JWT_SECRET,
+            SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS="6500",
+            SERVICE_ROUTING_DEADLINE_MILLISECONDS="6200",
+        )
+        oversized_routing_deadline = self._import_settings(
+            **common,
+            SERVICE_ROUTING_JWT_SECRET=SERVICE_JWT_SECRET,
+            SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS="7000",
+            SERVICE_ROUTING_DEADLINE_MILLISECONDS="6600",
+        )
+        oversized_public_budget = self._import_settings(
+            **common,
+            SERVICE_ROUTING_JWT_SECRET=SERVICE_JWT_SECRET,
+            SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS="7001",
+            SERVICE_ROUTING_DEADLINE_MILLISECONDS="6500",
+        )
+
+        self.assertIn("explicit strong secret", missing.stderr)
+        self.assertIn("explicit strong secret", weak.stderr)
+        self.assertIn("issuer and audience must be explicit", missing_identity.stderr)
+        self.assertIn("TTL_SECONDS", invalid_ttl.stderr)
+        self.assertIn("at least 500ms", missing_margin.stderr)
+        self.assertIn("between 1 and 6500", oversized_routing_deadline.stderr)
+        self.assertIn("between 1 and 7000", oversized_public_budget.stderr)
+
     def test_production_rejects_disabled_rate_limits_and_short_coordination_ttls(self) -> None:
         common = {"DATABASE_URL": "postgresql://service:secret@db.internal/service"}
         disabled = self._import_settings(**common, SERVICE_RATE_LIMIT_PER_MINUTE="0")
@@ -162,19 +220,33 @@ class ProductionSettingsTests(SimpleTestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("current consent document version is required in production", result.stderr)
 
-    def test_per_purpose_consent_version_overrides_common_version(self) -> None:
+    def test_production_rejects_debug(self) -> None:
         result = self._import_settings(
-            code=(
-                "import service_api.settings as s; "
-                "print(s.CONSENT_DOCUMENT_VERSIONS['SEARCH_HISTORY']); "
-                "print(s.CONSENT_DOCUMENT_VERSIONS['ROUTING_FEEDBACK'])"
-            ),
+            DATABASE_URL="postgresql://service:secret@db.internal/service",
+            SERVICE_DEBUG="true",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SERVICE_DEBUG must be false in production", result.stderr)
+
+    def test_registration_consent_versions_are_one_deployment_bundle(self) -> None:
+        result = self._import_settings(
             DATABASE_URL="postgresql://service:secret@db.internal/service",
             SERVICE_CONSENT_DOCUMENT_VERSION="privacy-common",
             SERVICE_CONSENT_SEARCH_HISTORY_DOCUMENT_VERSION="privacy-search-v2",
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.splitlines(), ["privacy-search-v2", "privacy-common"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Purpose-specific consent document versions are unsupported", result.stderr)
+
+        aligned = self._import_settings(
+            code=(
+                "import service_api.settings as s; "
+                "print(sorted(set(s.CONSENT_DOCUMENT_VERSIONS.values())))"
+            ),
+            DATABASE_URL="postgresql://service:secret@db.internal/service",
+            SERVICE_CONSENT_DOCUMENT_VERSION="privacy-common",
+        )
+        self.assertEqual(aligned.returncode, 0, aligned.stderr)
+        self.assertEqual(aligned.stdout.strip(), "['privacy-common']")
 
     def test_production_requires_explicit_data_rights_artifact_backend(self) -> None:
         result = self._import_settings(

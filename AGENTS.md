@@ -19,6 +19,7 @@ Codex reads this root file and the nearest nested `AGENTS.md` files. Before edit
 
 - `.codex/`: Codex project config and custom subagents
 - `.agents/skills/`: reusable Codex skills
+- `.codegraph/`: ignored local CodeGraph index; never a product artifact
 - `_workspace/`: durable work plans, handoffs, audits, and integration evidence
 - `src/`: all product artifacts, product documentation, contracts, implementation, tests, infrastructure, and executable scripts
 - `AGENTS.md`, `README.md`, `.gitignore`: root entry files

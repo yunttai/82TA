@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from uuid import UUID
 
+from django.db import transaction
 from django.utils import timezone
 
 from journeys.models import ConsentRecord, ServiceUser
@@ -17,14 +19,31 @@ class ConsentRepository:
         accepted: bool,
         recorded_at=None,
     ) -> ConsentRecord:
-        user = ServiceUser.objects.get(id=user_id, is_active=True, deleted_at__isnull=True)
-        return ConsentRecord.objects.create(
-            user=user,
-            consent_type=consent_type,
-            document_version=document_version,
-            accepted=accepted,
-            recorded_at=recorded_at or timezone.now(),
-        )
+        with transaction.atomic():
+            user = ServiceUser.objects.select_for_update().get(
+                id=user_id,
+                is_active=True,
+                deleted_at__isnull=True,
+            )
+            effective_at = recorded_at if recorded_at is not None else timezone.now()
+            previous_at = (
+                ConsentRecord.objects.filter(
+                    user=user,
+                    consent_type=consent_type,
+                )
+                .order_by("-recorded_at")
+                .values_list("recorded_at", flat=True)
+                .first()
+            )
+            if previous_at is not None and effective_at <= previous_at:
+                effective_at = previous_at + timedelta(microseconds=1)
+            return ConsentRecord.objects.create(
+                user=user,
+                consent_type=consent_type,
+                document_version=document_version,
+                accepted=accepted,
+                recorded_at=effective_at,
+            )
 
     @staticmethod
     def latest(*, user_id: UUID | str, consent_type: str) -> ConsentRecord | None:

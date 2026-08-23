@@ -614,6 +614,12 @@ resource "aws_wafv2_web_acl_logging_configuration" "this" {
     single_header { name = "cookie" }
   }
   redacted_fields {
+    single_header { name = "x-guest-token" }
+  }
+  redacted_fields {
+    single_header { name = "x-csrftoken" }
+  }
+  redacted_fields {
     query_string {}
   }
 }
@@ -821,6 +827,7 @@ resource "aws_secretsmanager_secret" "kakao_local" {
 
 resource "aws_secretsmanager_secret" "routing_token" {
   name                    = "${var.name}/service/routing-token"
+  description             = "Shared HS256 signing secret for Service-to-Routing JWT authentication"
   kms_key_id              = aws_kms_key.platform.arn
   recovery_window_in_days = 30
   tags                    = local.common_tags
@@ -1044,6 +1051,11 @@ resource "aws_ecs_task_definition" "service" {
       { name = "SERVICE_ROUTING_API_BASE_URL", value = var.routing_api_base_url },
       { name = "SERVICE_ROUTING_API_ALLOWED_HOSTS", value = join(",", var.routing_api_allowed_hosts) },
       { name = "SERVICE_ROUTING_VERIFY_SSL", value = "true" },
+      { name = "SERVICE_ROUTING_JWT_ISSUER", value = "service-api" },
+      { name = "SERVICE_ROUTING_JWT_AUDIENCE", value = "routing-api" },
+      { name = "SERVICE_ROUTING_JWT_TTL_SECONDS", value = "60" },
+      { name = "SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS", value = "7000" },
+      { name = "SERVICE_ROUTING_DEADLINE_MILLISECONDS", value = "6500" },
       { name = "SERVICE_TRUST_PROXY_HEADERS", value = "true" },
       # Django resolves X-Forwarded-For from the nearest untrusted hop. Trust
       # exactly the ALB subnet nodes and AWS-managed CloudFront origin-facing
@@ -1075,7 +1087,7 @@ resource "aws_ecs_task_definition" "service" {
         { name = "SERVICE_DATABASE_PASSWORD", valueFrom = "${aws_db_instance.service.master_user_secret[0].secret_arn}:password::" },
         { name = "SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY", valueFrom = aws_secretsmanager_secret.data_rights_artifact_key.arn }
       ],
-      var.routing_gateway_mode == "http" ? [{ name = "SERVICE_ROUTING_SERVICE_TOKEN", valueFrom = aws_secretsmanager_secret.routing_token.arn }] : []
+      var.routing_gateway_mode == "http" ? [{ name = "SERVICE_ROUTING_JWT_SECRET", valueFrom = aws_secretsmanager_secret.routing_token.arn }] : []
     )
     healthCheck = {
       command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/infra/healthz', timeout=2).read()\" || exit 1"]

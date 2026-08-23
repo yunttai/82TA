@@ -50,13 +50,25 @@ class RouteSearchApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Correlation-Id"], "corr-0001")
         self.assertEqual(body["status"], "PARTIAL")
-        self.assertEqual(body["recommendations"], {
-            "fastest": None,
-            "stable": None,
-            "efficient": None,
-            "publicTransitOnly": None,
-        })
-        self.assertEqual(body["paretoFrontier"], [])
+        route_ids = {
+            route["routeId"]
+            for route in body["recommendations"].values()
+            if route is not None
+        }
+        self.assertEqual(route_ids, {"route_6d206a95ed947d8a"})
+        self.assertEqual(body["baseline"]["routeId"], "route_6d206a95ed947d8a")
+        self.assertEqual(
+            body["paretoFrontier"],
+            [
+                {
+                    "routeId": "route_6d206a95ed947d8a",
+                    "taxiCostUpper": 0,
+                    "p50Seconds": 3300,
+                    "p90Seconds": 4200,
+                }
+            ],
+        )
+        self.assertEqual(body["warnings"], ["BUS_DATA_UNAVAILABLE"])
         self.assertNotIn("providerStatus", body)
         self.assertNotIn("modelVersions", body)
         self.assertNotIn("computation", body)
@@ -73,8 +85,7 @@ class RouteSearchApiTests(TestCase):
         self.assertNotIn("saveToHistory", encoded)
         self.assertNotIn("userId", encoded)
         self.assertNotIn("email", encoded)
-        self.assertNotEqual(views._gateway.last_envelope.correlation_id, "corr-0001")
-        self.assertEqual(len(views._gateway.last_envelope.correlation_id), 36)
+        self.assertEqual(views._gateway.last_envelope.correlation_id, "corr-0001")
         self.assertEqual(response["X-Correlation-Id"], "corr-0001")
         self.assertNotEqual(views._gateway.last_envelope.idempotency_key, "fixture-key-0001")
         self.assertEqual(len(views._gateway.last_envelope.idempotency_key), 64)

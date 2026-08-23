@@ -22,8 +22,11 @@ terraform plan
 
 Terraform creates secret containers but deliberately creates no secret values.
 Before the first ECS task starts, populate the Django secret, Kakao REST key,
-and dedicated data-rights artifact Fernet key ARNs from
-`application_secret_arns`; populate the Routing token only for HTTP mode. RDS
+dedicated data-rights artifact Fernet key, and—only for HTTP mode—the
+`routing_auth` secret from `application_secret_arns`. The Routing secret is an
+HS256 signing secret, not a reusable bearer token;
+the same value must be supplied to Routing as `ROUTING_SERVICE_JWT_SECRET`,
+with issuer `service-api` and audience `routing-api` on both deployments. RDS
 owns and rotates its master password in Secrets Manager. The
 container startup adapter combines that password with non-secret RDS endpoint
 fields into `DATABASE_URL` in process memory; neither the password nor URL is

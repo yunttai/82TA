@@ -99,6 +99,11 @@ GET  /v1/version
 - Routing producer는 Service consumer보다 먼저 backward-compatible field를 배포
 - deprecation 기간 뒤 제거
 - compatible minor는 OpenAPI/DB/code registry metadata의 minor를 올리되, Private request의 `contractVersion: "1.0"`은 1.x wire compatibility family로 유지한다.
+- `/v1/version.contractVersion`은 현재 로드된 Private OpenAPI의 repository
+  metadata(`1.1.0`)를 보고한다. optimize request/response body의 wire family
+  `1.0`과 구분한다.
+- `rankingPolicyVersion`은 exact opaque provenance이며 Service가 의미를
+  추론하거나 다시 계산하지 않는다.
 
 ## 7. Generated Clients
 

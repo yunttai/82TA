@@ -69,7 +69,7 @@ class EncryptedFilesystemArtifactStore:
                 delete=False,
             ) as temporary:
                 temporary_path = Path(temporary.name)
-                os.chmod(temporary.fileno(), 0o600)
+                os.chmod(temporary_path, 0o600)
                 temporary.write(encrypted)
                 temporary.flush()
                 os.fsync(temporary.fileno())

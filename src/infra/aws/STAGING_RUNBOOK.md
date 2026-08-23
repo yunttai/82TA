@@ -179,8 +179,9 @@ plan; changing it immediately makes outstanding exports unreadable.
   versions from S3 version history, then invalidate those three mutable paths.
 - Database: use PITR to a new instance and deliberately repoint a reviewed task
   definition. Run a restore drill before production and at least quarterly.
-- Secrets: rotate in Secrets Manager, force a new deployment, revoke the old
-  Routing token, and audit caller/correlation records.
+- Secrets: rotate the shared Service-to-Routing JWT signing secret in Secrets
+  Manager, deploy the matching value to both services, retire the old value,
+  and audit caller/correlation records without recording bearer JWTs.
 
 ## Production gaps
 

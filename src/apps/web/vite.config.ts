@@ -2,8 +2,6 @@ import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
-
-
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "VITE_");
   const privacyDocumentVersion = env.VITE_PRIVACY_DOCUMENT_VERSION;
@@ -33,5 +31,3 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
-
-

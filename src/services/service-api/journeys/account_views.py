@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+import unicodedata
 from datetime import timedelta
 from typing import Any
 
@@ -10,7 +11,9 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.middleware.csrf import rotate_token
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django.views.decorators.http import require_http_methods
 
 from consent.repository import ConsentRepository
@@ -121,6 +124,7 @@ def _normalized_email(value: Any) -> str:
     return email
 
 
+@sensitive_variables("payload", "password")
 def _credential_payload(request: HttpRequest) -> tuple[str, str]:
     payload = json_body(request)
     validate_schema("public", "EmailCredentialInput", payload)
@@ -130,11 +134,16 @@ def _credential_payload(request: HttpRequest) -> tuple[str, str]:
     return _normalized_email(payload.get("email")), password
 
 
+@sensitive_variables("payload", "password")
 def _registration_payload(request: HttpRequest) -> tuple[str, str, str, str, dict[str, bool]]:
     payload = json_body(request)
     validate_schema("public", "EmailRegistrationInput", payload)
-    nickname = payload["nickname"].strip()
-    if len(nickname) < 2 or len(nickname) > 20:
+    nickname = unicodedata.normalize("NFKC", payload["nickname"]).strip()
+    if (
+        len(nickname) < 2
+        or len(nickname) > 20
+        or any(unicodedata.category(character) in {"Cc", "Cf"} for character in nickname)
+    ):
         raise ApiProblem(400, "CONSTRAINT_OUT_OF_RANGE", "Nickname must contain 2 to 20 characters")
     document_version = payload["documentVersion"]
     validate_document_version("SERVICE_PRIVACY", document_version)
@@ -158,6 +167,7 @@ def _start_user_session(request: HttpRequest, user: ServiceUser) -> dict[str, An
             session_id=previous_session_id,
         )
     request.session.flush()
+    rotate_token(request)
     request.session["service_user_id"] = str(user.id)
     request.session.set_expiry(settings.AUTH_SESSION_TTL_SECONDS)
     request.session.save()
@@ -178,6 +188,8 @@ def _start_user_session(request: HttpRequest, user: ServiceUser) -> dict[str, An
     }
 
 
+@sensitive_variables("payload", "password", "password_hash")
+@sensitive_post_parameters("password")
 @require_http_methods(["POST"])
 def register_with_email(request: HttpRequest) -> JsonResponse:
     try:
@@ -188,10 +200,11 @@ def register_with_email(request: HttpRequest) -> JsonResponse:
             title="Too many registration attempts",
         )
         email, password, nickname, document_version, optional_consents = _registration_payload(request)
+        password_hash = make_password(password)
         try:
             with transaction.atomic():
                 user = IdentityRepository.create_user(
-                    email=email, password_hash=make_password(password), nickname=nickname
+                    email=email, password_hash=password_hash, nickname=nickname
                 )
                 ConsentRepository.record(
                     user_id=user.id, consent_type="SERVICE_PRIVACY",
@@ -210,6 +223,8 @@ def register_with_email(request: HttpRequest) -> JsonResponse:
         return problem_response(problem, request)
 
 
+@sensitive_variables("payload", "password", "password_hash")
+@sensitive_post_parameters("password")
 @require_http_methods(["POST"])
 def login_with_email(request: HttpRequest) -> JsonResponse:
     try:

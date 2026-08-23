@@ -6,7 +6,7 @@
   "routingApiMajor": 1,
   "databaseContractVersion": "1.2.0",
   "codeRegistryVersion": "1.3.0",
-  "rankingPolicyVersion": "0.1.0-planned",
+  "rankingPolicyVersion": "rank-0.1.1",
   "mappingPolicyVersion": "0.1.0-planned",
   "featureSchemaVersion": "0.1.0-planned",
   "status": "SERVICE_CONTRACT_MINOR_1_3"

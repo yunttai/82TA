@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# This script is LF-only so Git Bash can execute it on Windows.
+
 generated_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_dir="$(cd "${generated_dir}/../.." && pwd)"
 temporary_dir="$(mktemp -d /tmp/82ta-client-generation.XXXXXX)"
@@ -8,7 +10,16 @@ trap 'rm -rf -- "${temporary_dir}"' EXIT
 
 cd "${repository_dir}"
 
-python3 src/scripts/verify_contract_lock.py
+if python3 --version >/dev/null 2>&1; then
+  python_runtime=python3
+elif python --version >/dev/null 2>&1; then
+  python_runtime=python
+else
+  echo "A working Python runtime is required for contract verification." >&2
+  exit 1
+fi
+
+"${python_runtime}" src/scripts/verify_contract_lock.py
 
 npx --yes @redocly/cli@1.34.2 bundle \
   src/contracts/openapi/service-public.v1.yaml \

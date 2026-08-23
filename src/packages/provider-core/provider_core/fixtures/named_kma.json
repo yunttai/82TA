@@ -1,0 +1,9 @@
+{
+  "fixtureVersion":"1.0","provider":"KMA","operations":{"weather_context":{
+    "success":{"fetchedAt":"2026-08-24T08:50:01+09:00","receivedAt":"2026-08-24T08:50:01+09:00","observedAt":"2026-08-24T08:50:00+09:00","schemaVersion":"kma.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"coordinate":{"lon":127.10,"lat":37.39},"items":[{"category":"T1H","value":26.5},{"category":"RN1","value":0.0}]}},
+    "empty":{"fetchedAt":"2026-08-24T08:50:01+09:00","receivedAt":"2026-08-24T08:50:01+09:00","observedAt":"2026-08-24T08:50:00+09:00","schemaVersion":"kma.fixture.v1","httpStatus":200,"contentType":"application/json","body":{"coordinate":{"lon":127.10,"lat":37.39},"items":[]}},
+    "error":{"fetchedAt":"2026-08-24T08:50:01+09:00","receivedAt":"2026-08-24T08:50:01+09:00","observedAt":null,"schemaVersion":"kma.fixture.v1","httpStatus":503,"contentType":"application/json","body":{"error":"sanitized unavailable"}},
+    "rate_limited":{"fetchedAt":"2026-08-24T08:50:01+09:00","receivedAt":"2026-08-24T08:50:01+09:00","observedAt":null,"schemaVersion":"kma.fixture.v1","httpStatus":429,"contentType":"application/json","body":{"error":"sanitized rate limit"}},
+    "schema_drift":{"fetchedAt":"2026-08-24T08:50:01+09:00","receivedAt":"2026-08-24T08:50:01+09:00","observedAt":"2026-08-24T08:50:00+09:00","schemaVersion":"kma.drift","httpStatus":200,"contentType":"application/json","body":{"coordinate":{"lon":127.10,"lat":37.39},"items":[{"category":"T1H","value":"26.5"}]}}
+  }}
+}

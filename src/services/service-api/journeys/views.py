@@ -36,7 +36,7 @@ from .gateway import (
 from .models import RouteFeedback, RouteSearch, RouteSearchResult
 from .projection import project_public_response
 
-_SAFE_CORRELATION = re.compile(r"^[^\x00-\x1f\x7f]{1,1024}$")
+_SAFE_CORRELATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _contracts = CanonicalContracts()
 _fixtures: LockedFixtures | None = None
 _gateway: Any = None
@@ -80,7 +80,7 @@ def _correlation_id(request: HttpRequest) -> str:
             400,
             "CONSTRAINT_OUT_OF_RANGE",
             "Invalid correlation identifier",
-            violations=({"field": "X-Correlation-Id", "message": "contains invalid control characters or is too long"},),
+            violations=({"field": "X-Correlation-Id", "message": "must be an opaque 1-128 character identifier"},),
         )
     return supplied
 
@@ -415,11 +415,10 @@ def create_route_search(request: HttpRequest) -> JsonResponse:
 
         fixtures, gateway = _dependencies()
         routing_idempotency_key = _routing_idempotency_key(owner_key)
-        internal_correlation_id = str(uuid.uuid4())
         routing_response = gateway.optimize(
             payload,
             RoutingEnvelope(
-                correlation_id=internal_correlation_id,
+                correlation_id=correlation_id,
                 idempotency_key=routing_idempotency_key,
                 request_deadline=(
                     datetime.now(UTC) + timedelta(milliseconds=settings.ROUTING_DEADLINE_MILLISECONDS)

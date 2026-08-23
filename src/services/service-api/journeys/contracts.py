@@ -19,6 +19,16 @@ class ContractError(RuntimeError):
     pass
 
 
+def _canonical_text_bytes(raw: bytes) -> bytes:
+    """Normalize checkout line endings before comparing canonical text hashes."""
+
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ContractError("locked fixture is not valid UTF-8") from exc
+    return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+
+
 def _json_pointer(document: Any, pointer: str) -> Any:
     value = document
     if pointer:
@@ -85,7 +95,7 @@ class LockedFixtures:
         self._values: dict[str, Any] = {}
         for name, relative_path in self.FIXTURES.items():
             path = repository_root / relative_path
-            raw = path.read_bytes()
+            raw = _canonical_text_bytes(path.read_bytes())
             if hashlib.sha256(raw).hexdigest() != expected_hashes.get(relative_path):
                 raise ContractError(f"locked fixture hash mismatch: {relative_path}")
             self._values[name] = json.loads(raw)

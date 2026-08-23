@@ -20,6 +20,7 @@ _workspace/**
 **/node_modules/
 **/dist/
 **/build/
+**/*.egg-info/
 **/.coverage
 **/coverage/
 **/*.sqlite3

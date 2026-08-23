@@ -811,7 +811,16 @@ export interface operations {
             content: {
                 /** @example {
                  *       "email": "user@example.com",
-                 *       "password": "correct-horse-battery-staple"
+                 *       "password": "correct-horse-battery-staple",
+                 *       "nickname": "82TA 사용자",
+                 *       "documentVersion": "local-development",
+                 *       "requiredPrivacyAccepted": true,
+                 *       "optionalConsents": {
+                 *         "SEARCH_HISTORY": false,
+                 *         "PRECISE_LOCATION": false,
+                 *         "PRODUCT_ANALYTICS": false,
+                 *         "ROUTING_FEEDBACK": false
+                 *       }
                  *     } */
                 "application/json": components["schemas"]["EmailRegistrationInput"];
             };
@@ -1042,9 +1051,11 @@ export interface operations {
             400: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
             429: components["responses"]["Problem"];
             502: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
         };
     };
     getRouteSearch: {

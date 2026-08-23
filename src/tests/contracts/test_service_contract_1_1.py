@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -57,8 +58,22 @@ class ServiceContract11Tests(unittest.TestCase):
     def test_route_contract_documents_errors_and_owner_security(self) -> None:
         paths = self.public["paths"]
         create_responses = paths["/api/v1/route-searches"]["post"]["responses"]
-        self.assertIn("403", create_responses)
-        self.assertIn("502", create_responses)
+        self.assertEqual(
+            set(create_responses),
+            {"200", "400", "403", "409", "422", "429", "502", "503", "504"},
+        )
+        problem = {"$ref": "#/components/responses/Problem"}
+        self.assertEqual(create_responses["422"], problem)
+        self.assertEqual(create_responses["504"], problem)
+        self.assertEqual(self.codes["errorCodes"]["UNSUPPORTED_REGION"]["httpStatus"], 422)
+        self.assertFalse(self.codes["errorCodes"]["UNSUPPORTED_REGION"]["retryable"])
+        self.assertEqual(
+            self.codes["errorCodes"]["ROUTING_DEADLINE_EXCEEDED"]["httpStatus"],
+            504,
+        )
+        self.assertTrue(
+            self.codes["errorCodes"]["ROUTING_DEADLINE_EXCEEDED"]["retryable"]
+        )
         detail = paths["/api/v1/route-searches/{searchId}"]["get"]
         self.assertEqual(
             detail["security"],
@@ -115,6 +130,33 @@ class ServiceContract11Tests(unittest.TestCase):
             ["properties"]["contractVersion"]["const"],
             "1.0",
         )
+        self.assertEqual(self.public["info"]["version"], "1.3.0")
+        self.assertEqual(self.private["info"]["version"], "1.1.0")
+        manifest = json.loads(
+            (ROOT / "src/contracts/CONTEXT_MANIFEST.json").read_text(encoding="utf-8")
+        )
+        versions = json.loads(
+            (ROOT / "src/contracts/versions/platform-versions.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(manifest["contextVersion"], "1.3.0")
+        self.assertEqual(manifest["contractVersion"], "1.3.0")
+        self.assertEqual(versions["contextVersion"], "1.3.0")
+        self.assertEqual(versions["contractVersion"], "1.3.0")
+        self.assertEqual(versions["databaseContractVersion"], "1.2.0")
+        self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
+        self.assertEqual(versions["rankingPolicyVersion"], "rank-0.1.1")
+
+    def test_registration_inline_example_matches_its_schema(self) -> None:
+        example = self.public["paths"]["/api/v1/auth/register"]["post"]["requestBody"][
+            "content"
+        ]["application/json"]["example"]
+        schema = self.public["components"]["schemas"]["EmailRegistrationInput"]
+        errors = list(
+            Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(example)
+        )
+        self.assertEqual(errors, [])
 
     def test_new_problem_codes_have_expected_status(self) -> None:
         errors = self.codes["errorCodes"]

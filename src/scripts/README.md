@@ -20,6 +20,7 @@
 저장소 루트에서:
 
 ```bash
+python -m pip install -r src/scripts/requirements-validation.txt
 python src/scripts/validate_repository.py
 python src/scripts/snapshot_context.py service-product
 python src/scripts/snapshot_context.py routing-intelligence

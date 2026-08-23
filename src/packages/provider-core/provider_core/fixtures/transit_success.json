@@ -1,0 +1,61 @@
+{
+  "fixtureVersion": "1.0",
+  "scenario": "success",
+  "provider": "SANITIZED_TRANSIT_FIXTURE",
+  "operation": "search",
+  "fetchedAt": "2026-08-23T08:00:01+09:00",
+  "receivedAt": "2026-08-23T08:00:01+09:00",
+  "observedAt": "2026-08-23T08:00:00+09:00",
+  "schemaVersion": "fixture-transit.v1",
+  "status": "OK",
+  "results": [
+    {
+      "id": "sanitized-itinerary-1",
+      "legs": [
+        {
+          "id": "sanitized-leg-1",
+          "sequence": 0,
+          "mode": "BUS",
+          "from": {
+            "name": "Sanitized Origin Stop",
+            "lon": 127.1000,
+            "lat": 37.4000,
+            "externalId": "sanitized-stop-a",
+            "sequence": 10
+          },
+          "to": {
+            "name": "Sanitized Destination Stop",
+            "lon": 127.1100,
+            "lat": 37.4100,
+            "externalId": "sanitized-stop-b",
+            "sequence": 16
+          },
+          "p50Seconds": 900,
+          "p90Seconds": 1080,
+          "distanceMeters": 6200,
+          "fareExpectedKrw": 2800,
+          "fareLowerKrw": 2800,
+          "fareUpperKrw": 2800,
+          "expectedStartAt": "2026-08-23T08:05:00+09:00",
+          "expectedEndAt": "2026-08-23T08:20:00+09:00",
+          "transit": {
+            "routeLabel": "S-100",
+            "externalRouteId": "sanitized-route-100",
+            "routeType": "SEAT_BUS",
+            "direction": "Sanitized Terminal B",
+            "branchId": null,
+            "boardingSequence": 10,
+            "alightingSequence": 16,
+            "terminalNames": ["Sanitized Terminal A", "Sanitized Terminal B"],
+            "liveVehicleObserved": null
+          },
+          "geometry": [
+            {"lon": 127.1000, "lat": 37.4000},
+            {"lon": 127.1050, "lat": 37.4050},
+            {"lon": 127.1100, "lat": 37.4100}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # Email IAM Security Review
 
 Date: 2026-08-23
-Contract: Public 1.2.0
+Contract: Public 1.3.0
 
 - Passwords are accepted only over CSRF-protected JSON mutations, bounded to 12–128 characters and stored with Django's adaptive one-way password hasher. Plaintext credentials are not logged, returned or audited.
 - Login returns the same `INVALID_CREDENTIALS` response for an unknown email and an incorrect password and performs a dummy hash check for unknown users.

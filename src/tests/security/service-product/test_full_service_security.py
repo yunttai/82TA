@@ -42,6 +42,7 @@ from journeys.gateway import HttpRoutingGateway, RoutingEnvelope, public_to_priv
 from journeys.http_safety import UpstreamResponseTooLarge, read_bounded_response  # noqa: E402
 from journeys.models import (  # noqa: E402
     AnonymousSession,
+    AuthenticatedSession,
     DataRightsJob,
     RouteSearch,
     SavedPlace,
@@ -61,6 +62,13 @@ def _production_web_source() -> str:
 def _as_user(client: Client, user: ServiceUser) -> None:
     session = client.session
     session["service_user_id"] = str(user.id)
+    session.save()
+    authenticated = AuthenticatedSession.objects.create(
+        user=user,
+        token_hash=token_digest(session.session_key),
+        expires_at=timezone.now() + timedelta(days=1),
+    )
+    session["service_authenticated_session_id"] = str(authenticated.id)
     session.save()
 
 

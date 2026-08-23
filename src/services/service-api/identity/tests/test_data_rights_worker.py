@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 import tempfile
 from datetime import timedelta
@@ -67,7 +68,10 @@ class DataRightsWorkerTests(TestCase):
             self.assertEqual(job.status, DataRightsJob.Status.COMPLETE)
             self.assertTrue(job.artifact_ref.startswith("fernet-file:"))
             self.assertNotIn(b"portable@example.com", artifact_path.read_bytes())
-            self.assertEqual(stat.S_IMODE(artifact_path.stat().st_mode), 0o600)
+            # Windows does not expose POSIX group/other mode bits through chmod;
+            # the deployment runtime is POSIX, where the 0600 invariant applies.
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(artifact_path.stat().st_mode), 0o600)
             self.assertEqual(store.read(artifact_ref=job.artifact_ref)["account"]["email"], self.user.email)
             self.assertEqual(
                 job.download_expires_at,
