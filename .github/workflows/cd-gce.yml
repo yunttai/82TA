@@ -176,12 +176,21 @@ jobs:
 
       - name: Add pinned host key
         env:
+          HOST: ${{ secrets.HOST }}
           HOST_KEY: ${{ secrets.HOST_KEY }}
         run: |
           set -euo pipefail
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+
+          printf '%s %s\n' "$HOST" "$HOST_KEY" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+
+          # 등록 확인
+          ssh-keygen -F "$HOST" -f ~/.ssh/known_hosts >/dev/null || {
+            echo "Failed to register SSH host key for $HOST" >&2
+            exit 1
+          }
+
 
       - name: Check SSH and passwordless sudo
         env:
