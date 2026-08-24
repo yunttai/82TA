@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { RouteMap } from "../route-map/RouteMap";
+import { publicTransitFareReserveKrw } from "../route-search/fareBudget";
 import {
   presentedRouteLegs,
   type PresentedLeg,
@@ -174,6 +175,11 @@ function formatLegMinutes(seconds: number): string {
   return `${Math.ceil(seconds / 60)}분`;
 }
 
+function formatWaitMinutes(seconds: number): string {
+  if (seconds <= 0) return "곧 도착";
+  return formatLegMinutes(seconds);
+}
+
 function routeLegLabel(leg: RouteLeg, taxiIncludesWait = false, routeLabel: string | null = null): string {
   if (leg.mode === "TAXI") return taxiIncludesWait ? "택시 (호출+주행)" : "택시";
   if (routeLabel === null) return modeMessages[leg.mode];
@@ -203,6 +209,7 @@ interface RouteLegSummaryItem {
   label: string;
   p50Seconds: number;
   p90Seconds: number;
+  durationText?: string;
   title: string;
   screenReaderText: string;
 }
@@ -221,8 +228,9 @@ function routeLegSummaryItems(route: RouteCandidate): RouteLegSummaryItem[] {
           label: waitLabel,
           p50Seconds: wait.p50Seconds,
           p90Seconds: wait.p90Seconds,
-          title: `${waitLabel} 약 ${formatLegMinutes(wait.p50Seconds)} · 길어지면 ${formatLegMinutes(wait.p90Seconds)}`,
-          screenReaderText: `${waitLabel}, 예상 ${formatLegMinutes(wait.p50Seconds)}, 여유 기준 ${formatLegMinutes(wait.p90Seconds)}`,
+          durationText: formatWaitMinutes(wait.p50Seconds),
+          title: `${waitLabel} ${formatWaitMinutes(wait.p50Seconds)} · 길어지면 ${formatWaitMinutes(wait.p90Seconds)}`,
+          screenReaderText: `${waitLabel}, 예상 ${formatWaitMinutes(wait.p50Seconds)}, 여유 기준 ${formatWaitMinutes(wait.p90Seconds)}`,
         },
         {
           key: leg.legId,
@@ -538,7 +546,7 @@ function RouteCard({
         {summaryItems.map((item) => (
           <li data-mode={item.mode} title={item.title} key={item.key}>
             <span className="route-leg-summary-label">{item.label}</span>
-            <strong>{formatLegMinutes(item.p50Seconds)}</strong>
+            <strong>{item.durationText ?? formatLegMinutes(item.p50Seconds)}</strong>
             <span className="sr-only">{item.screenReaderText}</span>
           </li>
         ))}
@@ -549,7 +557,7 @@ function RouteCard({
       <dl className="metric-grid metric-grid-primary">
         <div><dt>지연 고려</dt><dd>{formatDuration(route.totalDuration.p90Seconds)}</dd></div>
         <div><dt>택시비 최대 예상</dt><dd>{formatMoney(route.taxiCost.upper)}</dd></div>
-        <div><dt>전체 예상 요금</dt><dd>{formatMoney(route.totalFareExpected)}</dd></div>
+        <div><dt>전체 예상 요금</dt><dd>{formatMoney(route.taxiCost.upper + publicTransitFareReserveKrw)}</dd></div>
         <div><dt>환승</dt><dd>{route.transferCount}회</dd></div>
       </dl>
       <button className="map-select-button" type="button" aria-pressed={selected} onClick={() => onSelect(route)}>

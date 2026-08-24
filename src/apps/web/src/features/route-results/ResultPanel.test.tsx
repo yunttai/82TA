@@ -74,6 +74,44 @@ const expiredResponse = {
 } satisfies PublicRouteSearchResponse;
 
 describe("ResultPanel journey guidance", () => {
+  it("uses customer-safe zero-wait copy and displays the total fare above the taxi upper estimate", () => {
+    const subwayRoute: RouteCandidate = {
+      ...route,
+      routeId: "zero-wait-subway",
+      taxiCost: { ...noFare, lower: 10_000, expected: 11_000, upper: 12_000 },
+      totalFareExpected: 12_000,
+      legs: [{
+        ...route.legs[0]!,
+        legId: "subway-zero-wait",
+        mode: "SUBWAY",
+        duration: timeEstimate,
+        waitDuration: { ...timeEstimate, p50Seconds: 0, p90Seconds: 0 },
+        travelDuration: timeEstimate,
+      }],
+    };
+    const beforeRender = structuredClone(subwayRoute);
+    const response: PublicRouteSearchResponse = {
+      ...expiredResponse,
+      status: "COMPLETE",
+      recommendations: { fastest: subwayRoute, stable: subwayRoute, efficient: null, publicTransitOnly: null },
+    };
+
+    const { container } = render(<ResultPanel phase="COMPLETE" response={response} problem={null} />);
+
+    expect(screen.getByText("곧 도착")).toBeVisible();
+    const customerCopy = [
+      container.textContent,
+      ...Array.from(container.querySelectorAll("[title], [aria-label]")).flatMap((element) => [
+        element.getAttribute("title"),
+        element.getAttribute("aria-label"),
+      ]),
+    ].filter((value): value is string => value !== null).join(" ");
+    expect(customerCopy).not.toContain("지하철 대기 0분");
+    expect(screen.getByText("택시비 최대 예상").nextElementSibling).toHaveTextContent("12,000원");
+    expect(screen.getByText("전체 예상 요금").nextElementSibling).toHaveTextContent("15,000원");
+    expect(subwayRoute).toEqual(beforeRender);
+  });
+
   it("keeps expired response content and prioritizes board, alight, and next-leg cues", async () => {
     const user = userEvent.setup();
     render(<ResultPanel phase="EXPIRED" response={expiredResponse} problem={null} />);
