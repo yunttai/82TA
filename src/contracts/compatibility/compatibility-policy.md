@@ -87,6 +87,10 @@ major URL 또는 compatibility adapter가 필요하다.
   producer는 평가된 모든 leg에 두 필드를 제공하고 Service는 재계산 없이 전달한다.
 - component P90은 각각 보수적인 marginal estimate이므로 합산해 전체 P90을
   재계산하지 않는다. 기존 `duration`이 authoritative total이다.
+- `PlaceRef.address`는 optional nullable additive field다. 도로명 주소를 우선하고
+  없으면 지번 주소를 제공하며, 값이 없으면 consumer는 주소 행을 숨긴다.
+- `provider`, `providerPlaceId`, `regionCode`는 장소 검색 결과의 사용자용 보조
+  label로 노출하지 않는다.
 - DBML, migration, event, code registry와 optimize request wire family `1.0`은
   변경하지 않는다.
 

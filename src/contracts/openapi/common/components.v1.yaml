@@ -69,6 +69,7 @@ components:
         provider: {type: [string, 'null']}
         providerPlaceId: {type: [string, 'null']}
         regionCode: {type: [string, 'null']}
+        address: {type: [string, 'null'], minLength: 1, maxLength: 200}
     TaxiBudget:
       type: object
       additionalProperties: false

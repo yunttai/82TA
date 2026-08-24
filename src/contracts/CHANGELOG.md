@@ -7,6 +7,9 @@
   time through Routing, Service and Web.
 - Kept `duration` and `totalDuration` authoritative and unchanged. Existing 1.x
   consumers can ignore the additive fields; absence remains distinct from known zero.
+- Added optional nullable `PlaceRef.address` so the Service place proxy preserves
+  Kakao Local's road address, with parcel address as fallback. Existing consumers
+  may ignore the field and new consumers hide the address row when it is absent.
 - No DBML, migration, event, code-registry, ranking, budget or route-ID change.
 
 ## Routing policy provenance activation — 2026-08-24
