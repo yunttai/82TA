@@ -104,7 +104,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     environment:
       name: gce
     env:
@@ -292,7 +292,7 @@ jobs:
           rm -f /tmp/82ta.provider.env /tmp/82ta.deploy.env
           EOF
 
-      - name: Upload Compose and HTTP Nginx configuration
+      - name: Upload Compose and Nginx configurations
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: |
@@ -304,15 +304,36 @@ jobs:
 
           scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
             src/infra/gce/nginx/default.http.conf.template \
-            "$SSH_TARGET:/tmp/82ta-default.conf.template"
+            "$SSH_TARGET:/tmp/82ta-default.http.conf.template"
+
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            src/infra/gce/nginx/default.https.conf.template \
+            "$SSH_TARGET:/tmp/82ta-default.https.conf.template"
 
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
           set -euo pipefail
+
           sudo -n install -o root -g root -m 0644 \
-            /tmp/82ta-docker-compose.prod.yml /opt/82ta/docker-compose.prod.yml
+            /tmp/82ta-docker-compose.prod.yml \
+            /opt/82ta/docker-compose.prod.yml
+
+          # HTTP/HTTPS 원본을 둘 다 보존하고 current template만 HTTP로 시작한다.
           sudo -n install -o root -g root -m 0644 \
-            /tmp/82ta-default.conf.template /opt/82ta/nginx/default.conf.template
-          rm -f /tmp/82ta-docker-compose.prod.yml /tmp/82ta-default.conf.template
+            /tmp/82ta-default.http.conf.template \
+            /opt/82ta/nginx/default.http.conf.template
+
+          sudo -n install -o root -g root -m 0644 \
+            /tmp/82ta-default.https.conf.template \
+            /opt/82ta/nginx/default.https.conf.template
+
+          sudo -n cp \
+            /opt/82ta/nginx/default.http.conf.template \
+            /opt/82ta/nginx/default.conf.template
+
+          rm -f \
+            /tmp/82ta-docker-compose.prod.yml \
+            /tmp/82ta-default.http.conf.template \
+            /tmp/82ta-default.https.conf.template
           EOF
 
       # Provider probe가 routing egress proxy를 필요로 할 수 있으므로 먼저 proxy만 올린다.
@@ -442,65 +463,24 @@ jobs:
           echo 'HTTP health check timed out' >&2
           exit 1
 
-      - name: Issue or renew the public certificate
+      # webroot 경로/volume 설정에 의존하지 않는다.
+      # nginx를 잠시 중지하고 Certbot standalone이 host port 80을 직접 사용한다.
+      # 실패하면 EXIT trap이 HTTP 설정으로 즉시 롤백하고 nginx를 다시 올린다.
+      - name: Issue certificate and switch Nginx to HTTPS
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: |
           set -euo pipefail
+
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
           set -euo pipefail
           cd /opt/82ta
 
-          # .deploy.env는 root:root 0600이므로 일반 sed로 읽으면 Permission denied가 난다.
           domain=$(sudo -n sed -n 's/^DOMAIN=//p' .deploy.env)
           letsencrypt_email=$(sudo -n sed -n 's/^LETSENCRYPT_EMAIL=//p' .deploy.env)
+
           test -n "$domain"
           test -n "$letsencrypt_email"
-
-          sudo -n docker compose \
-            --env-file .env \
-            --env-file .provider.env \
-            --env-file .deploy.env \
-            --env-file .runtime/provider-evidence.env \
-            -f docker-compose.prod.yml \
-            --profile tools run --rm certbot \
-            certonly \
-            --webroot -w /var/www/certbot \
-            --non-interactive \
-            --keep-until-expiring \
-            --email "$letsencrypt_email" \
-            -d "$domain" \
-            --agree-tos \
-            --no-eff-email \
-            --rsa-key-size 4096
-          EOF
-
-      - name: Upload HTTPS Nginx configuration
-        env:
-          SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
-        run: |
-          set -euo pipefail
-
-          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            src/infra/gce/nginx/default.https.conf.template \
-            "$SSH_TARGET:/tmp/82ta-default.https.conf.template"
-
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
-          set -euo pipefail
-          sudo -n install -o root -g root -m 0644 \
-            /tmp/82ta-default.https.conf.template \
-            /opt/82ta/nginx/default.conf.template
-          rm -f /tmp/82ta-default.https.conf.template
-          EOF
-
-      - name: Switch public Nginx to HTTPS
-        env:
-          SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
-        run: |
-          set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
-          set -euo pipefail
-          cd /opt/82ta
 
           compose=(
             sudo -n docker compose
@@ -511,7 +491,69 @@ jobs:
             -f docker-compose.prod.yml
           )
 
-          "${compose[@]}" config --quiet
+          rollback_http() {
+            rc=$?
+            if (( rc != 0 )); then
+              echo "Certificate/HTTPS switch failed; restoring HTTP nginx" >&2
+
+              sudo -n cp \
+                /opt/82ta/nginx/default.http.conf.template \
+                /opt/82ta/nginx/default.conf.template || true
+
+              "${compose[@]}" up -d \
+                --force-recreate \
+                --no-deps \
+                --wait \
+                --wait-timeout 120 \
+                nginx || true
+            fi
+            exit "$rc"
+          }
+          trap rollback_http EXIT
+
+          # HTTP nginx가 점유한 80/443 포트를 해제한다.
+          "${compose[@]}" stop nginx
+
+          # 포트 80이 실제로 비었는지 확인한다.
+          if sudo -n ss -ltn '( sport = :80 )' | tail -n +2 | grep -q .; then
+            echo "TCP/80 is still occupied after stopping nginx" >&2
+            sudo -n ss -ltnp '( sport = :80 )' >&2 || true
+            exit 1
+          fi
+
+          # docker compose run은 기본적으로 service port를 publish하지 않으므로
+          # -p 80:80으로 standalone challenge listener를 외부에 노출한다.
+          "${compose[@]}" --profile tools run \
+            --rm \
+            --no-deps \
+            -p 80:80 \
+            certbot \
+            certonly \
+            --standalone \
+            --preferred-challenges http \
+            --http-01-port 80 \
+            --non-interactive \
+            --keep-until-expiring \
+            --email "$letsencrypt_email" \
+            --cert-name "$domain" \
+            -d "$domain" \
+            --agree-tos \
+            --no-eff-email \
+            --rsa-key-size 4096
+
+          # 인증서가 실제로 Certbot volume에 생겼는지 확인한다.
+          "${compose[@]}" --profile tools run \
+            --rm \
+            --no-deps \
+            --entrypoint sh \
+            certbot \
+            -c "test -s '/etc/letsencrypt/live/$domain/fullchain.pem' && test -s '/etc/letsencrypt/live/$domain/privkey.pem'"
+
+          # 인증서 확보 후에만 HTTPS template로 전환한다.
+          sudo -n cp \
+            /opt/82ta/nginx/default.https.conf.template \
+            /opt/82ta/nginx/default.conf.template
+
           "${compose[@]}" up -d \
             --force-recreate \
             --no-deps \
@@ -519,6 +561,8 @@ jobs:
             --wait-timeout 120 \
             nginx
 
+          trap - EXIT
+          echo "Certificate issued and HTTPS nginx is healthy"
           EOF
 
       - name: Verify HTTPS
@@ -538,15 +582,109 @@ jobs:
           echo 'HTTPS health check timed out' >&2
           exit 1
 
-      - name: Enable maintenance timers
+      - name: Install and enable maintenance timers
         env:
           SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
         run: |
           set -euo pipefail
+
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
           set -euo pipefail
+
+          # 기존 certificate-renew unit이 webroot를 사용해도 재발하지 않도록
+          # standalone 방식의 host-side renewal script/service/timer로 덮어쓴다.
+          sudo -n tee /usr/local/sbin/82ta-certificate-renew >/dev/null <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          cd /opt/82ta
+
+          compose=(
+            docker compose
+            --env-file .env
+            --env-file .provider.env
+            --env-file .deploy.env
+            --env-file .runtime/provider-evidence.env
+            -f docker-compose.prod.yml
+          )
+
+          restore_nginx() {
+            rc=$?
+            "${compose[@]}" up -d \
+              --force-recreate \
+              --no-deps \
+              --wait \
+              --wait-timeout 120 \
+              nginx || true
+            exit "$rc"
+          }
+          trap restore_nginx EXIT
+
+          "${compose[@]}" stop nginx
+
+          if ss -ltn '( sport = :80 )' | tail -n +2 | grep -q .; then
+            echo "TCP/80 is occupied; cannot run Certbot standalone renewal" >&2
+            ss -ltnp '( sport = :80 )' >&2 || true
+            exit 1
+          fi
+
+          "${compose[@]}" --profile tools run \
+            --rm \
+            --no-deps \
+            -p 80:80 \
+            certbot \
+            renew \
+            --standalone \
+            --preferred-challenges http \
+            --non-interactive \
+            --quiet
+
+          "${compose[@]}" up -d \
+            --force-recreate \
+            --no-deps \
+            --wait \
+            --wait-timeout 120 \
+            nginx
+
+          trap - EXIT
+          SCRIPT
+
+          sudo -n chmod 0755 /usr/local/sbin/82ta-certificate-renew
+          sudo -n bash -n /usr/local/sbin/82ta-certificate-renew
+
+          sudo -n tee /etc/systemd/system/82ta-certificate-renew.service >/dev/null <<'UNIT'
+          [Unit]
+          Description=82ta Let's Encrypt certificate renewal
+          Wants=docker.service
+          After=docker.service network-online.target
+          ConditionPathExists=/opt/82ta/docker-compose.prod.yml
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/82ta-certificate-renew
+          UNIT
+
+          sudo -n tee /etc/systemd/system/82ta-certificate-renew.timer >/dev/null <<'UNIT'
+          [Unit]
+          Description=Weekly 82ta Let's Encrypt certificate renewal check
+
+          [Timer]
+          OnCalendar=Sun *-*-* 04:00:00
+          RandomizedDelaySec=1h
+          Persistent=true
+          Unit=82ta-certificate-renew.service
+
+          [Install]
+          WantedBy=timers.target
+          UNIT
+
+          sudo -n systemctl daemon-reload
           sudo -n systemctl enable --now 82ta-provider-evidence-refresh.timer
           sudo -n systemctl enable --now 82ta-certificate-renew.timer
+
+          sudo -n systemctl --no-pager --full status \
+            82ta-provider-evidence-refresh.timer \
+            82ta-certificate-renew.timer || true
           EOF
 
       - name: Dump remote diagnostics on failure
