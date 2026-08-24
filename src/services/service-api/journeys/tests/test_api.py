@@ -123,7 +123,10 @@ class RouteSearchApiTests(TestCase):
 
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json()["paretoFrontier"], metadata["paretoFrontier"])
-        self.assertEqual(list(search.results.values_list("routing_route_id", flat=True)), [])
+        self.assertEqual(
+            set(search.results.values_list("routing_route_id", flat=True)),
+            {response.json()["recommendations"]["fastest"]["routeId"]},
+        )
 
     def test_missing_idempotency_key_returns_problem_details(self) -> None:
         response = self.client.post(
@@ -187,7 +190,15 @@ class RouteSearchApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "PARTIAL")
-        self.assertEqual(response.json()["recommendations"]["fastest"], None)
+        fastest = response.json()["recommendations"]["fastest"]
+        self.assertIsNotNone(fastest)
+        self.assertEqual(fastest["pattern"], "TRANSIT_ONLY")
+        self.assertGreater(len(fastest["legs"]), 0)
+        self.assertEqual(fastest["legs"][0]["geometry"]["encoding"], "GEOJSON")
+        self.assertEqual(fastest["legs"][0]["from"]["name"], "광교중앙역")
+        self.assertEqual(fastest["legs"][-1]["to"]["name"], "강남역")
+        self.assertEqual(fastest["legs"][0]["transit"]["routeLabel"], "701")
+        self.assertEqual(fastest["legs"][0]["transit"]["direction"], "강남역 방면")
 
     @override_settings(ROUTING_GATEWAY_MODE="replay")
     def test_noncanonical_valid_request_is_an_honest_replay_miss(self) -> None:

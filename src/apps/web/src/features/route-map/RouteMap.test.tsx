@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { KakaoLatLng, KakaoMaps } from "../map/kakaoMaps";
+import type { KakaoLatLng, KakaoLatLngBounds, KakaoMaps } from "../map/kakaoMaps";
 import type { RouteCandidate } from "../../shared/api/publicService";
 import { RouteMap } from "./RouteMap";
 
@@ -48,7 +48,15 @@ describe("RouteMap canonical POLYLINE rendering", () => {
       getLat() { return this.lat; }
       getLng() { return this.lon; }
     }
-    class FakeMap { setCenter(_position: KakaoLatLng) {} }
+    const setBounds = vi.fn();
+    class FakeMap {
+      setCenter(_position: KakaoLatLng) {}
+      setBounds = setBounds;
+    }
+    const boundPoints: KakaoLatLng[] = [];
+    class FakeLatLngBounds implements KakaoLatLngBounds {
+      extend(position: KakaoLatLng) { boundPoints.push(position); }
+    }
     class FakeMarker { setPosition(_position: KakaoLatLng) {} }
     const polylinePaths: KakaoLatLng[][] = [];
     class FakePolyline {
@@ -57,6 +65,7 @@ describe("RouteMap canonical POLYLINE rendering", () => {
     const maps = {
       load: (callback: () => void) => callback(),
       LatLng: FakeLatLng,
+      LatLngBounds: FakeLatLngBounds,
       Map: FakeMap,
       Marker: FakeMarker,
       Polyline: FakePolyline,
@@ -68,24 +77,33 @@ describe("RouteMap canonical POLYLINE rendering", () => {
 
     await waitFor(() => expect(polylinePaths).toHaveLength(1));
     expect(polylinePaths[0]).toHaveLength(3);
-    expect(screen.queryByText(/POLYLINE 구간은/)).not.toBeInTheDocument();
+    expect(boundPoints).toHaveLength(5);
+    expect(boundPoints.map((point) => [point.getLng(), point.getLat()])).toEqual([
+      [-120.2, 38.5],
+      [-120.2, 38.5],
+      [-120.95, 40.7],
+      [-126.453, 43.252],
+      [-126.453, 43.252],
+    ]);
+    expect(setBounds).toHaveBeenCalledWith(expect.any(FakeLatLngBounds), 44, 28, 44, 28);
+    expect(screen.queryByText(/상세 경로선을 표시할 수 없습니다/)).not.toBeInTheDocument();
   });
 
   it("discloses malformed geometry without drawing a fake line", () => {
     render(<RouteMap route={routeWithGeometry("?????")} />);
-    expect(screen.getByText(/형식 또는 좌표가 올바르지 않아 표시하지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/상세 경로선을 표시할 수 없습니다/)).toBeInTheDocument();
   });
 
   it("discloses oversized geometry without decoding it", () => {
     render(<RouteMap route={routeWithGeometry("a".repeat(100_001))} />);
-    expect(screen.getByText(/안전한 표시 한도를 넘어 표시하지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/상세 경로선이 너무 길어 표시하지 않았습니다/)).toBeInTheDocument();
   });
 
   it("discloses malformed and oversized GEOJSON without iterating into a fake line", () => {
     const { rerender } = render(<RouteMap route={routeWithGeometry({ type: "LineString", coordinates: [[127.1, 37.3], [Infinity, 37.4]] }, "GEOJSON")} />);
-    expect(screen.getByText(/GEOJSON 구간은 형식 또는 좌표가 올바르지 않아 표시하지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/상세 경로선을 표시할 수 없습니다/)).toBeInTheDocument();
 
     rerender(<RouteMap route={routeWithGeometry({ type: "LineString", coordinates: Array.from({ length: 10_001 }, () => [127.1, 37.3]) }, "GEOJSON")} />);
-    expect(screen.getByText(/GEOJSON 구간은 안전한 표시 한도를 넘어 표시하지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/상세 경로선이 너무 길어 표시하지 않았습니다/)).toBeInTheDocument();
   });
 });

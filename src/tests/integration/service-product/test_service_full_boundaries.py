@@ -248,7 +248,10 @@ class ServiceFullBoundaryTests(SimpleTestCase):
         ):
             self.assertIn(feature, panel)
         self.assertIn("capabilities?.features?.taxiBridge !== true", form)
-        self.assertIn("capabilities?.features?.busSeatRisk !== true", form)
+        self.assertIn(
+            "capabilities?.features?.busSeatRisk === true && draft.avoidHighBusSeatRisk",
+            form,
+        )
 
     def test_bus_unknown_stale_low_confidence_and_high_gate_are_explicit(self) -> None:
         panel = (WEB_SOURCE / "features/route-results/ResultPanel.tsx").read_text(encoding="utf-8")
@@ -263,9 +266,11 @@ class ServiceFullBoundaryTests(SimpleTestCase):
             "DATA_STALE",
             "BUS_MAPPING_LOW_CONFIDENCE",
             "정보 없음",
-            "승차 가능성 대용값",
+            "boardabilityProxy",
+            "실제 탑승을 보장하지 않습니다.",
         ):
             self.assertIn(token, panel)
+        self.assertNotIn("승차 가능성 대용값", panel)
 
 
 if __name__ == "__main__":

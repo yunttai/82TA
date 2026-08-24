@@ -174,7 +174,7 @@ class ReplayRoutingGateway:
 
 
 class StubRoutingGateway:
-    """Contract-shaped stub for focused tests; never performs routing work."""
+    """Canonical demo stub for Service UI development; never performs routing work."""
 
     def __init__(self, fixtures: LockedFixtures | None = None) -> None:
         self.fixtures = fixtures or LockedFixtures()
@@ -185,26 +185,23 @@ class StubRoutingGateway:
         self.last_envelope = envelope
         self.last_forwarded_request = public_to_private(public_request, envelope)
         response = self.fixtures.get("routing_response")
-        response.update(
-            {
-                "requestId": self.last_forwarded_request["requestId"],
-                "status": "PARTIAL",
-                "recommendations": {
-                    "fastest": None,
-                    "stable": None,
-                    "efficient": None,
-                    "publicTransitOnly": None,
-                },
-                "routes": [],
-                "paretoRouteIds": [],
-                "warningCodes": ["PROVIDER_PARTIAL_FAILURE"],
-            }
-        )
-        computation = dict(response["computation"])
-        counts = dict(computation["candidateCounts"])
-        counts.update({"fullyEvaluated": 0, "pareto": 0})
-        computation["candidateCounts"] = counts
-        response["computation"] = computation
+        # Accept arbitrary valid Public requests while returning the locked,
+        # sanitized route fixture. This keeps the entire browser -> Service ->
+        # RoutingGateway -> public projection path visible without Provider I/O.
+        response["requestId"] = self.last_forwarded_request["requestId"]
+        origin_name = str(public_request["origin"]["displayName"]).strip()
+        destination_name = str(public_request["destination"]["displayName"]).strip()
+        for route in response["routes"]:
+            legs = route.get("legs", [])
+            if not legs:
+                continue
+            legs[0]["from"]["name"] = origin_name
+            legs[-1]["to"]["name"] = destination_name
+            for leg in legs:
+                transit = leg.get("transit")
+                if isinstance(transit, dict):
+                    transit["routeLabel"] = "701"
+                    transit["direction"] = f"{destination_name} 방면"
         return response
 
     def capabilities(self, *, allow_network: bool = True) -> dict[str, Any]:

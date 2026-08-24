@@ -5,6 +5,29 @@ import canonicalResponse from "../../../contracts/openapi/examples/public-route-
 
 const guestToken = "guest_e2e_0123456789abcdef0123456789abcdef";
 
+function commercializeRoute(route: typeof canonicalResponse.recommendations.fastest) {
+  return {
+    ...route,
+    legs: route.legs.map((leg, index) => ({
+      ...leg,
+      from: index === 0 ? { ...leg.from, name: "명지대학교 자연캠퍼스" } : leg.from,
+      to: index === route.legs.length - 1 ? { ...leg.to, name: "판교역" } : leg.to,
+      transit: { ...leg.transit, routeLabel: "701", direction: "판교역 방면" },
+    })),
+  };
+}
+
+const commercialCanonicalResponse = {
+  ...canonicalResponse,
+  baseline: commercializeRoute(canonicalResponse.baseline),
+  recommendations: {
+    fastest: commercializeRoute(canonicalResponse.recommendations.fastest),
+    stable: commercializeRoute(canonicalResponse.recommendations.stable),
+    efficient: commercializeRoute(canonicalResponse.recommendations.efficient),
+    publicTransitOnly: commercializeRoute(canonicalResponse.recommendations.publicTransitOnly),
+  },
+};
+
 async function mockPublicApi(page: Page) {
   let authenticated = false;
   await page.route("**/api/v1/**", async (route) => {
@@ -23,6 +46,20 @@ async function mockPublicApi(page: Page) {
     }
     if (path === "/api/v1/health") {
       await route.fulfill({ json: { status: "ok" } });
+      return;
+    }
+    if (path === "/api/v1/places/suggest") {
+      const origin = new URL(request.url()).searchParams.get("query")?.includes("명지") === true;
+      await route.fulfill({
+        json: {
+          items: [{
+            displayName: origin ? "명지대학교 자연캠퍼스" : "판교역",
+            coordinate: origin ? { lon: 127.187456, lat: 37.222345 } : { lon: 127.111159, lat: 37.394761 },
+            provider: "KAKAO_LOCAL",
+            providerPlaceId: origin ? "e2e-origin" : "e2e-destination",
+          }],
+        },
+      });
       return;
     }
     if (path === "/api/v1/guest-sessions" && request.method() === "POST") {
@@ -51,7 +88,7 @@ async function mockPublicApi(page: Page) {
     if (path === "/api/v1/route-searches" && request.method() === "POST") {
       await route.fulfill({
         json: {
-          ...canonicalResponse,
+          ...commercialCanonicalResponse,
           status: "PARTIAL",
           expiresAt: "2099-08-23T07:42:05.421+09:00",
         },
@@ -124,11 +161,19 @@ test("mobile route search stays within the Public Service boundary", async ({ pa
   await expect(page.getByRole("navigation", { name: "모바일 주요 메뉴" })).toBeVisible();
   await expect(page.getByRole("link", { name: "길찾기" })).toHaveAttribute("aria-current", "page");
   await page.getByText("지도에서 직접 위치 선택").click();
-  await expect(page.getByText("지도 선택을 사용할 수 없습니다.")).toBeVisible();
-  await expect(page.getByText(/출발지와 목적지 장소 검색을 이용해 주세요/)).toBeVisible();
+  await expect(page.locator(".coordinate-map")).toBeVisible();
+  await page.getByRole("combobox", { name: "출발지" }).fill("명지");
+  await page.getByRole("option", { name: "명지대학교 자연캠퍼스" }).click();
+  await page.getByRole("combobox", { name: "목적지" }).fill("판교");
+  await page.getByRole("option", { name: "판교역" }).click();
   await page.getByRole("button", { name: "내 예산으로 경로 찾기" }).click();
   await expect(page.getByText("일부 정보 없이 계산한 결과입니다.")).toBeVisible();
-  await expect(page.getByText("추천 경로 없음")).toHaveCount(4);
+  await expect(page.getByRole("region", { name: "경로 상세" })).toBeVisible();
+  await expect(page.getByText(/에서 버스 .*승차/)).toBeVisible();
+  await expect(page.getByText(/에서 하차/)).toBeVisible();
+  expect(await page.locator("body").innerText()).not.toMatch(/P50|P90|ETA|어디서 타고, 어디서 갈아타는지|Sanitized|SAN-R1/);
+  const resultOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(resultOverflow).toBeLessThanOrEqual(1);
 
   expect(requests.some((url) => new URL(url).pathname === "/api/v1/route-searches")).toBe(true);
   expect(requests.some((url) => /\/v1\/routes\/optimize/.test(new URL(url).pathname))).toBe(false);
@@ -148,15 +193,28 @@ test("320px layout has no horizontal page overflow and no serious accessibility 
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
 
   await bottomNav.getByRole("link", { name: "길찾기", exact: true }).click();
-  await page.getByText("세부 조건", { exact: true }).click();
-  const deadline = page.getByLabel(/^도착 마감 시각/);
-  const details = page.locator(".details-panel");
-  const [deadlineBox, detailsBox] = await Promise.all([deadline.boundingBox(), details.boundingBox()]);
-  expect(deadlineBox).not.toBeNull();
-  expect(detailsBox).not.toBeNull();
-  expect(deadlineBox!.x + deadlineBox!.width).toBeLessThanOrEqual(detailsBox!.x + detailsBox!.width);
+  await expect(page.getByText("세부 조건", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("checkbox", { name: "대중교통 사이 짧은 택시 이동 허용" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "검색 기록에 저장" })).toBeVisible();
+  await expect(page.getByRole("checkbox")).toHaveCount(2);
   const searchSizes = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
   expect(searchSizes.content).toBeLessThanOrEqual(searchSizes.viewport);
+
+  await page.getByRole("combobox", { name: "출발지" }).fill("명지대학교");
+  await page.getByRole("option", { name: "명지대학교 자연캠퍼스" }).click();
+  await page.getByRole("combobox", { name: "목적지" }).fill("판교");
+  await page.getByRole("option", { name: "판교역" }).click();
+  await page.getByRole("button", { name: "내 예산으로 경로 찾기" }).click();
+  await expect(page.getByRole("region", { name: "경로 상세" })).toBeVisible();
+  const resultBounds = await page.locator(".results, .results-workspace, .result-map-pane, .route-grid, .route-card, .journey-guide").evaluateAll((elements) => elements.map((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { left: bounds.left, right: bounds.right, width: bounds.width };
+  }));
+  for (const bounds of resultBounds) {
+    expect(bounds.left).toBeGreaterThanOrEqual(-0.5);
+    expect(bounds.right).toBeLessThanOrEqual(320.5);
+    expect(bounds.width).toBeLessThanOrEqual(320.5);
+  }
 
   const results = await new AxeBuilder({ page }).analyze();
   const serious = results.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");

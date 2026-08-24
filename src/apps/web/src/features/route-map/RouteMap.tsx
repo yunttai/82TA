@@ -9,17 +9,6 @@ interface RouteMapProps {
   selectedLegId?: string;
 }
 
-const modeLabels = {
-  WALK: "도보",
-  WAIT: "대기",
-  TRANSFER: "환승 이동",
-  TAXI: "택시",
-  BUS: "버스",
-  SUBWAY: "지하철",
-  GTX: "GTX",
-  TRAIN: "기차",
-} as const;
-
 export function RouteMap({ route, selectedLegId }: RouteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"READY" | "NO_KEY" | "FAILED">("READY");
@@ -48,6 +37,21 @@ export function RouteMap({ route, selectedLegId }: RouteMapProps) {
       new maps.Marker({ map, position: new maps.LatLng(first.lat, first.lon) });
       if (last !== undefined) new maps.Marker({ map, position: new maps.LatLng(last.lat, last.lon) });
 
+      const routePoints = route.legs.flatMap((leg) => {
+        const geometryPoints = leg.geometry.encoding === "GEOJSON"
+          ? (() => {
+              const decoded = decodeGeoJsonLine(leg.geometry.value);
+              return decoded.ok ? decoded.points : [];
+            })()
+          : leg.geometry.encoding === "POLYLINE"
+            ? (() => {
+                const decoded = decodeStandardPolyline(leg.geometry.value);
+                return decoded.ok ? decoded.points : [];
+              })()
+            : [];
+        return [leg.from.coordinate, ...geometryPoints, leg.to.coordinate];
+      });
+
       route.legs.forEach((leg) => {
         const line = leg.geometry.encoding === "GEOJSON"
           ? (() => {
@@ -69,6 +73,14 @@ export function RouteMap({ route, selectedLegId }: RouteMapProps) {
           strokeOpacity: 0.85,
         });
       });
+
+      if (maps.LatLngBounds !== undefined && map.setBounds !== undefined) {
+        const bounds = new maps.LatLngBounds();
+        routePoints.forEach((point) => bounds.extend(new maps.LatLng(point.lat, point.lon)));
+        // Fit after every overlay is added so the entire origin-to-destination
+        // route remains visible, including geometry that bends beyond endpoints.
+        map.setBounds(bounds, 44, 28, 44, 28);
+      }
     }).catch(() => {
       if (!disposed) setStatus("FAILED");
     });
@@ -98,23 +110,18 @@ export function RouteMap({ route, selectedLegId }: RouteMapProps) {
       {status !== "READY" && (
         <div className="map-fallback" role="status">
           <strong>지도 표시를 사용할 수 없습니다.</strong>
-          <p>{status === "NO_KEY" ? "배포 환경의 도메인 제한 Kakao 지도 키가 아직 연결되지 않았습니다." : "지도 SDK를 불러오지 못했습니다."}</p>
+          <p>{status === "NO_KEY" ? "현재 지도 연결을 확인할 수 없습니다. 아래 경로 상세를 이용해 주세요." : "지도를 불러오지 못했습니다. 아래 경로 상세를 이용해 주세요."}</p>
         </div>
       )}
       {(missingGeometry > 0 || malformedPolyline > 0 || oversizedPolyline > 0 || malformedGeoJson > 0 || oversizedGeoJson > 0) && (
         <p className="map-disclosure">
-          {missingGeometry > 0 && `${missingGeometry}개 구간은 geometry가 없어 지도에 그리지 않았습니다. `}
-          {malformedGeoJson > 0 && `${malformedGeoJson}개 GEOJSON 구간은 형식 또는 좌표가 올바르지 않아 표시하지 않았습니다. `}
-          {oversizedGeoJson > 0 && `${oversizedGeoJson}개 GEOJSON 구간은 안전한 표시 한도를 넘어 표시하지 않았습니다. `}
-          {malformedPolyline > 0 && `${malformedPolyline}개 POLYLINE 구간은 형식 또는 좌표가 올바르지 않아 표시하지 않았습니다. `}
-          {oversizedPolyline > 0 && `${oversizedPolyline}개 POLYLINE 구간은 안전한 표시 한도를 넘어 표시하지 않았습니다.`}
+          {missingGeometry > 0 && `${missingGeometry}개 구간의 상세 경로선을 제공하지 않습니다. `}
+          {malformedGeoJson > 0 && `${malformedGeoJson}개 구간의 상세 경로선을 표시할 수 없습니다. `}
+          {oversizedGeoJson > 0 && `${oversizedGeoJson}개 구간의 상세 경로선이 너무 길어 표시하지 않았습니다. `}
+          {malformedPolyline > 0 && `${malformedPolyline}개 구간의 상세 경로선을 표시할 수 없습니다. `}
+          {oversizedPolyline > 0 && `${oversizedPolyline}개 구간의 상세 경로선이 너무 길어 표시하지 않았습니다.`}
         </p>
       )}
-      <ol className="map-leg-summary" aria-label="선택 경로 구간 요약">
-        {route.legs.map((leg) => (
-          <li className={leg.legId === selectedLegId ? "selected-leg" : undefined} aria-current={leg.legId === selectedLegId ? "step" : undefined} key={leg.legId}><strong>{modeLabels[leg.mode]}</strong><span>{leg.from.name} → {leg.to.name}</span></li>
-        ))}
-      </ol>
     </section>
   );
 }

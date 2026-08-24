@@ -63,7 +63,7 @@ function PageFrame({ eyebrow, title, children }: PageFrameProps) {
 }
 
 function LoadMessage({ failed, empty }: { failed: boolean; empty: boolean }) {
-  if (failed) return <p className="degraded-notice" role="status">계정 API에 연결할 수 없습니다. 로그인 또는 Backend 준비 상태를 확인해 주세요.</p>;
+  if (failed) return <p className="degraded-notice" role="status">계정 정보를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.</p>;
   if (empty) return <p className="empty-copy">아직 표시할 항목이 없습니다.</p>;
   return <p className="empty-copy" role="status">불러오는 중…</p>;
 }
@@ -101,9 +101,9 @@ export function HistoryPage() {
               <div><strong>{item.status}</strong><span>{new Date(item.generatedAt).toLocaleString("ko-KR")}</span></div>
               <span>{item.history === undefined ? "저장 정보 확인 불가" : `${item.history.saved ? "기록 저장됨" : "기록 저장 안 함"} · ${item.history.ownerKind === "USER" ? "로그인 사용자" : "게스트"}`}</span>
               {item.history?.retainedUntil != null && <span>보관 기한 {new Date(item.history.retainedUntil).toLocaleString("ko-KR")}</span>}
-              {item.status === "EXPIRED" || new Date(item.expiresAt).getTime() <= Date.now()
-                ? <a href="/search">만료됨 · 다시 검색</a>
-                : <a href={`/searches/${encodeURIComponent(item.searchId)}`}>저장 결과 확인</a>}
+              <a href={`/searches/${encodeURIComponent(item.searchId)}`}>
+                {item.status === "EXPIRED" || new Date(item.expiresAt).getTime() <= Date.now() ? "지난 결과 보기" : "저장 결과 확인"}
+              </a>
             </li>
           ))}
         </ul>
@@ -144,7 +144,7 @@ export function StoredSearchPage({ searchId, routeId, legId }: { searchId: strin
   return (
     <div>
       {routeId !== undefined && <p className="context-banner">{legId === undefined ? "선택한 경로 상세" : "선택한 버스 구간 상세"}</p>}
-      <ResultPanel phase={new Date(response.expiresAt).getTime() <= Date.now() ? "EXPIRED" : response.status} response={response} problem={null} {...(routeId === undefined ? {} : { initialRouteId: routeId })} {...(legId === undefined ? {} : { initialLegId: legId })} />
+      <ResultPanel phase={response.status} response={response} problem={null} {...(routeId === undefined ? {} : { initialRouteId: routeId })} {...(legId === undefined ? {} : { initialLegId: legId })} />
     </div>
   );
 }
@@ -203,12 +203,12 @@ export function SavedPlacesPage() {
 
   return (
     <PageFrame eyebrow="내 장소" title="저장 장소">
-      <p className="page-lead">정확한 위치는 민감정보로 취급되며 Service 계정 경계 안에서만 저장됩니다.</p>
+      <p className="page-lead">정확한 위치는 민감정보로 취급하며 로그인한 82TA 계정에만 저장합니다.</p>
       <form className="resource-form" onSubmit={(event) => void submit(event)}>
         <label className="field"><span>별칭</span><input name="label" maxLength={50} placeholder="집, 학교, 회사" required /></label>
         <PlaceField label="장소 검색" value={query} onLabelChange={setQuery} onPlaceSelected={(selected) => { setPlace(selected); setQuery(selected.displayName); }} />
         <button className="primary-button" type="submit" disabled={place === null || status === "SAVING"}>민감 장소로 저장</button>
-        {status === "FAILED" && <p role="alert">저장 장소 API를 사용할 수 없습니다.</p>}
+        {status === "FAILED" && <p role="alert">저장 장소를 불러올 수 없습니다.</p>}
       </form>
       {items === null || items.length === 0 ? <LoadMessage failed={status === "FAILED"} empty={items?.length === 0} /> : (
         <ul className="resource-list">{items.map((item) => (
@@ -351,10 +351,10 @@ export function PreferencesPage() {
             <p>교통 제공 범위에 따라 실제 접근성을 보장하지 않습니다. 검색 결과의 지원 정보와 경고를 확인해 주세요.</p>
           </fieldset>
           <button className="primary-button" type="submit" disabled={status === "SAVING"}>{status === "SAVING" ? "저장 중…" : "선호 저장"}</button>
-          <p className="resource-meta">서버 설정 version {preferences.version ?? "확인 불가"}{preferences.updatedAt === undefined ? "" : ` · ${new Date(preferences.updatedAt).toLocaleString("ko-KR")} 갱신`}</p>
+          {preferences.updatedAt !== undefined && <p className="resource-meta">최근 저장 {new Date(preferences.updatedAt).toLocaleString("ko-KR")}</p>}
           {status === "DONE" && <p role="status">선호를 저장했습니다.</p>}
           {status === "CONFLICT" && <div className="degraded-notice" role="alert"><p>다른 기기에서 선호가 변경되었습니다. 자동으로 덮어쓰지 않습니다.</p><button className="secondary-button" type="button" onClick={() => void reloadPreferences().catch(() => setStatus("FAILED"))}>서버 최신값 불러오기</button></div>}
-          {status === "FAILED" && <p role="alert">선호 API를 사용할 수 없습니다.</p>}
+          {status === "FAILED" && <p role="alert">이동 선호를 저장할 수 없습니다.</p>}
         </form>
       )}
     </PageFrame>
@@ -367,6 +367,14 @@ const featureLabels: Readonly<Record<string, string>> = {
   busEtaModel: "버스 도착 예측", taxiBridge: "택시 연결", realtimeRerouting: "실시간 재추천",
 };
 
+const busInformationLabels = {
+  LIVE: "실시간 정보 제공",
+  PARTIAL: "일부 정보 제공",
+  HISTORICAL: "과거 운행 정보 제공",
+  UNSUPPORTED: "좌석 정보 미지원",
+  UNKNOWN: "확인 중",
+} as const;
+
 export function SupportPage() {
   const [support, setSupport] = useState<PublicCapabilities | null>(null);
   const [failed, setFailed] = useState(false);
@@ -377,10 +385,10 @@ export function SupportPage() {
   }, []);
   return (
     <PageFrame eyebrow="서비스 상태" title="지원 범위">
-      <p className="page-lead">지원 여부와 정보 공백을 숨기지 않습니다. 버스 좌석 엔진은 Routing 팀 결과를 Service가 표시만 합니다.</p>
+      <p className="page-lead">현재 이용할 수 있는 지역과 교통 정보를 확인하세요.</p>
       {support === null ? <LoadMessage failed={failed} empty={false} /> : (
         <>
-          <p className="coverage-chip">Bus Intelligence: {support.busIntelligenceCoverage ?? "UNKNOWN"}</p>
+          <p className="coverage-chip">버스 좌석 정보: {busInformationLabels[support.busIntelligenceCoverage ?? "UNKNOWN"]}</p>
           <ul className="capability-grid" aria-label="지역 지원">
             <li><span>출발 지역</span><strong>{support.region?.originSupported === true ? "지원" : support.region?.originSupported === false ? "미지원" : "확인 불가"}</strong></li>
             <li><span>도착 지역</span><strong>{support.region?.destinationSupported === true ? "지원" : support.region?.destinationSupported === false ? "미지원" : "확인 불가"}</strong></li>
@@ -388,7 +396,7 @@ export function SupportPage() {
           <ul className="capability-grid">{Object.entries(support.features).map(([name, enabled]) => (
             <li key={name}><span>{featureLabels[name] ?? "새 지원 항목"}</span><strong>{enabled === true ? "지원" : enabled === false ? "미지원" : "확인 중"}</strong></li>
           ))}</ul>
-          {support.degraded.length > 0 && <div className="degraded-notice"><strong>현재 제한</strong><p>일부 기능이 제한되어 있습니다. 검색 결과의 warning과 각 기능 상태를 확인해 주세요.</p></div>}
+          {support.degraded.length > 0 && <div className="degraded-notice"><strong>현재 제한</strong><p>일부 기능이 제한되어 있습니다. 검색 결과의 안내를 확인해 주세요.</p></div>}
         </>
       )}
     </PageFrame>
@@ -498,7 +506,7 @@ export function AccountPage() {
         {status === "SIGNED_OUT" && <button className="primary-button" type="button" onClick={() => void startGuestSession()}>게스트 세션 시작</button>}
         {status === "READY" && <button className="secondary-button" type="button" onClick={() => void signOut()}>{session?.subjectType === "USER" ? "로그아웃" : "게스트 세션 종료"}</button>}
         {status === "LOADING" && <p role="status">세션을 확인하는 중…</p>}
-        {status === "FAILED" && <p className="degraded-notice" role="alert">세션 Backend를 사용할 수 없습니다. guest route search는 계속 사용할 수 있습니다.</p>}
+        {status === "FAILED" && <p className="degraded-notice" role="alert">로그인 상태를 확인할 수 없습니다. 길찾기는 로그인 없이 계속 사용할 수 있습니다.</p>}
         <a className="primary-link" href="/privacy">개인정보와 데이터 권리 확인</a>
       </div>
     </PageFrame>
@@ -514,7 +522,7 @@ export function MePage() {
         <a href="/preferences"><strong>이동 선호</strong><span>예산·도보·환승 기본값</span></a>
         <a href="/places"><strong>저장 장소</strong><span>민감 위치 관리</span></a>
         <a href="/support"><strong>지원 범위</strong><span>현재 기능과 제한</span></a>
-        <a href="/privacy"><strong>개인정보</strong><span>위치·삭제·export 상태</span></a>
+        <a href="/privacy"><strong>개인정보</strong><span>위치·데이터 받기·삭제</span></a>
         <a href="/account"><strong>계정</strong><span>로그인·회원가입·세션 관리</span></a>
       </div>
     </PageFrame>
@@ -597,13 +605,13 @@ export function PrivacyPage() {
     <PageFrame eyebrow="개인정보" title="위치는 필요한 순간에만">
       <div className="privacy-grid">
         <article><h2>현재 위치</h2><p>브라우저 권한으로 한 번 읽고 현재 화면 상태에서만 사용합니다. 프론트 저장소와 로그에 좌표를 남기지 않습니다.</p></article>
-        <article><h2>저장 장소와 기록</h2><p>로그인·동의가 있는 경우 Service Backend가 관리합니다. Routing에는 사용자 identity나 장소 별칭을 보내지 않습니다.</p></article>
-        <article><h2>오프라인 캐시</h2><p>앱 shell과 정적 자산만 캐시합니다. `/api/` 응답과 계정 데이터는 Service Worker가 캐시하지 않습니다.</p></article>
+        <article><h2>저장 장소와 기록</h2><p>로그인과 동의가 있는 경우에만 82TA 계정에 보관합니다. 길찾기 계산에는 계정 정보나 장소 별칭을 보내지 않습니다.</p></article>
+        <article><h2>오프라인 저장</h2><p>앱을 여는 데 필요한 기본 파일만 기기에 보관합니다. 길찾기 결과와 계정 정보는 오프라인용으로 저장하지 않습니다.</p></article>
       </div>
       <section className="privacy-section" aria-labelledby="consent-title">
         <h2 id="consent-title">동의 관리</h2>
         {documentVersion === undefined || documentVersion.trim().length === 0 ? (
-          <p className="degraded-notice">배포 환경의 개인정보 문서 version이 설정되지 않아 동의 변경을 잠갔습니다.</p>
+          <p className="degraded-notice">개인정보 안내 설정을 확인할 수 없어 동의 변경을 잠시 사용할 수 없습니다.</p>
         ) : consents === null ? <p role="status">동의 상태를 불러오는 중…</p> : (
           <ul className="consent-list">{(Object.keys(consentLabels) as ConsentType[]).map((type) => {
             const record = consents.find((item) => item.consentType === type);
@@ -614,8 +622,8 @@ export function PrivacyPage() {
       <section className="privacy-section" aria-labelledby="rights-title">
         <h2 id="rights-title">데이터 권리</h2>
         <div className="rights-actions">
-          <button className="primary-button" type="button" disabled={status === "SENDING" || exportJob?.status === "PENDING" || exportJob?.status === "RUNNING"} onClick={() => void requestExport()}>내 데이터 export 요청</button>
-          <button className="danger-button" type="button" disabled={status === "SENDING" || deletionJob?.status === "PENDING" || deletionJob?.status === "RUNNING"} onClick={() => void requestDeletion()}>내 Service 데이터 삭제 요청</button>
+          <button className="primary-button" type="button" disabled={status === "SENDING" || exportJob?.status === "PENDING" || exportJob?.status === "RUNNING"} onClick={() => void requestExport()}>내 데이터 받기</button>
+          <button className="danger-button" type="button" disabled={status === "SENDING" || deletionJob?.status === "PENDING" || deletionJob?.status === "RUNNING"} onClick={() => void requestDeletion()}>계정 데이터 삭제 요청</button>
         </div>
         {[exportJob, deletionJob].filter((job): job is DataRightsJob => job !== null).map((job) => {
           const expiry = job.downloadExpiresAt == null ? null : new Date(job.downloadExpiresAt);
@@ -623,10 +631,10 @@ export function PrivacyPage() {
             ? safeDownloadUrl(job.downloadUrl)
             : null;
           const stateLabel = job.status === "PENDING" ? "요청 접수" : job.status === "RUNNING" ? "처리 중" : job.status === "COMPLETE" ? "완료" : "실패";
-          return <div className="job-status" key={job.jobId}><strong>{job.type === "EXPORT" ? "Export" : "삭제"} · {stateLabel}</strong><span>요청 {new Date(job.requestedAt).toLocaleString("ko-KR")}</span>{(job.status === "PENDING" || job.status === "RUNNING") && <span role="status">서버 상태를 자동으로 다시 확인합니다.</span>}<button className="secondary-button" type="button" onClick={() => void refreshJob(job)}>상태 새로고침</button>{job.type === "EXPORT" && job.status === "COMPLETE" && downloadUrl !== null && <a href={downloadUrl} rel="noopener noreferrer">만료 전 다운로드</a>}{job.type === "EXPORT" && job.status === "COMPLETE" && downloadUrl === null && <span>다운로드가 만료되었거나 안전한 주소를 확인할 수 없어 새 export가 필요합니다.</span>}{job.status === "FAILED" && <span>요청을 완료하지 못했습니다. 고객지원에서 상태를 확인해 주세요.</span>}</div>;
+          return <div className="job-status" key={job.jobId}><strong>{job.type === "EXPORT" ? "데이터 받기" : "삭제"} · {stateLabel}</strong><span>요청 {new Date(job.requestedAt).toLocaleString("ko-KR")}</span>{(job.status === "PENDING" || job.status === "RUNNING") && <span role="status">진행 상태를 자동으로 다시 확인합니다.</span>}<button className="secondary-button" type="button" onClick={() => void refreshJob(job)}>상태 새로고침</button>{job.type === "EXPORT" && job.status === "COMPLETE" && downloadUrl !== null && <a href={downloadUrl} rel="noopener noreferrer">만료 전 다운로드</a>}{job.type === "EXPORT" && job.status === "COMPLETE" && downloadUrl === null && <span>다운로드 기간이 지났습니다. 다시 요청해 주세요.</span>}{job.status === "FAILED" && <span>요청을 완료하지 못했습니다. 고객지원에서 상태를 확인해 주세요.</span>}</div>;
         })}
       </section>
-      {status === "FAILED" && <p role="alert">개인정보 API 요청을 완료하지 못했습니다. 로그인 상태와 Backend를 확인해 주세요.</p>}
+      {status === "FAILED" && <p role="alert">개인정보 요청을 완료하지 못했습니다. 로그인 상태를 확인한 뒤 다시 시도해 주세요.</p>}
     </PageFrame>
   );
 }

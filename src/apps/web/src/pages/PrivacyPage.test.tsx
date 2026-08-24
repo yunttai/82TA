@@ -87,10 +87,10 @@ describe("PrivacyPage consent document version", () => {
     const user = userEvent.setup();
     render(<PrivacyPage />);
 
-    await user.click(await screen.findByRole("button", { name: "내 데이터 export 요청" }));
+    await user.click(await screen.findByRole("button", { name: "내 데이터 받기" }));
     await user.click(await screen.findByRole("button", { name: "상태 새로고침" }));
 
-    expect(await screen.findByText(/다운로드가 만료되었거나 안전한 주소/)).toBeInTheDocument();
+    expect(await screen.findByText(/다운로드 기간이 지났습니다/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "만료 전 다운로드" })).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("private-export.zip");
   });
