@@ -2,7 +2,7 @@ name: CD - Blank GCE Server
 
 on:
   push:
-    branches: ["main", "feature/realtime-multimodal-e2e"]
+    branches: ["main"]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
