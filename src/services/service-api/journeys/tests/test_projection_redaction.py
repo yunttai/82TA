@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import copy
+
 from django.test import SimpleTestCase
 
 from journeys.contracts import CanonicalContracts, LockedFixtures
-from journeys.projection import _public_geometry, project_public_response
+from journeys.projection import _public_geometry, _public_route, project_public_response
 
 
 class PublicProjectionRedactionTests(SimpleTestCase):
@@ -128,6 +130,9 @@ class PublicProjectionRedactionTests(SimpleTestCase):
             {"routeLabel": "100", "routeType": None, "direction": "OUTBOUND"},
         )
         self.assertEqual(public_leg["geometry"], {"encoding": "NONE"})
+        canonical_request = fixtures.get("public_request")
+        self.assertEqual(public_leg["from"]["name"], canonical_request["origin"]["displayName"])
+        self.assertEqual(public_leg["to"]["name"], canonical_request["destination"]["displayName"])
         self.assertEqual(public_leg["waitDuration"]["p50Seconds"], 120)
         self.assertEqual(public_leg["travelDuration"]["p50Seconds"], 480)
         public_route = projected["recommendations"]["fastest"]
@@ -159,6 +164,54 @@ class PublicProjectionRedactionTests(SimpleTestCase):
             {"encoding": "NONE"},
         )
         self.assertNotIn("private@example.invalid", str(projected_polyline))
+
+    def test_customer_stop_names_replace_provider_placeholders_without_mutating_route(self) -> None:
+        private_route = {
+            "legs": [
+                {
+                    "legId": "taxi-access",
+                    "from": {"name": "Origin", "coordinate": {"lon": 127.10, "lat": 37.30}},
+                    "to": {"name": "Destination", "coordinate": {"lon": 127.11, "lat": 37.31}},
+                    "geometry": {"encoding": "NONE"},
+                    "transit": None,
+                },
+                {
+                    "legId": "subway",
+                    "from": {"name": "판교(판교테크노밸리)", "coordinate": {"lon": 127.11, "lat": 37.31}},
+                    "to": {"name": "어린이대공원(세종대)", "coordinate": {"lon": 127.12, "lat": 37.32}},
+                    "geometry": {"encoding": "NONE"},
+                    "transit": {
+                        "routeLabel": "7호선",
+                        "routeType": "SUBWAY",
+                        "direction": "Kakao Transit Destination",
+                    },
+                },
+                {
+                    "legId": "final-walk",
+                    "from": {"name": "어린이대공원(세종대)", "coordinate": {"lon": 127.12, "lat": 37.32}},
+                    "to": {"name": "Kakao transit destination", "coordinate": {"lon": 127.13, "lat": 37.33}},
+                    "geometry": {"encoding": "NONE"},
+                    "transit": None,
+                },
+            ]
+        }
+        original = copy.deepcopy(private_route)
+        public = _public_route(
+            private_route,
+            {
+                "origin": {"displayName": "드론 기업지원허브센터"},
+                "destination": {"displayName": "세종대학교"},
+            },
+        )
+
+        self.assertEqual(public["legs"][0]["from"]["name"], "드론 기업지원허브센터")
+        self.assertEqual(public["legs"][0]["to"]["name"], "판교(판교테크노밸리)")
+        self.assertEqual(public["legs"][1]["from"]["name"], "판교(판교테크노밸리)")
+        self.assertEqual(public["legs"][-1]["to"]["name"], "세종대학교")
+        self.assertIsNone(public["legs"][1]["transit"]["direction"])
+        self.assertEqual(public["legs"][1]["transit"]["routeLabel"], "7호선")
+        self.assertEqual(private_route, original)
+        self.assertNotRegex(str(public), r"(?i)origin|destination|kakao\s+transit")
 
     def test_valid_polyline_is_reencoded_as_numeric_geojson(self) -> None:
         # Standard 1e5 polyline encoding for two points in the Seoul area.

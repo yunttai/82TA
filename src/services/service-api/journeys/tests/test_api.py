@@ -183,7 +183,7 @@ class RouteSearchApiTests(TestCase):
         payload["destination"]["coordinate"] = {"lon": 127.0276, "lat": 37.4979}
         payload["destination"]["providerPlaceId"] = "dynamic-destination"
         payload["departure"]["time"] = "2026-08-23T09:15:00+09:00"
-        payload["taxiBudget"]["maxAmount"] = 5000
+        payload["taxiBudget"]["maxAmount"] = 2000
         payload["saveToHistory"] = False
 
         response = self.post(payload, key="dynamic-key-0001")
@@ -199,6 +199,11 @@ class RouteSearchApiTests(TestCase):
         self.assertEqual(fastest["legs"][-1]["to"]["name"], "강남역")
         self.assertEqual(fastest["legs"][0]["transit"]["routeLabel"], "701")
         self.assertEqual(fastest["legs"][0]["transit"]["direction"], "강남역 방면")
+        self.assertEqual(fastest["taxiCost"]["upper"], 0)
+        self.assertEqual(
+            response.json()["recommendations"]["publicTransitOnly"]["routeId"],
+            fastest["routeId"],
+        )
 
     @override_settings(ROUTING_GATEWAY_MODE="replay")
     def test_noncanonical_valid_request_is_an_honest_replay_miss(self) -> None:

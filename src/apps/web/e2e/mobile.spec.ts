@@ -10,9 +10,9 @@ function commercializeRoute(route: typeof canonicalResponse.recommendations.fast
     ...route,
     legs: route.legs.map((leg, index) => ({
       ...leg,
-      from: index === 0 ? { ...leg.from, name: "명지대학교 자연캠퍼스" } : leg.from,
-      to: index === route.legs.length - 1 ? { ...leg.to, name: "판교역" } : leg.to,
-      transit: { ...leg.transit, routeLabel: "701", direction: "판교역 방면" },
+      from: index === 0 ? { ...leg.from, name: "Origin" } : leg.from,
+      to: index === route.legs.length - 1 ? { ...leg.to, name: "Kakao Transit Destination" } : leg.to,
+      transit: { ...leg.transit, routeLabel: "701", direction: "Kakao Transit Destination" },
     })),
   };
 }
@@ -171,7 +171,7 @@ test("mobile route search stays within the Public Service boundary", async ({ pa
   await expect(page.getByRole("region", { name: "경로 상세" })).toBeVisible();
   await expect(page.getByText(/에서 버스 .*승차/)).toBeVisible();
   await expect(page.getByText(/에서 하차/)).toBeVisible();
-  expect(await page.locator("body").innerText()).not.toMatch(/P50|P90|ETA|어디서 타고, 어디서 갈아타는지|Sanitized|SAN-R1/);
+  expect(await page.locator("body").innerText()).not.toMatch(/P50|P90|ETA|어디서 타고, 어디서 갈아타는지|Origin|Destination|Kakao\s+Transit|Sanitized|SAN-R1|다음 ·/i);
   const resultOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(resultOverflow).toBeLessThanOrEqual(1);
 
