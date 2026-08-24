@@ -21,7 +21,8 @@ base=(
 
 "${base[@]}" up -d --wait --wait-timeout 120 \
   routing-egress-proxy routing-db routing-redis
-"${base[@]}" --profile tools run --rm provider-evidence
+"${base[@]}" --profile tools run \
+  --interactive=false --no-tty --rm provider-evidence </dev/null
 
 evidence_file=.runtime/provider-evidence.env
 if [[ ! -s $evidence_file ]] \
