@@ -4,6 +4,7 @@ import { HomeMap } from "../features/home/HomeMap";
 import { PwaStatus } from "../features/pwa/PwaStatus";
 import { ResultPanel } from "../features/route-results/ResultPanel";
 import { SearchForm } from "../features/route-search/SearchForm";
+import { maximumTaxiBudgetKrw, taxiBudgetToExpectedFareCapKrw } from "../features/route-search/fareBudget";
 import { useRouteSearch } from "../features/route-search/useRouteSearch";
 import { getPreferences, getPublicCapabilities, type PublicCapabilities, type UserPreferences } from "../shared/api/publicService";
 import { inspectCurrentSession } from "../shared/session/sessionMemory";
@@ -97,7 +98,9 @@ function SearchPage() {
               <span aria-hidden="true">→</span>
               <strong>{state.request.destination.displayName}</strong>
             </div>
-            <p>택시비 상한 {state.request.taxiBudget.maxAmount.toLocaleString("ko-KR")}원</p>
+            <p>{state.request.taxiBudget.maxAmount === maximumTaxiBudgetKrw
+              ? "예상 요금 상한 무관"
+              : `예상 요금 상한 ${taxiBudgetToExpectedFareCapKrw(state.request.taxiBudget.maxAmount).toLocaleString("ko-KR")}원`}</p>
             <button type="button" onClick={reset}>조건 수정</button>
           </section>
         )}
@@ -106,17 +109,17 @@ function SearchPage() {
             <span className="search-card-mark" aria-hidden="true">↗</span>
             <div>
               <h2 id="search-title">경로 검색</h2>
-              <p>장소와 사용할 택시비를 입력하세요.</p>
+              <p>장소와 예상 요금 상한을 입력하세요.</p>
             </div>
           </div>
-          {capabilitiesFailed && <p className="degraded-notice" role="status">현재 기능 지원 범위를 확인할 수 없습니다. 좌석 위험 회피와 택시 연결 선택은 잠갔습니다.</p>}
-          <SearchForm busy={busy} offline={!online} errors={state.errors} capabilities={capabilities} initialPreferences={initialPreferences} {...(quickBudget === undefined ? {} : { initialTaxiBudget: quickBudget })} onSubmit={search} />
+          {capabilitiesFailed && <p className="degraded-notice" role="status">현재 기능 지원 범위를 확인할 수 없습니다. 택시 연결 선택은 잠갔습니다.</p>}
+          <SearchForm busy={busy} offline={!online} errors={state.errors} capabilities={capabilities} initialPreferences={initialPreferences} {...(quickBudget === undefined ? {} : { initialFareCap: quickBudget })} onSubmit={search} />
         </section>
 
         {state.phase === "SEARCHING" && (
           <section className="search-progress" aria-live="polite" aria-busy="true">
             <span className="progress-mark" aria-hidden="true">82</span>
-            <div><h2>가능한 이동 조합을 비교하고 있습니다</h2><p>택시비 상한, P50·P90 도착시간, 환승과 지원 정보를 함께 확인합니다.</p></div>
+            <div><h2>가능한 이동 조합을 비교하고 있습니다</h2><p>예상 요금과 도착 시간, 환승 정보를 함께 확인합니다.</p></div>
           </section>
         )}
 

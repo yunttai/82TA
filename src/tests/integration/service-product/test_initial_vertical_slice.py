@@ -91,13 +91,13 @@ class InitialVerticalSliceIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(views._gateway, StubRoutingGateway)
         self.assertEqual(body["status"], "PARTIAL")
-        self.assertEqual(body["recommendations"], {
-            "fastest": None,
-            "stable": None,
-            "efficient": None,
-            "publicTransitOnly": None,
-        })
-        self.assertEqual(body["warnings"], ["PROVIDER_PARTIAL_FAILURE"])
+        self.assertIsNotNone(body["recommendations"]["fastest"])
+        self.assertEqual(body["recommendations"]["fastest"]["pattern"], "TRANSIT_ONLY")
+        self.assertEqual(body["recommendations"]["fastest"]["legs"][0]["geometry"]["encoding"], "GEOJSON")
+        self.assertEqual(body["recommendations"]["fastest"]["legs"][0]["from"]["name"], "명지대학교 자연캠퍼스")
+        self.assertEqual(body["recommendations"]["fastest"]["legs"][-1]["to"]["name"], "판교역")
+        self.assertEqual(body["recommendations"]["fastest"]["legs"][0]["transit"]["routeLabel"], "701")
+        self.assertEqual(body["warnings"], ["BUS_DATA_UNAVAILABLE"])
         self.assertEqual(
             CanonicalContracts().validate("public", "PublicRouteSearchResponse", body),
             [],
@@ -196,7 +196,7 @@ class InitialVerticalSliceIntegrationTests(TestCase):
         # COMPLETE is the normal typed response branch; the other states have
         # explicit banners or terminal branches.
         self.assertIn("phase: ResponsePhase", hook)
-        self.assertIn("phase: responsePhase(data)", hook)
+        self.assertIn("phase: data.status", hook)
         for explicit_status in statuses[1:]:
             self.assertIn(explicit_status, hook + panel)
 

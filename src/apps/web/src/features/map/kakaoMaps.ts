@@ -3,8 +3,19 @@ export interface KakaoLatLng {
   getLng: () => number;
 }
 
+export interface KakaoLatLngBounds {
+  extend: (position: KakaoLatLng) => void;
+}
+
 export interface KakaoMap {
   setCenter: (position: KakaoLatLng) => void;
+  setBounds?: (
+    bounds: KakaoLatLngBounds,
+    paddingTop?: number,
+    paddingRight?: number,
+    paddingBottom?: number,
+    paddingLeft?: number,
+  ) => void;
 }
 
 export interface KakaoMarker {
@@ -14,6 +25,7 @@ export interface KakaoMarker {
 export interface KakaoMaps {
   load: (callback: () => void) => void;
   LatLng: new (lat: number, lon: number) => KakaoLatLng;
+  LatLngBounds?: new () => KakaoLatLngBounds;
   Map: new (element: HTMLElement, options: { center: KakaoLatLng; level: number }) => KakaoMap;
   Marker: new (options: { map: KakaoMap; position: KakaoLatLng; draggable?: boolean }) => KakaoMarker;
   Polyline: new (options: { map: KakaoMap; path: KakaoLatLng[]; strokeWeight: number; strokeColor: string; strokeOpacity: number }) => unknown;

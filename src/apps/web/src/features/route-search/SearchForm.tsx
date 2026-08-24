@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { PlaceField } from "../place-search/PlaceField";
 import { MapCoordinatePicker } from "../place-search/MapCoordinatePicker";
+import { maximumTaxiBudgetKrw, taxiBudgetToExpectedFareCapKrw } from "./fareBudget";
 import type {
   PlaceRef,
   PublicCapabilities,
@@ -13,11 +14,7 @@ type Optimization = PublicRouteSearchRequest["preferences"]["optimization"];
 type AllowedMode = NonNullable<PublicRouteSearchRequest["preferences"]["allowedModes"]>[number];
 
 const canonicalModes: readonly AllowedMode[] = ["WALK", "WAIT", "TRANSFER", "TAXI", "BUS", "SUBWAY", "GTX", "TRAIN"];
-const budgetPresetAmounts = [0, 5000, 10000, 20000] as const;
-const modeLabels: Readonly<Record<AllowedMode, string>> = {
-  WALK: "도보", WAIT: "대기", TRANSFER: "환승 이동", TAXI: "택시",
-  BUS: "버스", SUBWAY: "지하철", GTX: "GTX", TRAIN: "기차",
-};
+const budgetPresetAmounts = [maximumTaxiBudgetKrw, 5000, 10000, 20000] as const;
 
 export interface SearchDraft {
   originName: string;
@@ -31,6 +28,7 @@ export interface SearchDraft {
   departureType: PublicRouteSearchRequest["departure"]["type"];
   arrivalDeadline: string;
   taxiBudgetKrw: string;
+  fareCapUnconstrained: boolean;
   maxWalkMinutes: string;
   maxTransfers: string;
   maxTaxiLegs: string;
@@ -49,7 +47,7 @@ interface SearchFormProps {
   errors: readonly string[];
   capabilities?: PublicCapabilities | null;
   initialPreferences?: UserPreferences | null;
-  initialTaxiBudget?: number;
+  initialFareCap?: number;
   onSubmit: (draft: SearchDraft) => void;
 }
 
@@ -59,23 +57,24 @@ function localDateTimeDefault(): string {
   return koreaTime.toISOString().slice(0, 16);
 }
 
-export function SearchForm({ busy, offline = false, errors, capabilities, initialPreferences = null, initialTaxiBudget, onSubmit }: SearchFormProps) {
+export function SearchForm({ busy, offline = false, errors, capabilities, initialPreferences = null, initialFareCap, onSubmit }: SearchFormProps) {
   const errorId = useId();
   const [userEdited, setUserEdited] = useState(false);
-  const startingTaxiBudget = initialTaxiBudget ?? 10000;
-  const [selectedBudgetPreset, setSelectedBudgetPreset] = useState<number | null>(budgetPresetAmounts.includes(startingTaxiBudget as (typeof budgetPresetAmounts)[number]) ? startingTaxiBudget : null);
+  const startingFareCap = initialFareCap ?? 10000;
+  const [selectedBudgetPreset, setSelectedBudgetPreset] = useState<number | null>(budgetPresetAmounts.includes(startingFareCap as (typeof budgetPresetAmounts)[number]) ? startingFareCap : null);
   const [draft, setDraft] = useState<SearchDraft>({
-    originName: "명지대학교 자연캠퍼스",
-    originLongitude: "127.187456",
-    originLatitude: "37.222345",
-    destinationName: "판교역",
-    destinationLongitude: "127.111159",
-    destinationLatitude: "37.394761",
+    originName: "",
+    originLongitude: "",
+    originLatitude: "",
+    destinationName: "",
+    destinationLongitude: "",
+    destinationLatitude: "",
     departureTiming: "NOW",
     departureTime: localDateTimeDefault(),
     departureType: "DEPART_AT",
     arrivalDeadline: "",
-    taxiBudgetKrw: String(startingTaxiBudget),
+    taxiBudgetKrw: String(startingFareCap),
+    fareCapUnconstrained: startingFareCap === maximumTaxiBudgetKrw,
     maxWalkMinutes: "15",
     maxTransfers: "3",
     maxTaxiLegs: "2",
@@ -89,13 +88,15 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
   });
 
   useEffect(() => {
-    if (initialPreferences === null || userEdited || initialTaxiBudget !== undefined) return;
-    setSelectedBudgetPreset(budgetPresetAmounts.includes(initialPreferences.defaultTaxiBudget as (typeof budgetPresetAmounts)[number])
-      ? initialPreferences.defaultTaxiBudget
+    if (initialPreferences === null || userEdited || initialFareCap !== undefined) return;
+    const preferredFareCap = taxiBudgetToExpectedFareCapKrw(initialPreferences.defaultTaxiBudget);
+    setSelectedBudgetPreset(budgetPresetAmounts.includes(preferredFareCap as (typeof budgetPresetAmounts)[number])
+      ? preferredFareCap
       : null);
     setDraft((current) => ({
       ...current,
-      taxiBudgetKrw: String(initialPreferences.defaultTaxiBudget),
+      taxiBudgetKrw: String(preferredFareCap),
+      fareCapUnconstrained: initialPreferences.defaultTaxiBudget === maximumTaxiBudgetKrw,
       maxWalkMinutes: String(initialPreferences.maxWalkSeconds / 60),
       maxTransfers: String(initialPreferences.maxTransfers),
       maxTaxiLegs: String(initialPreferences.maxTaxiLegs),
@@ -103,7 +104,7 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
       avoidStairs: initialPreferences.accessibility?.avoidStairs ?? false,
       wheelchair: initialPreferences.accessibility?.wheelchair ?? false,
     }));
-  }, [initialPreferences, initialTaxiBudget, userEdited]);
+  }, [initialPreferences, initialFareCap, userEdited]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -139,7 +140,7 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
               value={draft.originName}
               allowCurrentLocation
               disabled={busy}
-              onLabelChange={(originName) => setDraft({ ...draft, originName })}
+              onLabelChange={(originName) => setDraft({ ...draft, originName, originLongitude: "", originLatitude: "" })}
               onPlaceSelected={(place: PlaceRef) => setDraft({
                 ...draft,
                 originName: place.displayName,
@@ -152,7 +153,7 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
               label="목적지"
               value={draft.destinationName}
               disabled={busy}
-              onLabelChange={(destinationName) => setDraft({ ...draft, destinationName })}
+              onLabelChange={(destinationName) => setDraft({ ...draft, destinationName, destinationLongitude: "", destinationLatitude: "" })}
               onPlaceSelected={(place: PlaceRef) => setDraft({
                 ...draft,
                 destinationName: place.displayName,
@@ -202,19 +203,19 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
             />
           </label>
           <div className="budget-section field-wide">
-            <span className="budget-title">요금 상한</span>
-            <div className="budget-presets" role="group" aria-label="택시 요금 빠른 선택">
-              {([[0, "무관"], [5000, "5천원"], [10000, "1만원"], [20000, "2만원"]] as const).map(([amount, label]) => (
+            <span className="budget-title">예상 요금 상한</span>
+            <div className="budget-presets" role="group" aria-label="예상 요금 상한 빠른 선택">
+              {([[maximumTaxiBudgetKrw, "무관"], [5000, "5천원"], [10000, "1만원"], [20000, "2만원"]] as const).map(([amount, label]) => (
                 <button key={amount} type="button" aria-pressed={selectedBudgetPreset === amount} onClick={() => {
                   setSelectedBudgetPreset(amount);
-                  setDraft({ ...draft, taxiBudgetKrw: String(amount) });
+                  setDraft({ ...draft, taxiBudgetKrw: String(amount), fareCapUnconstrained: amount === maximumTaxiBudgetKrw });
                 }}>
                   {label}
                 </button>
               ))}
             </div>
             <label className="field budget-field">
-              <span>직접 입력</span>
+              <span>요금 상한 직접 입력</span>
               <span className="input-suffix">
                 <input
                   name="taxiBudgetKrw"
@@ -222,13 +223,17 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
                   min={0}
                   max={500000}
                   step={1}
-                  value={draft.taxiBudgetKrw}
-                  onFocus={() => setSelectedBudgetPreset(null)}
+                  value={selectedBudgetPreset === maximumTaxiBudgetKrw ? "" : draft.taxiBudgetKrw}
+                  placeholder={selectedBudgetPreset === maximumTaxiBudgetKrw ? "무관 선택됨" : undefined}
+                  onFocus={() => {
+                    if (selectedBudgetPreset === maximumTaxiBudgetKrw) setDraft({ ...draft, taxiBudgetKrw: "", fareCapUnconstrained: false });
+                    setSelectedBudgetPreset(null);
+                  }}
                   onChange={(event) => {
                     setSelectedBudgetPreset(null);
-                    setDraft({ ...draft, taxiBudgetKrw: event.currentTarget.value });
+                    setDraft({ ...draft, taxiBudgetKrw: event.currentTarget.value, fareCapUnconstrained: false });
                   }}
-                  required
+                  required={selectedBudgetPreset !== maximumTaxiBudgetKrw}
                 />
                 <span>원</span>
               </span>
@@ -236,137 +241,25 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
           </div>
         </div>
 
-        <details className="details-panel">
-          <summary>세부 조건</summary>
-          <div className="form-grid details-grid">
-            <label className="field field-wide deadline-field">
-              <span>도착 마감 시각(선택) · 한국 시간</span>
-              <input
-                name="arrivalDeadline"
-                type="datetime-local"
-                value={draft.arrivalDeadline}
-                onChange={(event) => setDraft({ ...draft, arrivalDeadline: event.currentTarget.value })}
-              />
-              <small>출발 시각을 역산하지 않고 Service를 통해 Routing에 그대로 전달합니다.</small>
-            </label>
-            <label className="field">
-              <span>최대 도보</span>
-              <span className="input-suffix">
-                <input
-                  name="maxWalkMinutes"
-                  inputMode="numeric"
-                  value={draft.maxWalkMinutes}
-                  onChange={(event) => setDraft({ ...draft, maxWalkMinutes: event.currentTarget.value })}
-                />
-                <span>분</span>
-              </span>
-            </label>
-            <label className="field">
-              <span>최대 환승</span>
-              <select
-                name="maxTransfers"
-                value={draft.maxTransfers}
-                onChange={(event) => setDraft({ ...draft, maxTransfers: event.currentTarget.value })}
-              >
-                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((count) => <option key={count} value={count}>{count}회</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span>최대 택시 구간</span>
-              <select
-                name="maxTaxiLegs"
-                value={draft.maxTaxiLegs}
-                onChange={(event) => setDraft({ ...draft, maxTaxiLegs: event.currentTarget.value })}
-              >
-                {[0, 1, 2, 3].map((count) => <option key={count} value={count}>{count}개</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span>추천 기준</span>
-              <select
-                name="optimization"
-                value={draft.optimization}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  if (value === "FASTEST" || value === "STABLE" || value === "EFFICIENT" || value === "BALANCED") {
-                    setDraft({ ...draft, optimization: value });
-                  }
-                }}
-              >
-                <option value="BALANCED">균형</option>
-                <option value="FASTEST">빠른 도착</option>
-                <option value="STABLE">안정적인 도착</option>
-                <option value="EFFICIENT">비용 효율</option>
-              </select>
-            </label>
-          </div>
-          <div className="check-list">
-            <fieldset className="mode-fieldset">
-              <legend>허용 교통수단</legend>
-              <div className="mode-grid">
-                {canonicalModes.map((mode) => (
-                  <label className="check-field" key={mode}>
-                    <input
-                      type="checkbox"
-                      checked={draft.allowedModes.includes(mode)}
-                      onChange={(event) => setDraft({
-                        ...draft,
-                        allowedModes: event.currentTarget.checked
-                          ? [...draft.allowedModes, mode]
-                          : draft.allowedModes.filter((item) => item !== mode),
-                      })}
-                    />
-                    <span>{modeLabels[mode]}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={capabilities?.features?.taxiBridge === true && draft.allowTaxiBridge}
-                disabled={capabilities?.features?.taxiBridge !== true}
-                onChange={(event) => setDraft({ ...draft, allowTaxiBridge: event.currentTarget.checked })}
-              />
-              <span>대중교통 사이 짧은 택시 이동 허용</span>
-            </label>
-            {capabilities?.features?.taxiBridge !== true && <p className="capability-help">택시 연결은 {capabilities === null ? "지원 여부 확인 중" : "현재 미지원"}이라 선택할 수 없습니다.</p>}
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={capabilities?.features?.busSeatRisk === true && draft.avoidHighBusSeatRisk}
-                disabled={capabilities?.features?.busSeatRisk !== true}
-                onChange={(event) => setDraft({ ...draft, avoidHighBusSeatRisk: event.currentTarget.checked })}
-              />
-              <span>좌석 부족 위험이 높은 버스 피하기</span>
-            </label>
-            {capabilities?.features?.busSeatRisk !== true && <p className="capability-help">좌석 위험 회피는 {capabilities === null ? "지원 여부 확인 중" : "현재 미지원"}이라 선택할 수 없습니다. 위험이 낮다는 뜻은 아닙니다.</p>}
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={draft.avoidStairs}
-                onChange={(event) => setDraft({ ...draft, avoidStairs: event.currentTarget.checked })}
-              />
-              <span>계단이 있는 경로 피하기</span>
-            </label>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={draft.wheelchair}
-                onChange={(event) => setDraft({ ...draft, wheelchair: event.currentTarget.checked })}
-              />
-              <span>휠체어 접근 가능한 경로 우선</span>
-            </label>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={draft.saveToHistory}
-                onChange={(event) => setDraft({ ...draft, saveToHistory: event.currentTarget.checked })}
-              />
-              <span>동의한 계정의 검색 기록에 저장</span>
-            </label>
-          </div>
-        </details>
+        <div className="check-list primary-search-options">
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={capabilities?.features?.taxiBridge === true && draft.allowTaxiBridge}
+              disabled={capabilities?.features?.taxiBridge !== true}
+              onChange={(event) => setDraft({ ...draft, allowTaxiBridge: event.currentTarget.checked })}
+            />
+            <span>대중교통 사이 짧은 택시 이동 허용</span>
+          </label>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={draft.saveToHistory}
+              onChange={(event) => setDraft({ ...draft, saveToHistory: event.currentTarget.checked })}
+            />
+            <span>검색 기록에 저장</span>
+          </label>
+        </div>
       </fieldset>
 
       {errors.length > 0 && (

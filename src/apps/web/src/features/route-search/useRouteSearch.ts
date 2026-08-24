@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import type { SearchDraft } from "./SearchForm";
+import { expectedFareCapToTaxiBudgetKrw } from "./fareBudget";
 import {
   createIdempotencyKey,
   createRouteSearch,
@@ -62,7 +63,10 @@ function validateDraft(draft: SearchDraft): ValidationResult {
   const originLatitude = numberInRange(draft.originLatitude, 33, 39.5);
   const destinationLongitude = numberInRange(draft.destinationLongitude, 124, 132);
   const destinationLatitude = numberInRange(draft.destinationLatitude, 33, 39.5);
-  const taxiBudgetKrw = integerInRange(draft.taxiBudgetKrw, 0, 500_000);
+  const expectedFareCapKrw = integerInRange(draft.taxiBudgetKrw, 0, 500_000);
+  const taxiBudgetKrw = expectedFareCapKrw === null
+    ? null
+    : expectedFareCapToTaxiBudgetKrw(expectedFareCapKrw, draft.fareCapUnconstrained);
   const maxWalkMinutes = numberInRange(draft.maxWalkMinutes, 0, 120);
   const maxWalkSeconds = maxWalkMinutes === null ? null : maxWalkMinutes * 60;
   const maxTransfers = integerInRange(draft.maxTransfers, 0, 8);
@@ -74,7 +78,7 @@ function validateDraft(draft: SearchDraft): ValidationResult {
   if (originLongitude === null || originLatitude === null) errors.push("출발 좌표가 지원 범위를 벗어났습니다.");
   if (draft.destinationName.trim().length === 0) errors.push("목적지 이름을 입력해 주세요.");
   if (destinationLongitude === null || destinationLatitude === null) errors.push("도착 좌표가 지원 범위를 벗어났습니다.");
-  if (taxiBudgetKrw === null) errors.push("택시비는 0원부터 500,000원까지 정수로 입력해 주세요.");
+  if (taxiBudgetKrw === null) errors.push("예상 요금 상한은 0원부터 500,000원까지 정수로 입력해 주세요.");
   if (maxWalkSeconds === null || !Number.isInteger(maxWalkSeconds)) errors.push("최대 도보 시간은 0분부터 120분까지 초 단위로 정확히 입력해 주세요.");
   if (maxTransfers === null) errors.push("최대 환승 횟수를 확인해 주세요.");
   if (maxTaxiLegs === null) errors.push("최대 택시 구간 수를 확인해 주세요.");
@@ -153,31 +157,10 @@ function errorPhase(problem: PublicProblem | undefined, status: number): "NO_FEA
   return "FAILED";
 }
 
-function responsePhase(response: PublicRouteSearchResponse): ResponsePhase {
-  return new Date(response.expiresAt).getTime() <= Date.now() ? "EXPIRED" : response.status;
-}
-
 export function useRouteSearch() {
   const [state, setState] = useState<RouteSearchState>({ phase: "IDLE", errors: [] });
   const requestSequence = useRef(0);
   const lastAttempt = useRef<{ request: PublicRouteSearchRequest; idempotencyKey: string } | null>(null);
-
-  useEffect(() => {
-    if (!("response" in state) || state.response === null || state.phase === "EXPIRED") return undefined;
-
-    const delay = new Date(state.response.expiresAt).getTime() - Date.now();
-    if (delay <= 0) {
-      setState({ ...state, phase: "EXPIRED" });
-      return undefined;
-    }
-
-    const maximumTimerDelay = 2_147_483_647;
-    const timer = window.setTimeout(
-      () => setState({ ...state, phase: "EXPIRED" }),
-      Math.min(delay, maximumTimerDelay),
-    );
-    return () => window.clearTimeout(timer);
-  }, [state]);
 
   async function execute(request: PublicRouteSearchRequest, idempotencyKey: string) {
     const sequence = ++requestSequence.current;
@@ -188,7 +171,7 @@ export function useRouteSearch() {
       if (sequence !== requestSequence.current) return;
 
       if (data !== undefined) {
-        setState({ phase: responsePhase(data), errors: [], response: data, problem: null, request });
+        setState({ phase: data.status, errors: [], response: data, problem: null, request });
         return;
       }
 

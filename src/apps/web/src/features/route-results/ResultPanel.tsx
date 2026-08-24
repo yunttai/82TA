@@ -24,18 +24,18 @@ interface ResultPanelProps {
 
 const warningMessages: Readonly<Record<string, string>> = {
   BUS_DATA_UNAVAILABLE: "버스 실시간 정보를 사용할 수 없습니다.",
-  BUS_MAPPING_LOW_CONFIDENCE: "일부 버스 노선 연결의 신뢰도가 낮습니다.",
-  ETA_MODEL_FALLBACK: "공식 도착정보 대신 예측값을 사용했습니다.",
+  BUS_MAPPING_LOW_CONFIDENCE: "일부 버스의 좌석·대기 정보는 표시하지 않습니다.",
+  ETA_MODEL_FALLBACK: "실시간 도착정보가 없어 예상 도착시간을 사용했습니다.",
   HISTORICAL_PROXY_USED: "실시간 정보 대신 과거 자료를 사용했습니다.",
   TAXI_FARE_MAY_VARY: "실제 택시 요금은 달라질 수 있습니다.",
   TAXI_DISPATCH_WAIT_ESTIMATED: "택시 배차 대기는 추정값입니다.",
   TRANSFER_MARGIN_LOW: "환승 여유가 짧습니다.",
   GEOMETRY_PARTIAL: "일부 구간의 지도 경로가 없습니다.",
-  PROVIDER_PARTIAL_FAILURE: "일부 교통 정보가 빠진 상태로 계산했습니다.",
-  DATA_STALE: "일부 정보가 최신 기준을 넘었습니다.",
-  BUDGET_NEAR_LIMIT: "택시비 상한이 입력한 예산에 가깝습니다.",
-  BOARDABILITY_IS_PROXY: "승차 가능성은 실제 승차 결과가 아닌 대용 지표입니다.",
-  FEATURE_OUT_OF_DISTRIBUTION: "일부 조건이 예측 모델의 일반 범위를 벗어날 수 있습니다.",
+  PROVIDER_PARTIAL_FAILURE: "일부 교통 정보가 빠진 결과입니다.",
+  DATA_STALE: "일부 정보가 오래되었습니다.",
+  BUDGET_NEAR_LIMIT: "택시비 최대 예상이 설정한 택시 이용 예산에 가깝습니다.",
+  BOARDABILITY_IS_PROXY: "탑승 가능성은 참고용이며 실제 탑승을 보장하지 않습니다.",
+  FEATURE_OUT_OF_DISTRIBUTION: "평소와 다른 교통 상황에서는 예상이 달라질 수 있습니다.",
   FUTURE_TRANSIT_ESTIMATED: "미래 대중교통 정보는 과거 자료 기반 추정값입니다.",
 };
 
@@ -46,7 +46,7 @@ const reasonMessages: Readonly<Record<string, string>> = {
   UPSTREAM_STOP_HIGHER_BOARDABILITY: "상류 정류장 이동으로 대기 위험을 낮춘 경로",
   HIGH_BUS_SEAT_RISK_AVOIDED: "높은 좌석 부족 위험을 피한 경로",
   TAXI_BRIDGE_CONNECTS_FAST_LINES: "짧은 택시 이동으로 빠른 교통망을 연결한 경로",
-  WITHIN_STRICT_TAXI_BUDGET: "택시비 상한이 예산 이내인 경로",
+  WITHIN_STRICT_TAXI_BUDGET: "택시비 최대 예상이 택시 이용 예산 이내인 경로",
   NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET: "예산을 더 써도 시간 이득이 크지 않은 경로",
   LOWER_WALKING_TIME: "도보 시간이 짧은 경로",
   LOWER_P90_ARRIVAL_TIME: "보수적으로 보아도 도착이 빠른 경로",
@@ -63,13 +63,6 @@ const featureMessages: Readonly<Record<string, string>> = {
   taxiBridge: "택시 연결",
   realtimeRerouting: "실시간 재추천",
 };
-
-const confidenceMessages = {
-  HIGH: "높음",
-  MEDIUM: "참고 수준",
-  LOW: "낮음",
-  UNKNOWN: "정보 없음",
-} as const;
 
 const coverageMessages = {
   LIVE: "실시간 정보 사용",
@@ -103,6 +96,7 @@ const patternMessages: Readonly<Record<RouteCandidate["pattern"], string>> = {
 const resultStatusMessages = {
   COMPLETE: "추천 완료",
   PARTIAL: "일부 정보 제한",
+  EXPIRED: "이전 검색 결과",
 } as const;
 
 const problemMessages: Readonly<Record<string, string>> = {
@@ -230,7 +224,7 @@ function routeLegSummaryItems(route: RouteCandidate): RouteLegSummaryItem[] {
           label: waitLabel,
           p50Seconds: wait.p50Seconds,
           p90Seconds: wait.p90Seconds,
-          title: `${waitLabel} P50 ${formatLegMinutes(wait.p50Seconds)} · P90 ${formatLegMinutes(wait.p90Seconds)}`,
+          title: `${waitLabel} 약 ${formatLegMinutes(wait.p50Seconds)} · 길어지면 ${formatLegMinutes(wait.p90Seconds)}`,
           screenReaderText: `${waitLabel}, 예상 ${formatLegMinutes(wait.p50Seconds)}, 여유 기준 ${formatLegMinutes(wait.p90Seconds)}`,
         },
         {
@@ -239,7 +233,7 @@ function routeLegSummaryItems(route: RouteCandidate): RouteLegSummaryItem[] {
           label: routeLegLabel(leg),
           p50Seconds: travel.p50Seconds,
           p90Seconds: travel.p90Seconds,
-          title: `${leg.from.name} → ${leg.to.name} · P90 ${formatLegMinutes(travel.p90Seconds)}`,
+          title: `${leg.from.name} → ${leg.to.name} · 약 ${formatLegMinutes(travel.p50Seconds)} · 지연 시 ${formatLegMinutes(travel.p90Seconds)}`,
           screenReaderText: `${leg.from.name}에서 ${leg.to.name}까지`,
         },
       ];
@@ -250,7 +244,7 @@ function routeLegSummaryItems(route: RouteCandidate): RouteLegSummaryItem[] {
       label: routeLegLabel(leg, leg.mode === "TAXI"),
       p50Seconds: leg.duration.p50Seconds,
       p90Seconds: leg.duration.p90Seconds,
-      title: `${leg.from.name} → ${leg.to.name} · P90 ${formatLegMinutes(leg.duration.p90Seconds)}`,
+      title: `${leg.from.name} → ${leg.to.name} · 약 ${formatLegMinutes(leg.duration.p50Seconds)} · 지연 시 ${formatLegMinutes(leg.duration.p90Seconds)}`,
       screenReaderText: `${leg.from.name}에서 ${leg.to.name}까지`,
     }];
   });
@@ -268,13 +262,6 @@ function formatArrival(value: string | null | undefined): string {
   if (value == null) return "정보 없음";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "정보 확인 필요" : date.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function originLabel(origin: RouteCandidate["totalDuration"]["origin"]): string {
-  return ({
-    OBSERVED: "관측", PROVIDER_ESTIMATE: "제공사 추정", MODEL_PREDICTED: "모델 예측",
-    HISTORICAL_PROXY: "과거 자료", USER_INPUT: "사용자 입력", UNKNOWN: "출처 확인 불가",
-  } as const)[origin];
 }
 
 function isRouteUsable(route: RouteCandidate, strictTaxiBudgetKrw?: number): boolean {
@@ -317,17 +304,113 @@ function WarningList({ codes }: { codes: readonly string[] }) {
   );
 }
 
-function ProvenanceList({ items }: { items: NonNullable<RouteCandidate["provenance"]> }) {
-  if (items.length === 0) return null;
+function DegradedProvenanceList({ items }: { items: NonNullable<RouteCandidate["provenance"]> }) {
+  const degradedItems = items.filter((item) => item.fallbackLevel > 0 || item.confidence.grade === "LOW");
+  if (degradedItems.length === 0) return null;
   return (
-    <ul className="provenance-list" aria-label="데이터 출처">
-      {items.map((item, index) => (
+    <ul className="provenance-list" aria-label="정보 정확도 안내">
+      {degradedItems.map((item, index) => (
         <li key={`${item.origin}-${item.receivedAt}-${index}`}>
-          <span>{originLabel(item.origin)} · 신뢰도 {confidenceMessages[item.confidence.grade]}</span>
-          <span>수신 {formatArrival(item.receivedAt)}{item.ageSeconds == null ? "" : ` · 응답 기준 ${formatDuration(item.ageSeconds)} 전`}{item.fallbackLevel > 0 ? " · 대체 정보 사용" : ""}</span>
+          <span>{item.fallbackLevel > 0 ? "일부 정보는 대체 자료를 사용했습니다." : "일부 정보의 정확도가 낮을 수 있습니다."}</span>
+          {item.ageSeconds != null && <span>{formatDuration(item.ageSeconds)} 전에 받은 정보</span>}
         </li>
       ))}
     </ul>
+  );
+}
+
+function formatDistance(meters: number): string {
+  if (meters < 1_000) return `${meters}m`;
+  return `${new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 }).format(meters / 1_000)}km`;
+}
+
+function rideAction(leg: RouteLeg): string {
+  if (leg.mode === "WALK") return `${leg.to.name}까지 걸어서 이동`;
+  if (leg.mode === "TRANSFER") return `${leg.to.name}으로 환승 이동`;
+  if (leg.mode === "WAIT") return `${leg.from.name}에서 대기`;
+  if (leg.mode === "TAXI") return `${leg.from.name}에서 택시 탑승`;
+  return `${leg.from.name}에서 ${routeLegLabel(leg)} 승차`;
+}
+
+function alightAction(leg: RouteLeg): string {
+  if (leg.mode === "WALK" || leg.mode === "TRANSFER") return `${leg.to.name} 도착`;
+  if (leg.mode === "WAIT") return `${leg.to.name}에서 다음 이동 준비`;
+  return `${leg.to.name}에서 하차`;
+}
+
+function nextLegAction(leg: RouteLeg): string {
+  if (leg.mode === "WALK") return `${leg.to.name}까지 도보`;
+  if (leg.mode === "TRANSFER") return `${leg.to.name}으로 환승 이동`;
+  if (leg.mode === "WAIT") return `${leg.from.name}에서 대기`;
+  return `${leg.from.name}에서 ${routeLegLabel(leg)} 이용`;
+}
+
+function JourneyTimeline({
+  route,
+  selectedLegId,
+  onSelectLeg,
+}: {
+  route: RouteCandidate;
+  selectedLegId?: string;
+  onSelectLeg: (legId: string) => void;
+}) {
+  const first = route.legs[0];
+  const last = route.legs.at(-1);
+  if (first === undefined || last === undefined) return null;
+
+  return (
+    <section className="journey-guide" aria-label="경로 상세">
+      <div className="journey-guide-heading">
+        <h4>경로 상세</h4>
+        <strong>{route.legs.length}개 구간</strong>
+      </div>
+      <div className="journey-endpoint journey-origin">
+        <span aria-hidden="true" />
+        <div><small>출발</small><strong>{first.from.name}</strong></div>
+      </div>
+      <ol className="journey-timeline">
+        {route.legs.map((leg, index) => {
+          const direction = transitText(leg, "direction");
+          const nextLeg = route.legs[index + 1];
+          return (
+            <li
+              className={leg.legId === selectedLegId ? "selected-leg" : undefined}
+              aria-current={leg.legId === selectedLegId ? "step" : undefined}
+              data-mode={leg.mode}
+              key={leg.legId}
+            >
+              <div className="journey-mode" aria-hidden="true">{modeMessages[leg.mode].slice(0, 1)}</div>
+              <button
+                className="journey-step-body"
+                type="button"
+                aria-pressed={leg.legId === selectedLegId}
+                onClick={() => onSelectLeg(leg.legId)}
+              >
+                <span className="journey-step-number">{index + 1} · {modeMessages[leg.mode]}</span>
+                <strong className="journey-action">{rideAction(leg)}</strong>
+                {direction !== null && <span className="journey-direction">{direction}</span>}
+                <div className="journey-step-metrics" aria-label={`${modeMessages[leg.mode]} 구간 정보`}>
+                  <span>약 {formatLegMinutes(leg.duration.p50Seconds)}</span>
+                  {leg.distanceMeters > 0 && <span>{formatDistance(leg.distanceMeters)}</span>}
+                  {leg.waitDuration !== undefined && leg.waitDuration.p50Seconds > 0 && (
+                    <span>대기 약 {formatLegMinutes(leg.waitDuration.p50Seconds)}</span>
+                  )}
+                  {leg.fare.expected > 0 && <span>예상 {formatMoney(leg.fare.expected)}</span>}
+                </div>
+                <span className="journey-alight">{alightAction(leg)}</span>
+                {nextLeg !== undefined && (
+                  <span className="journey-transfer-cue">다음 · {nextLegAction(nextLeg)}</span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="journey-endpoint journey-destination">
+        <span aria-hidden="true" />
+        <div><small>도착</small><strong>{last.to.name}</strong></div>
+      </div>
+    </section>
   );
 }
 
@@ -337,7 +420,7 @@ function BusIntelligence({ route, searchId }: { route: RouteCandidate; searchId:
 
   return (
     <details className="bus-panel">
-      <summary>버스 좌석·대기 정보</summary>
+      <summary>버스 탑승 정보</summary>
       {busLegs.map((leg) => {
         const intelligence = leg.busIntelligence;
         if (intelligence == null) return null;
@@ -348,50 +431,51 @@ function BusIntelligence({ route, searchId }: { route: RouteCandidate; searchId:
           <div className="bus-leg" key={leg.legId}>
             <p><strong>{leg.from.name} → {leg.to.name}</strong></p>
             {!safeToPresent ? (
-              <p className="degraded-notice">노선·정류장 연결 신뢰도를 확인할 수 없어 차량별 좌석·대기 정보는 표시하지 않습니다.</p>
+              <p className="degraded-notice">좌석·대기 정보를 정확히 확인하기 어려워 기본 경로만 표시합니다.</p>
             ) : (
               <>
                 <dl className="metric-grid compact">
-                  <div><dt>정보 범위</dt><dd>{coverageMessages[intelligence.coverage]}</dd></div>
-                  <div><dt>정류장 도착 예상</dt><dd>{formatArrival(intelligence.userArrivalTime)}</dd></div>
-                  <div><dt>기대 대기</dt><dd>{formatDuration(intelligence.expectedWaitSeconds)}</dd></div>
-                  <div><dt>P90 대기</dt><dd>{formatDuration(intelligence.p90WaitSeconds)}</dd></div>
-                  <div><dt>매핑 신뢰도</dt><dd>{confidenceMessages[mappingGrade]}</dd></div>
+                  <div><dt>현재 정보</dt><dd>{coverageMessages[intelligence.coverage]}</dd></div>
+                  <div><dt>정류장 도착</dt><dd>{formatArrival(intelligence.userArrivalTime)}</dd></div>
+                  <div><dt>예상 대기</dt><dd>{formatDuration(intelligence.expectedWaitSeconds)}</dd></div>
+                  <div><dt>길어질 때</dt><dd>{formatDuration(intelligence.p90WaitSeconds)}</dd></div>
                 </dl>
                 <ul className="vehicle-list">
                   {intelligence.candidateVehicles.map((vehicle, index) => (
                     <li key={vehicle.vehicleRef}>
-                      <span>후보 차량 {index + 1}</span>
-                      <span>ETA {formatDuration(vehicle.eta.p50Seconds)} · P90 {formatDuration(vehicle.eta.p90Seconds)} · {originLabel(vehicle.eta.origin)} · 신뢰도 {confidenceMessages[vehicle.eta.confidence.grade]}</span>
-                      <span>관측 잔여 좌석 {vehicle.remainSeatObserved == null ? "정보 없음" : `${vehicle.remainSeatObserved}석`}</span>
+                      <span>다음 버스 {index + 1}</span>
                       <span>
-                        좌석 부족 확률 {vehicle.seatRiskAtBoarding == null
+                        약 {formatDuration(vehicle.eta.p50Seconds)} 뒤 도착 · 늦으면 {formatDuration(vehicle.eta.p90Seconds)}
+                      </span>
+                      <span>현재 확인된 좌석 {vehicle.remainSeatObserved == null ? "정보 없음" : `${vehicle.remainSeatObserved}석`}</span>
+                      <span>
+                        좌석 부족 가능성 {vehicle.seatRiskAtBoarding == null
                           ? "정보 없음"
                           : formatProbability(vehicle.seatRiskAtBoarding.noSeatProbability)}
                       </span>
                       <span>
-                        2석 이하 위험 {vehicle.seatRiskAtBoarding == null
+                        여유 좌석 2석 이하 가능성 {vehicle.seatRiskAtBoarding == null
                           ? "정보 없음"
                           : formatProbability(vehicle.seatRiskAtBoarding.lowSeat2Probability)}
                       </span>
                       <span>
-                        5석 이하 위험 {vehicle.seatRiskAtBoarding?.lowSeat5Probability == null
+                        여유 좌석 5석 이하 가능성 {vehicle.seatRiskAtBoarding?.lowSeat5Probability == null
                           ? "정보 없음"
                           : formatProbability(vehicle.seatRiskAtBoarding.lowSeat5Probability)}
                       </span>
                       <span>
-                        승차 가능성 대용값 {vehicle.boardabilityProxy == null
+                        탑승 가능성 참고 {vehicle.boardabilityProxy == null
                           ? "정보 없음"
                           : formatProbability(vehicle.boardabilityProxy)}
                       </span>
                     </li>
                   ))}
                 </ul>
-                <p className="disclosure">차량별 값은 Routing 응답을 그대로 표시합니다. 승차 가능성 대용값은 실제 승차 결과를 보장하지 않습니다.</p>
+                <p className="disclosure">표시된 시간과 좌석 정보는 예상값이며 실제 탑승을 보장하지 않습니다.</p>
               </>
             )}
             <WarningList codes={intelligence.warnings} />
-            <a className="detail-link" href={`/searches/${encodeURIComponent(searchId)}/routes/${encodeURIComponent(route.routeId)}/bus/${encodeURIComponent(leg.legId)}`}>이 버스 구간 주소 열기</a>
+            <a className="detail-link" href={`/searches/${encodeURIComponent(searchId)}/routes/${encodeURIComponent(route.routeId)}/bus/${encodeURIComponent(leg.legId)}`}>버스 구간 자세히 보기</a>
           </div>
         );
       })}
@@ -406,6 +490,7 @@ function RouteCard({
   selectedLegId,
   searchId,
   onSelect,
+  onSelectLeg,
   strictTaxiBudgetKrw,
 }: {
   labels: readonly string[];
@@ -414,6 +499,7 @@ function RouteCard({
   selectedLegId?: string;
   searchId: string;
   onSelect: (route: RouteCandidate) => void;
+  onSelectLeg: (legId: string) => void;
   strictTaxiBudgetKrw?: number;
 }) {
   if (route == null) {
@@ -435,7 +521,7 @@ function RouteCard({
           {labels.map((label) => <span className="card-kicker" key={label}>{label}</span>)}
         </div>
         <h3>경로 정보를 검증할 수 없습니다</h3>
-        <p>시간·비용 범위나 이동 구간 순서가 계약과 맞지 않아 잘못된 값을 숨겼습니다. 다시 검색해 주세요.</p>
+        <p>시간·비용 또는 이동 순서에 문제가 있어 이 경로를 표시하지 않았습니다. 다시 검색해 주세요.</p>
       </article>
     );
   }
@@ -451,7 +537,6 @@ function RouteCard({
           </div>
           <h3>{formatDuration(route.totalDuration.p50Seconds)}</h3>
         </div>
-        <span className="confidence-chip">신뢰도 {confidenceMessages[route.totalDuration.confidence.grade]}</span>
       </div>
       <p className="route-pattern">{patternMessages[route.pattern]}</p>
       <ol className="route-leg-summary" aria-label="이동 구간 요약">
@@ -467,56 +552,58 @@ function RouteCard({
         <p className="taxi-duration-note">택시 예상 대기와 해당 시각의 도로 주행시간을 분리해 표시합니다.</p>
       )}
       <dl className="metric-grid metric-grid-primary">
-        <div><dt>안정 도착 P90</dt><dd>{formatDuration(route.totalDuration.p90Seconds)}</dd></div>
-        <div><dt>택시비 상한</dt><dd>{formatMoney(route.taxiCost.upper)}</dd></div>
+        <div><dt>지연 고려</dt><dd>{formatDuration(route.totalDuration.p90Seconds)}</dd></div>
+        <div><dt>택시비 최대 예상</dt><dd>{formatMoney(route.taxiCost.upper)}</dd></div>
         <div><dt>전체 예상 요금</dt><dd>{formatMoney(route.totalFareExpected)}</dd></div>
         <div><dt>환승</dt><dd>{route.transferCount}회</dd></div>
       </dl>
-      <details className="route-more">
-        <summary>요금·도착시간 자세히</summary>
-        <dl className="metric-grid">
-          <div><dt>택시 예상</dt><dd>{formatMoney(route.taxiCost.expected)}</dd></div>
-          <div><dt>택시 최저 예상</dt><dd>{formatMoney(route.taxiCost.lower)}</dd></div>
-          <div><dt>택시 요금 출처</dt><dd>{originLabel(route.taxiCost.origin)}</dd></div>
-          <div><dt>도보</dt><dd>{formatDuration(route.walkSeconds)}</dd></div>
-          <div><dt>택시 구간</dt><dd>{route.taxiLegCount}개</dd></div>
-          <div><dt>신뢰도 점수</dt><dd>{route.reliabilityScore}</dd></div>
-          <div><dt>P50 도착</dt><dd>{formatArrival(route.arrivalAt?.p50)}</dd></div>
-          <div><dt>P90 도착</dt><dd>{formatArrival(route.arrivalAt?.p90)}</dd></div>
-        </dl>
-      </details>
+      <button className="map-select-button" type="button" aria-pressed={selected} onClick={() => onSelect(route)}>
+        {selected ? "선택한 경로" : "이 경로 지도·상세 보기"}
+      </button>
+      {selected && (
+        <JourneyTimeline
+          route={route}
+          {...(selectedLegId === undefined ? {} : { selectedLegId })}
+          onSelectLeg={onSelectLeg}
+        />
+      )}
       <ReasonList codes={route.reasonCodes} />
       <WarningList codes={route.warningCodes} />
-      <ProvenanceList items={route.provenance ?? []} />
-      <button className="map-select-button" type="button" aria-pressed={selected} onClick={() => onSelect(route)}>
-        {selected ? "지도에서 보는 중" : "지도·상세 보기"}
-      </button>
-      <details className="leg-panel">
-        <summary>{route.legs.length}개 이동 구간 보기</summary>
-        <ol>
+      <details className="route-more">
+        <summary>시간·요금 자세히</summary>
+        <dl className="metric-grid">
+          <div><dt>택시비 예상</dt><dd>{formatMoney(route.taxiCost.expected)}</dd></div>
+          <div><dt>택시비 범위</dt><dd>{formatMoney(route.taxiCost.lower)}~{formatMoney(route.taxiCost.upper)}</dd></div>
+          <div><dt>도보</dt><dd>{formatDuration(route.walkSeconds)}</dd></div>
+          <div><dt>택시 구간</dt><dd>{route.taxiLegCount}개</dd></div>
+          <div><dt>예상 도착</dt><dd>{formatArrival(route.arrivalAt?.p50)}</dd></div>
+          <div><dt>지연 시 도착 예상</dt><dd>{formatArrival(route.arrivalAt?.p90)}</dd></div>
+        </dl>
+        <DegradedProvenanceList items={route.provenance ?? []} />
+        <ol className="technical-leg-list" aria-label="구간별 세부 정보">
           {route.legs.map((leg) => (
-            <li className={leg.legId === selectedLegId ? "selected-leg" : undefined} aria-current={leg.legId === selectedLegId ? "step" : undefined} key={leg.legId}>
+            <li key={leg.legId}>
               <strong>{routeLegLabel(leg, leg.mode === "TAXI" && (leg.waitDuration === undefined || leg.travelDuration === undefined))}</strong>
               <span>{leg.from.name} → {leg.to.name}</span>
-              <span>P50 {formatDuration(leg.duration.p50Seconds)} · P90 {formatDuration(leg.duration.p90Seconds)} · {leg.distanceMeters}m</span>
+              <span>예상 {formatDuration(leg.duration.p50Seconds)} · 지연 고려 {formatDuration(leg.duration.p90Seconds)} · {formatDistance(leg.distanceMeters)}</span>
               {leg.waitDuration !== undefined && leg.travelDuration !== undefined && (
-                <span>대기 P50 {formatDuration(leg.waitDuration.p50Seconds)} · P90 {formatDuration(leg.waitDuration.p90Seconds)} / 이동 P50 {formatDuration(leg.travelDuration.p50Seconds)} · P90 {formatDuration(leg.travelDuration.p90Seconds)}</span>
+                <span>대기 약 {formatDuration(leg.waitDuration.p50Seconds)} · 길어지면 {formatDuration(leg.waitDuration.p90Seconds)} / 이동 약 {formatDuration(leg.travelDuration.p50Seconds)} · 길어지면 {formatDuration(leg.travelDuration.p90Seconds)}</span>
               )}
-              <span>요금 {formatMoney(leg.fare.expected)}~{formatMoney(leg.fare.upper)} · {originLabel(leg.duration.origin)}</span>
+              <span>요금 {formatMoney(leg.fare.expected)}~{formatMoney(leg.fare.upper)}</span>
               {(leg.expectedStartAt != null || leg.expectedEndAt != null) && <span>예상 시각 {formatArrival(leg.expectedStartAt)} → {formatArrival(leg.expectedEndAt)}</span>}
-              <ProvenanceList items={leg.provenance} />
+              <DegradedProvenanceList items={leg.provenance} />
               {leg.geometry.encoding === "NONE" && <span className="geometry-note">지도 경로 없음</span>}
             </li>
           ))}
         </ol>
       </details>
       <BusIntelligence route={route} searchId={searchId} />
-      <a className="detail-link" href={`/searches/${encodeURIComponent(searchId)}/routes/${encodeURIComponent(route.routeId)}`}>이 경로 주소 열기</a>
+      <a className="detail-link" href={`/searches/${encodeURIComponent(searchId)}/routes/${encodeURIComponent(route.routeId)}`}>이 경로만 보기</a>
     </article>
   );
 }
 
-function FeedbackForm({ searchId, routeId }: { searchId: string; routeId: string | null }) {
+function FeedbackForm({ searchId, routeId, disabled = false }: { searchId: string; routeId: string | null; disabled?: boolean }) {
   const [status, setStatus] = useState<"IDLE" | "SENDING" | "DONE" | "FAILED">("IDLE");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -542,7 +629,7 @@ function FeedbackForm({ searchId, routeId }: { searchId: string; routeId: string
   return (
     <details className="feedback-panel">
       <summary>이 추천에 의견 보내기</summary>
-      {routeId === null ? <p>먼저 추천 경로를 선택해 주세요.</p> : (
+      {disabled ? <p>이전 검색 결과에는 의견을 남길 수 없습니다. 최신 경로를 다시 검색해 주세요.</p> : routeId === null ? <p>먼저 추천 경로를 선택해 주세요.</p> : (
         <form onSubmit={(event) => void submit(event)}>
           <label className="field">
             <span>만족도</span>
@@ -587,7 +674,7 @@ function SupportPanel({ support }: { support: PublicCapabilities }) {
 
 function EmptyState({ phase, problem, onRetry, onRestart }: { phase: ResultPanelProps["phase"]; problem: PublicProblem | null; onRetry?: () => void; onRestart?: () => void }) {
   const content = phase === "NO_FEASIBLE_ROUTE"
-    ? ["조건에 맞는 경로가 없습니다", "택시비 상한이나 최대 도보·환승 조건을 조정해 다시 검색해 보세요."]
+    ? ["조건에 맞는 경로가 없습니다", "택시 이용 예산이나 최대 도보·환승 조건을 조정해 다시 검색해 보세요."]
     : phase === "PROVIDER_UNAVAILABLE"
       ? ["교통 정보를 불러올 수 없습니다", "잠시 후 다시 검색해 주세요. 입력한 위치는 브라우저에 저장하지 않습니다."]
       : phase === "EXPIRED"
@@ -607,6 +694,7 @@ function EmptyState({ phase, problem, onRetry, onRestart }: { phase: ResultPanel
 
 export function ResultPanel({ phase, response, problem, initialRouteId, initialLegId, strictTaxiBudgetKrw, onRetry, onRestart }: ResultPanelProps) {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [selectedLegId, setSelectedLegId] = useState<string | undefined>(initialLegId);
   const cards = response === null ? [] : recommendationCards(response.recommendations);
 
   useEffect(() => {
@@ -618,10 +706,12 @@ export function ResultPanel({ phase, response, problem, initialRouteId, initialL
       .map((card) => card.route)
       .filter((route): route is RouteCandidate => route != null);
     const requested = routes.find((route) => route.routeId === initialRouteId);
-    setSelectedRouteId(requested?.routeId ?? routes[0]?.routeId ?? null);
-  }, [initialRouteId, response]);
+    const selectedRoute = requested ?? routes[0];
+    setSelectedRouteId(selectedRoute?.routeId ?? null);
+    setSelectedLegId(selectedRoute?.legs.some((leg) => leg.legId === initialLegId) === true ? initialLegId : undefined);
+  }, [initialLegId, initialRouteId, response]);
 
-  if (response === null || phase === "NO_FEASIBLE_ROUTE" || phase === "PROVIDER_UNAVAILABLE" || phase === "FAILED" || phase === "EXPIRED") {
+  if (response === null || phase === "NO_FEASIBLE_ROUTE" || phase === "PROVIDER_UNAVAILABLE" || phase === "FAILED") {
     return <EmptyState phase={phase} problem={problem} {...(onRetry === undefined ? {} : { onRetry })} {...(onRestart === undefined ? {} : { onRestart })} />;
   }
 
@@ -634,6 +724,16 @@ export function ResultPanel({ phase, response, problem, initialRouteId, initialL
         </div>
         <span className={`status-badge status-${phase.toLowerCase()}`}>{resultStatusMessages[phase]}</span>
       </div>
+
+      {phase === "EXPIRED" && (
+        <div className="stale-result-banner" role="status">
+          <div>
+            <strong>이전 검색 결과를 보고 있어요.</strong>
+            <p>보던 경로는 그대로 유지됩니다. 이동 전 다시 검색하면 최신 교통 정보를 확인할 수 있어요.</p>
+          </div>
+          {onRestart !== undefined && <button type="button" onClick={onRestart}>검색 조건 확인</button>}
+        </div>
+      )}
 
       {phase === "PARTIAL" && (
         <div className="partial-banner" role="status">
@@ -649,7 +749,7 @@ export function ResultPanel({ phase, response, problem, initialRouteId, initialL
             route={cards
               .map((card) => card.route)
               .find((route) => route?.routeId === selectedRouteId) ?? null}
-            {...(initialLegId === undefined ? {} : { selectedLegId: initialLegId })}
+            {...(selectedLegId === undefined ? {} : { selectedLegId })}
           />
         </div>
         <div className="route-grid" aria-label="추천 경로 목록">
@@ -659,9 +759,13 @@ export function ResultPanel({ phase, response, problem, initialRouteId, initialL
               labels={card.labels}
               route={card.route}
               selected={card.route?.routeId === selectedRouteId}
-              {...(initialLegId === undefined ? {} : { selectedLegId: initialLegId })}
+              {...(selectedLegId === undefined ? {} : { selectedLegId })}
               searchId={response.searchId}
-              onSelect={(route) => setSelectedRouteId(route.routeId)}
+              onSelect={(route) => {
+                setSelectedRouteId(route.routeId);
+                setSelectedLegId(undefined);
+              }}
+              onSelectLeg={setSelectedLegId}
               {...(strictTaxiBudgetKrw === undefined ? {} : { strictTaxiBudgetKrw })}
             />
           ))}
@@ -670,17 +774,17 @@ export function ResultPanel({ phase, response, problem, initialRouteId, initialL
       {response.baseline != null && (
         <section className="baseline-panel" aria-label="대중교통 기준 경로">
           <strong>대중교통 기준</strong>
-          <span>P50 {formatDuration(response.baseline.totalDuration.p50Seconds)}</span>
-          <span>P90 {formatDuration(response.baseline.totalDuration.p90Seconds)}</span>
-          <span>택시 상한 {formatMoney(response.baseline.taxiCost.upper)}</span>
+          <span>예상 소요 {formatDuration(response.baseline.totalDuration.p50Seconds)}</span>
+          <span>지연 고려 {formatDuration(response.baseline.totalDuration.p90Seconds)}</span>
+          <span>택시비 최대 예상 {formatMoney(response.baseline.taxiCost.upper)}</span>
         </section>
       )}
       {response.paretoFrontier !== undefined && response.paretoFrontier.length > 0 && (
         <div className="pareto-panel">
           <h3>예산과 도착시간 비교</h3>
-          <div className="table-scroll">
+          <div className="table-scroll" role="region" aria-label="예산과 도착시간 비교 표" tabIndex={0}>
             <table>
-              <thead><tr><th>경로</th><th>택시 상한</th><th>P50</th><th>P90</th></tr></thead>
+              <thead><tr><th>경로</th><th>택시비 최대 예상</th><th>예상 소요</th><th>지연 고려</th></tr></thead>
               <tbody>{response.paretoFrontier.map((item, index) => (
                 <tr key={item.routeId}><td>비교 경로 {index + 1}</td><td>{formatMoney(item.taxiCostUpper)}</td><td>{formatDuration(item.p50Seconds)}</td><td>{formatDuration(item.p90Seconds)}</td></tr>
               ))}</tbody>
@@ -689,7 +793,7 @@ export function ResultPanel({ phase, response, problem, initialRouteId, initialL
         </div>
       )}
       <SupportPanel support={response.support} />
-      <FeedbackForm searchId={response.searchId} routeId={selectedRouteId} />
+      <FeedbackForm searchId={response.searchId} routeId={selectedRouteId} disabled={phase === "EXPIRED"} />
     </section>
   );
 }
