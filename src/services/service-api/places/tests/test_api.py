@@ -55,14 +55,38 @@ class PlaceApiTests(SimpleTestCase):
                         None,
                         {},
                         {"place_name": "bad", "x": "nan", "y": "37.2"},
-                        {"place_name": "valid", "x": "127.05", "y": "37.29", "id": "place-1"},
+                        {
+                            "place_name": "valid",
+                            "road_address_name": "경기 성남시 분당구 판교역로 160",
+                            "address_name": "경기 성남시 분당구 백현동 530",
+                            "x": "127.05",
+                            "y": "37.29",
+                            "id": "place-1",
+                        },
                     ]
                 }
 
         items = FixtureAdapter(rest_key="test").suggest("판교")
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["displayName"], "valid")
+        self.assertEqual(items[0]["address"], "경기 성남시 분당구 판교역로 160")
         self.assertEqual(items[0]["coordinate"], {"lon": 127.05, "lat": 37.29})
+
+    def test_kakao_adapter_falls_back_to_parcel_address(self) -> None:
+        class FixtureAdapter(KakaoLocalAdapter):
+            def _get(self, path, params):
+                return {
+                    "documents": [{
+                        "place_name": "센트럴",
+                        "road_address_name": "",
+                        "address_name": "경기 수원시 영통구 이의동 1338",
+                        "x": "127.05",
+                        "y": "37.29",
+                    }]
+                }
+
+        items = FixtureAdapter(rest_key="test").suggest("센트럴")
+        self.assertEqual(items[0]["address"], "경기 수원시 영통구 이의동 1338")
 
     def test_kakao_adapter_rejects_malformed_reverse_shape(self) -> None:
         class FixtureAdapter(KakaoLocalAdapter):

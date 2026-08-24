@@ -211,7 +211,7 @@ export function PlaceField({
                 }}
               >
                 <strong>{item.displayName}</strong>
-                <span>{item.regionCode ?? "지역 정보 없음"} · {item.provider ?? "출처 미상"}</span>
+                {item.address && <span>{item.address}</span>}
               </button>
             </li>
           ))}

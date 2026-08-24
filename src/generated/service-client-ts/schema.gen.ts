@@ -639,6 +639,7 @@ export interface components {
             provider?: string | null;
             providerPlaceId?: string | null;
             regionCode?: string | null;
+            address?: string | null;
         };
         Confidence: {
             score: number;

@@ -131,13 +131,13 @@ precache/runtime cache 금지:
 | TYPING | 입력 유지 | 2자 미만이면 API 호출 없음 |
 | DEBOUNCING | 별도 spinner 없음 | 마지막 입력만 유효 |
 | LOADING | combobox 안 loading status | 이전 stale suggestion을 선택 가능처럼 두지 않음 |
-| RESULTS | saved/recent/provider source를 시각·접근성 label로 구분 | arrow/Enter/Escape와 touch 지원 |
+| RESULTS | 장소명 아래 도로명 주소(없으면 지번 주소)를 표시 | arrow/Enter/Escape와 touch 지원 |
 | EMPTY_RESULTS | `검색 결과가 없어요` | 주소를 더 구체적으로 입력 |
 | ERROR_RETRYABLE | 입력 유지, 일반 오류 | 다시 시도 |
 | RATE_LIMITED | 기다릴 이유와 retry 가능 시점의 일반 안내 | 즉시 반복 호출 금지 |
 | SELECTED | displayName을 표시하고 PlaceRef 전체 확정 | clear/change 가능 |
 
-API 문자열은 text node로만 렌더링한다. HTML injection을 허용하지 않는다. 동일 displayName 결과는 주소/행정구역 등 Public PlaceRef에 실제 제공된 정보만으로 구분하며 providerPlaceId를 사용자 label로 쓰지 않는다.
+API 문자열은 text node로만 렌더링한다. HTML injection을 허용하지 않는다. 동일 displayName 결과는 Public PlaceRef의 `address`로 구분한다. 주소가 없으면 보조 행을 숨기며 `provider`, `providerPlaceId`, `regionCode`나 결측 placeholder를 사용자 label로 쓰지 않는다.
 
 ### 4.3 현재 위치
 

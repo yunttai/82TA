@@ -81,6 +81,14 @@ class KakaoLocalAdapter:
                 ):
                     continue
                 display_name = raw_display_name.strip()
+                raw_address = document.get("road_address_name") or document.get("address_name")
+                address = (
+                    raw_address.strip()
+                    if isinstance(raw_address, str)
+                    and raw_address.strip()
+                    and len(raw_address.strip()) <= 200
+                    else None
+                )
                 lon, lat = float(document["x"]), float(document["y"])
                 if not math.isfinite(lon) or not math.isfinite(lat):
                     continue
@@ -92,6 +100,7 @@ class KakaoLocalAdapter:
                     "provider": "KAKAO_LOCAL",
                     "providerPlaceId": str(document.get("id") or "") or None,
                     "regionCode": None,
+                    "address": address,
                 }
                 if display_name:
                     items.append(item)
@@ -107,6 +116,7 @@ class KakaoLocalAdapter:
                 "provider": None,
                 "providerPlaceId": None,
                 "regionCode": None,
+                "address": None,
             }
         documents = self._get(
             "/v2/local/geo/coord2address.json",
@@ -134,6 +144,7 @@ class KakaoLocalAdapter:
             "provider": "KAKAO_LOCAL",
             "providerPlaceId": None,
             "regionCode": str(address.get("h_code") or address.get("b_code") or "").strip() or None,
+            "address": display_name.strip(),
         }
 
 
