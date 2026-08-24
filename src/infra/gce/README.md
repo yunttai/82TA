@@ -43,11 +43,12 @@ All of these are required:
 
 `HOST_KEY` is the reviewed `known_hosts` line for the VM. `USER` must be able to
 run passwordless `sudo`. Before the first run, point the domain's DNS A record at
-the VM and allow inbound TCP 80/443 in the GCE firewall. Those cloud resources
-and GitHub secret values cannot be inferred by the repository.
+the VM and allow inbound TCP 80/443 in the GCE firewall. If UFW is already active
+on the VM, bootstrap also opens TCP 80/443 in that host firewall. Those cloud
+resources and GitHub secret values cannot be inferred by the repository.
 
-The workflow runs automatically for `main`, tags matching `v*.*.*`, and
-`feature/realtime-multimodal-e2e`; it can also be started manually.
+The workflow runs automatically for `main` and tags matching `v*.*.*`; it can
+also be started manually.
 
 ## Database and Redis
 

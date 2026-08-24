@@ -60,6 +60,13 @@ fi
 docker compose version >/dev/null
 systemctl enable --now docker
 
+# GCE network firewall rules do not override an active host firewall. Keep an
+# existing UFW policy enabled, but explicitly expose the two public web ports.
+if command -v ufw >/dev/null && ufw status | grep -q '^Status: active'; then
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+fi
+
 install -d -o "$deploy_user" -g "$deploy_user" -m 0750 "$remote_dir"
 install -d -o "$deploy_user" -g "$deploy_user" -m 0750 \
   "$remote_dir/nginx" \
@@ -147,7 +154,9 @@ compose=(
   --env-file .deploy.env
   -f docker-compose.prod.yml
 )
-"${compose[@]}" --profile tools run --rm certbot renew --webroot -w /var/www/certbot
+"${compose[@]}" --profile tools run \
+  --interactive=false --no-tty --rm \
+  certbot renew --webroot -w /var/www/certbot </dev/null
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 EOF
 chmod 0755 /usr/local/sbin/82ta-renew-certificate
