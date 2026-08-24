@@ -283,7 +283,7 @@ jobs:
           "${compose[@]}" config --quiet
           "${compose[@]}" pull web service-api routing-api routing-egress-proxy routing-db routing-redis
           "${compose[@]}" down --remove-orphans || true
-          "${compose[@]}" up -d nginx web routing-egress-proxy
+          "${compose[@]}" up -d service-api web routing-egress-proxy nginx
           EOF
 
       - name: Wait for HTTP
