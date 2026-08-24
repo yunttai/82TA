@@ -232,6 +232,7 @@ describe("route search vertical slice", () => {
 
     render(<App />);
     await selectDefaultPlaces(user);
+    await user.click(screen.getByRole("button", { name: "5천원" }));
     await user.click(screen.getByRole("button", { name: "내 예산으로 경로 찾기" }));
 
     expect(await screen.findAllByText("일부 정보 제한")).toHaveLength(1);
@@ -261,8 +262,11 @@ describe("route search vertical slice", () => {
     expect(routeRequest.headers.get("Idempotency-Key")).toBeTruthy();
     expect(currentGuestToken()).toBe(guestCredential.guestToken);
     const body = await routeRequest.text();
-    expect(body).toContain('"maxAmount":7000');
+    expect(body).toContain('"maxAmount":2000');
     expect(body).toContain('"strict":true');
+    expect(body).toContain('"maxWalkSeconds":7200');
+    expect(body).toContain('"maxTransfers":8');
+    expect(body).toContain('"maxTaxiLegs":3');
     expect(body).toContain('"requestedRecommendations":["FASTEST","STABLE","EFFICIENT","PUBLIC_TRANSIT_ONLY"]');
   });
 
@@ -293,7 +297,9 @@ describe("route search vertical slice", () => {
     expect(body.departure.type).toBe("DEPART_AT");
     expect(body.departure.time).toBe("2030-01-02T01:30:00.000Z");
     expect(body.arrivalDeadline).toBeNull();
-    expect(body.preferences.maxTransfers).toBe(3);
+    expect(body.preferences.maxWalkSeconds).toBe(7_200);
+    expect(body.preferences.maxTransfers).toBe(8);
+    expect(body.preferences.maxTaxiLegs).toBe(3);
   });
 
   it("keeps an offline draft but blocks route-search submission", async () => {
@@ -706,7 +712,7 @@ describe("Bus Intelligence mapping gate", () => {
     expect(within(guide).getByText("판교제2테크노밸리 승차에서 버스 9241번 승차")).toBeVisible();
     expect(within(guide).getByText("용인 방면")).toBeVisible();
     expect(within(guide).getByText("삼가역·두산위브 하차에서 하차")).toBeVisible();
-    expect(within(guide).getByText(/다음 · 삼가역·두산위브 환승에서 버스 5000번 이용/)).toBeVisible();
+    expect(within(guide).queryByText(/다음 ·/)).not.toBeInTheDocument();
     expect(screen.queryByText("제공사 추정 · 신뢰도 정보 없음")).not.toBeInTheDocument();
   });
 

@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { RouteMap } from "../route-map/RouteMap";
+import {
+  presentedRouteLegs,
+  type PresentedLeg,
+} from "./itineraryPresentation";
 import type {
   PublicCapabilities,
   PublicProblem,
@@ -33,7 +37,7 @@ const warningMessages: Readonly<Record<string, string>> = {
   GEOMETRY_PARTIAL: "일부 구간의 지도 경로가 없습니다.",
   PROVIDER_PARTIAL_FAILURE: "일부 교통 정보가 빠진 결과입니다.",
   DATA_STALE: "일부 정보가 오래되었습니다.",
-  BUDGET_NEAR_LIMIT: "택시비 최대 예상이 설정한 택시 이용 예산에 가깝습니다.",
+  BUDGET_NEAR_LIMIT: "예상 요금이 설정한 상한에 가깝습니다.",
   BOARDABILITY_IS_PROXY: "탑승 가능성은 참고용이며 실제 탑승을 보장하지 않습니다.",
   FEATURE_OUT_OF_DISTRIBUTION: "평소와 다른 교통 상황에서는 예상이 달라질 수 있습니다.",
   FUTURE_TRANSIT_ESTIMATED: "미래 대중교통 정보는 과거 자료 기반 추정값입니다.",
@@ -46,7 +50,7 @@ const reasonMessages: Readonly<Record<string, string>> = {
   UPSTREAM_STOP_HIGHER_BOARDABILITY: "상류 정류장 이동으로 대기 위험을 낮춘 경로",
   HIGH_BUS_SEAT_RISK_AVOIDED: "높은 좌석 부족 위험을 피한 경로",
   TAXI_BRIDGE_CONNECTS_FAST_LINES: "짧은 택시 이동으로 빠른 교통망을 연결한 경로",
-  WITHIN_STRICT_TAXI_BUDGET: "택시비 최대 예상이 택시 이용 예산 이내인 경로",
+  WITHIN_STRICT_TAXI_BUDGET: "예상 요금이 설정한 상한 이내인 경로",
   NO_MEANINGFUL_GAIN_FROM_MORE_BUDGET: "예산을 더 써도 시간 이득이 크지 않은 경로",
   LOWER_WALKING_TIME: "도보 시간이 짧은 경로",
   LOWER_P90_ARRIVAL_TIME: "보수적으로 보아도 도착이 빠른 경로",
@@ -170,15 +174,7 @@ function formatLegMinutes(seconds: number): string {
   return `${Math.ceil(seconds / 60)}분`;
 }
 
-function transitText(leg: RouteLeg, key: "routeLabel" | "direction"): string | null {
-  const transit: unknown = leg.transit;
-  if (transit === null || typeof transit !== "object" || Array.isArray(transit)) return null;
-  const value = (transit as Record<string, unknown>)[key];
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function routeLegLabel(leg: RouteLeg, taxiIncludesWait = false): string {
-  const routeLabel = transitText(leg, "routeLabel");
+function routeLegLabel(leg: RouteLeg, taxiIncludesWait = false, routeLabel: string | null = null): string {
   if (leg.mode === "TAXI") return taxiIncludesWait ? "택시 (호출+주행)" : "택시";
   if (routeLabel === null) return modeMessages[leg.mode];
   if (leg.mode === "BUS") {
@@ -212,7 +208,8 @@ interface RouteLegSummaryItem {
 }
 
 function routeLegSummaryItems(route: RouteCandidate): RouteLegSummaryItem[] {
-  return route.legs.flatMap((leg) => {
+  return presentedRouteLegs(route).flatMap((presented) => {
+    const leg = presented.primaryLeg;
     const wait = leg.waitDuration;
     const travel = leg.travelDuration;
     if (waitSeparatedModes.has(leg.mode) && wait !== undefined && travel !== undefined) {
@@ -230,22 +227,24 @@ function routeLegSummaryItems(route: RouteCandidate): RouteLegSummaryItem[] {
         {
           key: leg.legId,
           mode: leg.mode,
-          label: routeLegLabel(leg),
+          label: routeLegLabel(leg, false, presented.routeLabel),
           p50Seconds: travel.p50Seconds,
           p90Seconds: travel.p90Seconds,
-          title: `${leg.from.name} → ${leg.to.name} · 약 ${formatLegMinutes(travel.p50Seconds)} · 지연 시 ${formatLegMinutes(travel.p90Seconds)}`,
-          screenReaderText: `${leg.from.name}에서 ${leg.to.name}까지`,
+          title: `${presented.fromName} → ${presented.toName} · 약 ${formatLegMinutes(travel.p50Seconds)} · 지연 시 ${formatLegMinutes(travel.p90Seconds)}`,
+          screenReaderText: `${presented.fromName}에서 ${presented.toName}까지`,
         },
       ];
     }
     return [{
       key: leg.legId,
       mode: leg.mode,
-      label: routeLegLabel(leg, leg.mode === "TAXI"),
+      label: presented.stationConnector
+        ? (leg.mode === "WALK" ? "환승 도보" : "환승 이동")
+        : routeLegLabel(leg, leg.mode === "TAXI", presented.routeLabel),
       p50Seconds: leg.duration.p50Seconds,
       p90Seconds: leg.duration.p90Seconds,
-      title: `${leg.from.name} → ${leg.to.name} · 약 ${formatLegMinutes(leg.duration.p50Seconds)} · 지연 시 ${formatLegMinutes(leg.duration.p90Seconds)}`,
-      screenReaderText: `${leg.from.name}에서 ${leg.to.name}까지`,
+      title: `${presented.fromName} → ${presented.toName} · 약 ${formatLegMinutes(leg.duration.p50Seconds)} · 지연 시 ${formatLegMinutes(leg.duration.p90Seconds)}`,
+      screenReaderText: `${presented.fromName}에서 ${presented.toName}까지`,
     }];
   });
 }
@@ -324,25 +323,20 @@ function formatDistance(meters: number): string {
   return `${new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 }).format(meters / 1_000)}km`;
 }
 
-function rideAction(leg: RouteLeg): string {
-  if (leg.mode === "WALK") return `${leg.to.name}까지 걸어서 이동`;
-  if (leg.mode === "TRANSFER") return `${leg.to.name}으로 환승 이동`;
-  if (leg.mode === "WAIT") return `${leg.from.name}에서 대기`;
-  if (leg.mode === "TAXI") return `${leg.from.name}에서 택시 탑승`;
-  return `${leg.from.name}에서 ${routeLegLabel(leg)} 승차`;
+function rideAction(presented: PresentedLeg): string {
+  const leg = presented.primaryLeg;
+  if (presented.stationConnector) return `${presented.fromName}에서 환승 통로로 이동`;
+  if (leg.mode === "WALK") return `${presented.toName}까지 걸어서 이동`;
+  if (leg.mode === "TRANSFER") return `${presented.toName}으로 환승 이동`;
+  if (leg.mode === "WAIT") return `${presented.fromName}에서 대기`;
+  if (leg.mode === "TAXI") return `${presented.fromName}에서 택시 탑승`;
+  return `${presented.fromName}에서 ${routeLegLabel(leg, false, presented.routeLabel)} 승차`;
 }
 
-function alightAction(leg: RouteLeg): string {
-  if (leg.mode === "WALK" || leg.mode === "TRANSFER") return `${leg.to.name} 도착`;
-  if (leg.mode === "WAIT") return `${leg.to.name}에서 다음 이동 준비`;
-  return `${leg.to.name}에서 하차`;
-}
-
-function nextLegAction(leg: RouteLeg): string {
-  if (leg.mode === "WALK") return `${leg.to.name}까지 도보`;
-  if (leg.mode === "TRANSFER") return `${leg.to.name}으로 환승 이동`;
-  if (leg.mode === "WAIT") return `${leg.from.name}에서 대기`;
-  return `${leg.from.name}에서 ${routeLegLabel(leg)} 이용`;
+function alightAction(presented: PresentedLeg): string | null {
+  const mode = presented.primaryLeg.mode;
+  if (mode === "WALK" || mode === "TRANSFER" || mode === "WAIT") return null;
+  return `${presented.toName}에서 하차`;
 }
 
 function JourneyTimeline({
@@ -354,41 +348,43 @@ function JourneyTimeline({
   selectedLegId?: string;
   onSelectLeg: (legId: string) => void;
 }) {
-  const first = route.legs[0];
-  const last = route.legs.at(-1);
+  const presentedLegs = presentedRouteLegs(route);
+  const first = presentedLegs[0];
+  const last = presentedLegs.at(-1);
   if (first === undefined || last === undefined) return null;
 
   return (
     <section className="journey-guide" aria-label="경로 상세">
       <div className="journey-guide-heading">
         <h4>경로 상세</h4>
-        <strong>{route.legs.length}개 구간</strong>
+        <strong>{presentedLegs.length}단계</strong>
       </div>
       <div className="journey-endpoint journey-origin">
         <span aria-hidden="true" />
-        <div><small>출발</small><strong>{first.from.name}</strong></div>
+        <div><small>출발</small><strong>{first.fromName}</strong></div>
       </div>
       <ol className="journey-timeline">
-        {route.legs.map((leg, index) => {
-          const direction = transitText(leg, "direction");
-          const nextLeg = route.legs[index + 1];
+        {presentedLegs.map((presented, index) => {
+          const leg = presented.primaryLeg;
+          const selected = presented.legs.some((item) => item.legId === selectedLegId);
+          const alight = alightAction(presented);
           return (
             <li
-              className={leg.legId === selectedLegId ? "selected-leg" : undefined}
-              aria-current={leg.legId === selectedLegId ? "step" : undefined}
+              className={selected ? "selected-leg" : undefined}
+              aria-current={selected ? "step" : undefined}
               data-mode={leg.mode}
-              key={leg.legId}
+              key={presented.key}
             >
               <div className="journey-mode" aria-hidden="true">{modeMessages[leg.mode].slice(0, 1)}</div>
               <button
                 className="journey-step-body"
                 type="button"
-                aria-pressed={leg.legId === selectedLegId}
+                aria-pressed={selected}
                 onClick={() => onSelectLeg(leg.legId)}
               >
                 <span className="journey-step-number">{index + 1} · {modeMessages[leg.mode]}</span>
-                <strong className="journey-action">{rideAction(leg)}</strong>
-                {direction !== null && <span className="journey-direction">{direction}</span>}
+                <strong className="journey-action">{rideAction(presented)}</strong>
+                {presented.direction !== null && <span className="journey-direction">{presented.direction}</span>}
                 <div className="journey-step-metrics" aria-label={`${modeMessages[leg.mode]} 구간 정보`}>
                   <span>약 {formatLegMinutes(leg.duration.p50Seconds)}</span>
                   {leg.distanceMeters > 0 && <span>{formatDistance(leg.distanceMeters)}</span>}
@@ -397,10 +393,7 @@ function JourneyTimeline({
                   )}
                   {leg.fare.expected > 0 && <span>예상 {formatMoney(leg.fare.expected)}</span>}
                 </div>
-                <span className="journey-alight">{alightAction(leg)}</span>
-                {nextLeg !== undefined && (
-                  <span className="journey-transfer-cue">다음 · {nextLegAction(nextLeg)}</span>
-                )}
+                {alight !== null && <span className="journey-alight">{alight}</span>}
               </button>
             </li>
           );
@@ -408,7 +401,7 @@ function JourneyTimeline({
       </ol>
       <div className="journey-endpoint journey-destination">
         <span aria-hidden="true" />
-        <div><small>도착</small><strong>{last.to.name}</strong></div>
+        <div><small>도착</small><strong>{last.toName}</strong></div>
       </div>
     </section>
   );
@@ -417,6 +410,7 @@ function JourneyTimeline({
 function BusIntelligence({ route, searchId }: { route: RouteCandidate; searchId: string }) {
   const busLegs = route.legs.filter((leg) => leg.busIntelligence != null);
   if (busLegs.length === 0) return null;
+  const presentedLegs = presentedRouteLegs(route);
 
   return (
     <details className="bus-panel">
@@ -424,12 +418,13 @@ function BusIntelligence({ route, searchId }: { route: RouteCandidate; searchId:
       {busLegs.map((leg) => {
         const intelligence = leg.busIntelligence;
         if (intelligence == null) return null;
+        const presented = presentedLegs.find((item) => item.legs.some((candidate) => candidate.legId === leg.legId));
         const mappingGrade = intelligence.mapping?.grade ?? "UNKNOWN";
         const safeToPresent = mappingGrade === "HIGH"
           && intelligence.p90WaitSeconds >= intelligence.expectedWaitSeconds;
         return (
           <div className="bus-leg" key={leg.legId}>
-            <p><strong>{leg.from.name} → {leg.to.name}</strong></p>
+            <p><strong>{presented?.fromName ?? "승차 지점"} → {presented?.toName ?? "하차 지점"}</strong></p>
             {!safeToPresent ? (
               <p className="degraded-notice">좌석·대기 정보를 정확히 확인하기 어려워 기본 경로만 표시합니다.</p>
             ) : (
@@ -509,7 +504,7 @@ function RouteCard({
           {labels.map((label) => <span className="card-kicker" key={label}>{label}</span>)}
         </div>
         <h3>추천 경로 없음</h3>
-        <p>현재 응답에는 이 추천 유형에 해당하는 경로가 없습니다.</p>
+        <p>이 조건에서는 해당 추천 경로를 찾지 못했어요.</p>
       </article>
     );
   }
@@ -580,22 +575,6 @@ function RouteCard({
           <div><dt>지연 시 도착 예상</dt><dd>{formatArrival(route.arrivalAt?.p90)}</dd></div>
         </dl>
         <DegradedProvenanceList items={route.provenance ?? []} />
-        <ol className="technical-leg-list" aria-label="구간별 세부 정보">
-          {route.legs.map((leg) => (
-            <li key={leg.legId}>
-              <strong>{routeLegLabel(leg, leg.mode === "TAXI" && (leg.waitDuration === undefined || leg.travelDuration === undefined))}</strong>
-              <span>{leg.from.name} → {leg.to.name}</span>
-              <span>예상 {formatDuration(leg.duration.p50Seconds)} · 지연 고려 {formatDuration(leg.duration.p90Seconds)} · {formatDistance(leg.distanceMeters)}</span>
-              {leg.waitDuration !== undefined && leg.travelDuration !== undefined && (
-                <span>대기 약 {formatDuration(leg.waitDuration.p50Seconds)} · 길어지면 {formatDuration(leg.waitDuration.p90Seconds)} / 이동 약 {formatDuration(leg.travelDuration.p50Seconds)} · 길어지면 {formatDuration(leg.travelDuration.p90Seconds)}</span>
-              )}
-              <span>요금 {formatMoney(leg.fare.expected)}~{formatMoney(leg.fare.upper)}</span>
-              {(leg.expectedStartAt != null || leg.expectedEndAt != null) && <span>예상 시각 {formatArrival(leg.expectedStartAt)} → {formatArrival(leg.expectedEndAt)}</span>}
-              <DegradedProvenanceList items={leg.provenance} />
-              {leg.geometry.encoding === "NONE" && <span className="geometry-note">지도 경로 없음</span>}
-            </li>
-          ))}
-        </ol>
       </details>
       <BusIntelligence route={route} searchId={searchId} />
       <a className="detail-link" href={`/searches/${encodeURIComponent(searchId)}/routes/${encodeURIComponent(route.routeId)}`}>이 경로만 보기</a>
@@ -674,7 +653,7 @@ function SupportPanel({ support }: { support: PublicCapabilities }) {
 
 function EmptyState({ phase, problem, onRetry, onRestart }: { phase: ResultPanelProps["phase"]; problem: PublicProblem | null; onRetry?: () => void; onRestart?: () => void }) {
   const content = phase === "NO_FEASIBLE_ROUTE"
-    ? ["조건에 맞는 경로가 없습니다", "택시 이용 예산이나 최대 도보·환승 조건을 조정해 다시 검색해 보세요."]
+    ? ["조건에 맞는 경로가 없습니다", "출발지·목적지와 출발 시간을 확인하거나 예상 요금 상한을 조정해 보세요."]
     : phase === "PROVIDER_UNAVAILABLE"
       ? ["교통 정보를 불러올 수 없습니다", "잠시 후 다시 검색해 주세요. 입력한 위치는 브라우저에 저장하지 않습니다."]
       : phase === "EXPIRED"

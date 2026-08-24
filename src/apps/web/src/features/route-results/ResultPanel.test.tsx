@@ -83,8 +83,9 @@ describe("ResultPanel journey guidance", () => {
     expect(screen.queryByText("어디서 타고, 어디서 갈아타는지")).not.toBeInTheDocument();
     expect(screen.getByText("승차 정류장에서 버스 승차")).toBeVisible();
     expect(screen.getByText("환승 정류장에서 하차")).toBeVisible();
-    expect(screen.getByText("다음 · 도착지까지 도보")).toBeVisible();
     expect(screen.getByText("도착지까지 걸어서 이동")).toBeVisible();
+    expect(screen.queryByText(/다음 ·/)).not.toBeInTheDocument();
+    expect(screen.queryByText("도착지 도착")).not.toBeInTheDocument();
     expect(screen.queryByText(/제공사 추정 · 신뢰도 정보 없음/)).not.toBeInTheDocument();
     expect(screen.queryByText(/P50|P90|ETA|Routing 응답|대용값/)).not.toBeInTheDocument();
     expect(screen.getByText(/이전 검색 결과에는 의견을 남길 수 없습니다/)).toBeInTheDocument();
@@ -93,5 +94,82 @@ describe("ResultPanel journey guidance", () => {
     expect(walkStep).toHaveAttribute("aria-pressed", "false");
     await user.click(walkStep);
     expect(walkStep).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("hides provider placeholders and combines repeated same-station walk connectors", () => {
+    const rawRoute: RouteCandidate = {
+      ...route,
+      routeId: "raw-provider-route",
+      pattern: "TAXI_TRANSIT",
+      legs: [
+        {
+          ...route.legs[0]!,
+          legId: "taxi-access",
+          sequence: 0,
+          mode: "TAXI",
+          from: { name: "Origin", coordinate: { lon: 127.1, lat: 37.3 } },
+          to: { name: "Destination", coordinate: { lon: 127.11, lat: 37.31 } },
+          transit: null,
+        },
+        {
+          ...route.legs[0]!,
+          legId: "subway-one",
+          sequence: 1,
+          mode: "SUBWAY",
+          from: { name: "판교(판교테크노밸리)", coordinate: { lon: 127.11, lat: 37.31 } },
+          to: { name: "논현", coordinate: { lon: 127.12, lat: 37.32 } },
+          transit: { routeLabel: "신분당선", direction: "Kakao Transit Destination" } as unknown as NonNullable<RouteCandidate["legs"][number]["transit"]>,
+        },
+        ...[0, 121, 1].map((seconds, index) => ({
+          ...route.legs[1]!,
+          legId: `same-station-walk-${index}`,
+          sequence: index + 2,
+          from: { name: "논현", coordinate: { lon: 127.12, lat: 37.32 } },
+          to: { name: "논현", coordinate: { lon: 127.12, lat: 37.32 } },
+          duration: { ...timeEstimate, p50Seconds: seconds, p90Seconds: seconds },
+          distanceMeters: index === 1 ? 100 : index,
+        })),
+        {
+          ...route.legs[0]!,
+          legId: "subway-two",
+          sequence: 5,
+          mode: "SUBWAY",
+          from: { name: "논현", coordinate: { lon: 127.12, lat: 37.32 } },
+          to: { name: "어린이대공원(세종대)", coordinate: { lon: 127.13, lat: 37.33 } },
+          transit: { routeLabel: "7호선", direction: null } as unknown as NonNullable<RouteCandidate["legs"][number]["transit"]>,
+        },
+        {
+          ...route.legs[1]!,
+          legId: "final-walk",
+          sequence: 6,
+          from: { name: "어린이대공원(세종대)", coordinate: { lon: 127.13, lat: 37.33 } },
+          to: { name: "Kakao transit destination", coordinate: { lon: 127.14, lat: 37.34 } },
+        },
+      ],
+    };
+    const beforeRender = structuredClone(rawRoute);
+    const response: PublicRouteSearchResponse = {
+      ...expiredResponse,
+      status: "COMPLETE",
+      recommendations: { fastest: rawRoute, stable: rawRoute, efficient: null, publicTransitOnly: null },
+    };
+
+    const { container } = render(<ResultPanel phase="COMPLETE" response={response} problem={null} />);
+
+    const customerCopy = [
+      container.textContent,
+      ...Array.from(container.querySelectorAll("[title], [aria-label]")).flatMap((element) => [
+        element.getAttribute("title"),
+        element.getAttribute("aria-label"),
+      ]),
+    ].filter((value): value is string => value !== null).join(" ");
+    expect(customerCopy).not.toMatch(/Origin|Destination|Kakao\s+Transit|Sanitized|Fixture/i);
+    expect(screen.getByText("출발지")).toBeVisible();
+    expect(screen.getByText("도착지")).toBeVisible();
+    expect(screen.getAllByText("논현에서 환승 통로로 이동")).toHaveLength(1);
+    expect(screen.getByText("5단계")).toBeVisible();
+    expect(screen.getByText("지하철 신분당선")).toBeVisible();
+    expect(screen.queryByText(/다음 ·/)).not.toBeInTheDocument();
+    expect(rawRoute).toEqual(beforeRender);
   });
 });

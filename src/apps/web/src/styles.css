@@ -2371,8 +2371,7 @@ body {
 
 .journey-step-number,
 .journey-direction,
-.journey-alight,
-.journey-transfer-cue {
+.journey-alight {
   font-size: 0.7rem;
   line-height: 1.4;
 }
@@ -2411,30 +2410,6 @@ body {
 .journey-alight {
   color: #354a42;
   font-weight: 750;
-}
-
-.journey-transfer-cue {
-  border-top: 1px dashed #d7e1dc;
-  padding-top: 0.35rem;
-  color: var(--accent);
-  font-weight: 850;
-}
-
-.technical-leg-list {
-  display: grid;
-  gap: 0.55rem;
-  padding: 0;
-  list-style: none;
-}
-
-.technical-leg-list > li {
-  display: grid;
-  gap: 0.2rem;
-  border-radius: 0.7rem;
-  padding: 0.65rem;
-  background: var(--surface-soft);
-  font-size: 0.7rem;
-  overflow-wrap: anywhere;
 }
 
 @media (max-width: 390px) {
