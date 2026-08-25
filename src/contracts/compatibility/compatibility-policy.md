@@ -94,7 +94,7 @@ major URL 또는 compatibility adapter가 필요하다.
 - DBML, migration, event, code registry와 optimize request wire family `1.0`은
   변경하지 않는다.
 
-## 1.5.0 compatibility decision
+## 1.6.0 compatibility decision
 
 - 분류: backward-compatible Public API minor. 기존 endpoint와 required
   `FavoriteJourney.defaultConstraints`를 유지하면서 optional typed
@@ -111,9 +111,8 @@ major URL 또는 compatibility adapter가 필요하다.
   DDL과 backfill이 없다. old Service binary는 이를 opaque object로 round-trip할 수 있다.
 - `POST /api/v1/me/favorite-journeys/from-places`는 additive endpoint다. 두 saved
   place, favorite, digest-only ledger receipt를 한 transaction으로 만들며 24시간
-  DB-authoritative owner-scoped idempotency를 제공한다. 1.5는 미출시 상태이므로 mutable
-  object 묶음 draft를 immutable ID receipt로 좁힌 것은 1.4 consumer를 깨지 않는다.
-  기존 collection CRUD는 유지한다.
+  DB-authoritative owner-scoped idempotency를 제공한다. 기존 1.5 consumer가 사용하던
+  collection CRUD와 서울 자전거 endpoint는 그대로 유지한다.
 - additive Service DB ledger table은 database contract 1.3.0 expand다. old Service는
   table을 무시할 수 있고 기존 table/column에는 backfill이나 narrowing이 없다. endpoint
   rollback은 unexpired receipt drain/reader overlap 뒤 table contract를 수행한다.
@@ -131,6 +130,22 @@ major URL 또는 compatibility adapter가 필요하다.
   사용하지 않는다.
 - Private Routing OpenAPI, generated Python client, Routing DB, event, error-code registry,
   route/ranking/budget semantics은 변경하지 않는다.
+
+## 1.5.0 compatibility decision
+
+- 분류: backward-compatible Public API minor.
+- `GET /api/v1/bike-options`와 전용 응답 schema는 additive endpoint다. 기존
+  Public consumer, route-search 요청·응답, 추천 순위와 Private Routing 계약은
+  바뀌지 않는다.
+- 자전거 시간은 서버가 대여소 사이 WGS84 직선거리를 시속 15km로 나누어
+  정수 초로 제공한다. 도로·자전거길 경로시간이나 실시간 자전거 수량으로
+  표현하지 않는다.
+- 대여소 자료의 기준 월·공개일·출처·라이선스와 `NOT_PROVIDED` availability 상태를
+  응답에 포함한다. 설치 거치대 수는 실시간 대여 가능 자전거 수가 아니다.
+- 대여소는 요청 좌표와 5km 이내에서 거리·station ID 순으로 결정한다. 지원
+  범위 밖은 오류로 위장하지 않고 빈 목록과 `null` 예상시간을 반환한다.
+- DBML, migration, event, code registry, Private Routing API, ranking 및 route ID는
+  변경하지 않는다.
 
 ## `rank-0.2.0` / `strategy-2.0.0` policy decision
 

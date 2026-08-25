@@ -8,13 +8,13 @@
 |---|---|
 | 작성 기준일 | 2026-08-25 KST |
 | 프로젝트 | Budget Route Platform / 82TA |
-| Context / Contract | `1.5.1` / `1.5.0` |
-| Public OpenAPI | `1.5.0` |
+| Context / Contract | `1.6.0` / `1.6.0` |
+| Public OpenAPI | `1.6.0` |
 | Private Routing OpenAPI metadata | `1.2.0` |
 | Private request wire family | `contractVersion: "1.0"` — 1.x 호환 계열 |
 | Ranking / Strategy | `rank-0.2.0` / `strategy-2.0.0` |
 | Mapping policy | `0.1.0-planned` |
-| Contract aggregate SHA-256 | `e86a90c2d3d016830dc9193ef0acd271cd08f8037b68cc5a4bc8cda14c7550db` |
+| Contract aggregate SHA-256 | `e2b9fd58b3ea0b37bdc82ae319efc9f23455e17f4ecae43b63473f2e444b8797` |
 
 ## 0. 발표용 한 줄 요약
 
@@ -739,14 +739,14 @@ Replay bundle에는 다음을 고정한다.
 
 | 값 | 의미 |
 |---|---|
-| repository `contractVersion=1.5.0` | 전체 정본 계약 bundle 버전 |
-| Public OpenAPI `1.5.0` | 사용자-facing API 문서 버전 |
+| repository `contractVersion=1.6.0` | 전체 정본 계약 bundle 버전 |
+| Public OpenAPI `1.6.0` | 사용자-facing API 문서 버전 |
 | Private OpenAPI metadata `1.2.0` | Private OpenAPI 문서 자체 버전 |
 | Private body `contractVersion="1.0"` | 호환되는 1.x wire family 식별자 |
 
 따라서 Private 요청 body가 `1.0`이라고 해서 현재 플랫폼 계약이 1.0이라는 뜻은 아니다.
 
-### 4.2 Public Service API — 전체 31개 operation
+### 4.2 Public Service API — 전체 32개 operation
 
 기본 server 예시는 `https://api.example.invalid`이며 실제 배포 주소로 교체한다. OpenAPI top-level은 public이며, 아래에 세션이 표시된 operation만 `sessionid` cookie 또는 `X-Guest-Token`을 요구한다.
 
@@ -783,6 +783,7 @@ Replay bundle에는 다음을 고정한다.
 | 29 | `DELETE /api/v1/me/data` | `deleteUserData` | USER session | deprecated 삭제 compatibility alias | 202, 401 |
 | 30 | `GET /api/v1/support/capabilities` | `getPublicCapabilities` | 공개 | 지원 지역·기능·Bus coverage 조회 | 200 |
 | 31 | `GET /api/v1/health` | `publicHealth` | 공개 | 공개 서비스 health | 200 |
+| 32 | `GET /api/v1/bike-options` | `getBikeOptions` | 공개 | 주변 따릉이 대여소와 시속 15km 기준 예상시간 조회 | 200, 400, 429 |
 
 ### 4.3 핵심 Public API: `POST /api/v1/route-searches`
 
@@ -1156,13 +1157,16 @@ Weather/traffic: recent valid cache -> missing context flag
 
 ### 확인된 것
 
-- Public 31개, Private 7개 operation이 OpenAPI와 구현 경계에 존재한다.
+- Public 32개, Private 7개 operation이 OpenAPI와 구현 경계에 존재한다.
+- Service API가 공식 대여소 snapshot에서 출발·도착지 주변 따릉이 위치를 고르고,
+  대여소 간 직선거리와 시속 15km로 예상시간을 계산하며 Web은 그 값을 표시한다.
+  실시간 자전거와 빈 거치대 수는 제공된 것으로 위장하지 않는다.
 - Service는 generated private client 기반 Routing gateway를 사용하고 공개 projection에서 private 필드를 제거한다.
 - Provider→canonical graph→time-dependent optimizer→strict budget→Pareto/ranking 경로가 구현되어 있다.
 - Kakao transit/walk/current directions는 local Docker live probe와 Web→Service→Routing E2E 증거가 있다.
 - local live 결과는 HTTP 200 `PARTIAL`, `WALK → BUS → BUS → WALK`, `P50=P90=1579초`, taxi upper `0원 <= 10,000원`이었다.
 - 해당 local run에서 6개 container가 healthy였고, route/4 legs/geometry가 PostGIS에 저장되었으며 public response에 private Provider/model/computation marker가 노출되지 않았다.
-- context/contract `1.5.1` / `1.5.0`, 41-file contract lock과 repository validation이 통과한다.
+- context/contract `1.6.0` / `1.6.0`, 42-file contract lock과 repository validation이 통과한다.
 
 ### 아직 운영 완료라고 말하면 안 되는 것
 

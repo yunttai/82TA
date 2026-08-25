@@ -28,6 +28,8 @@
 - missing future label은 negative가 아님
 - Pareto frontier에 완전 지배 후보 없음
 - 동일 snapshot replay는 동일 결과
+- 따릉이 예상시간은 `ceil(직선거리 m × 3600 / 15000)` 정수 초이고 실시간 수량으로 표시하지 않음
+- 따릉이 예상은 첫 pickup과 그 ID가 아닌 가장 가까운 return을 참조하며, 그런 return이 없으면 `null`
 
 ## 경계면 QA
 
@@ -64,6 +66,7 @@ QA는 양쪽을 동시에 읽는다.
 18. 첫 favorite-from-places 생성은 현재 `PRECISE_LOCATION` 동의와 write quota를 요구하지만 성공 receipt의 same-body replay는 동의 철회 뒤에도 quota 재소비 없이 성공하고, expiry 뒤 새 생성은 다시 동의를 요구함
 19. ledger에는 raw idempotency key·body·response·label·display name·좌표가 없고 digest key rotation 중에도 모든 unexpired version을 조회할 수 있음
 20. legacy FavoriteJourney POST/PATCH/DELETE의 canonical 4xx response set이 producer와 OpenAPI/generated client에서 일치함
+21. 서울 내 두 좌표 → 인근 따릉이 위치·시속 15km 단순 예상과 실시간 수량 미제공 안내
 
 ## GA 수용
 

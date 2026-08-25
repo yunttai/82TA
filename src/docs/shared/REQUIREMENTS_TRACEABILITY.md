@@ -26,6 +26,7 @@
 | FR-BUS-001~010 | Routing | Routing DBML, BusLegIntelligence | `src/packages/bus-intelligence-core` | MAP-GOLD-*, MODEL-SEAT-*, MODEL-ETA-* |
 | FR-OPT-001~008 | Routing | RouteCandidate, code registry | `src/packages/routing-domain` | PROP-BUDGET-001, PROP-PARETO-001 |
 | FR-UI-001~009 | Service | Public OpenAPI, code registry | `src/apps/web`, public projection | CT-UI-*, A11Y-*, E2E-* |
+| FR-BIKE-001~003 | Service | Public OpenAPI | `src/services/service-api/bikes`, `src/apps/web` | CT-SVC-BIKE-001, CT-UI-BIKE-001 |
 | FR-IAM-001~007 | Service | Service DBML, Public OpenAPI | `src/services/service-api` | SEC-IAM-*, DATA-DELETE-* |
 | FR-OPS-001~006 | Joint/Routing | health/version/capability, events | `src/services`, `src/workers`, `src/infra` | RES-*, PERF-*, DR-* |
 

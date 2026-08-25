@@ -37,6 +37,19 @@ set +a
 export ROUTING_RUNTIME_ENVIRONMENT=DEVELOPMENT
 ```
 
+검토된 Kakao 3개 operation과 GBIS 도착·차량 위치 2개 operation을 함께 조립할
+때는 다음 factory를 명시한다. 아래 두 키와 exact 5-operation evidence bundle이
+모두 필요하며, 키만 설정해서는 operation이 활성화되지 않는다.
+
+```powershell
+$env:ROUTING_PROVIDER_CONFIG_FACTORY = 'provider_core.production:build_kakao_gbis_config'
+$env:KAKAO_REST_API_KEY = '<secret>'
+$env:GBIS_SERVICE_KEY = '<secret>'
+$env:ROUTING_PROVIDER_EVIDENCE_JSON = '<reviewed evidence JSON>'
+# 배포 네트워크가 고정 CONNECT proxy를 사용할 때만 설정
+$env:ROUTING_PROVIDER_HTTPS_PROXY_URL = 'http://routing-provider-proxy:3128'
+```
+
 ## Local test
 
 ```powershell

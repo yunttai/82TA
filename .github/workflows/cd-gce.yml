@@ -448,6 +448,36 @@ jobs:
           "${compose[@]}" ps
           EOF
 
+      - name: Verify Service coordination backend matches current GCE topology
+        env:
+          SSH_TARGET: ${{ secrets.USER }}@${{ secrets.HOST }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_TARGET" bash -s <<'EOF'
+          set -euo pipefail
+          cd /opt/82ta
+
+          compose=(
+            sudo -n docker compose
+            --env-file .env
+            --env-file .provider.env
+            --env-file .deploy.env
+            --env-file .runtime/provider-evidence.env
+            -f docker-compose.prod.yml
+          )
+
+          coordination_backend=$(
+            "${compose[@]}" exec -T service-api python manage.py shell \
+              -c "from django.conf import settings; print(settings.COORDINATION_BACKEND)" \
+              | tail -n 1 | tr -d '\r'
+          )
+          if [[ "$coordination_backend" != "local" ]]; then
+            echo "Expected the current single-node GCE Service coordination backend to be local, got: $coordination_backend" >&2
+            exit 1
+          fi
+          echo "Service coordination backend: local (expected for current GCE topology)"
+          EOF
+
       - name: Wait for HTTP
         run: |
           set -euo pipefail

@@ -12,6 +12,35 @@ requirements:
       - src/apps/web
     tests: [CT-SVC-PLACE-001, E2E-SEARCH-001]
     releaseGate: place-search-contract-and-abuse-controls
+  FR-BIKE-001:
+    title: 공식 스냅샷 기반 인근 따릉이 대여소와 단순 주행 예상시간
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/paths/~1api~1v1~1bike-options
+      - src/contracts/openapi/service-public.v1.yaml#/components/schemas/BikeOptionsResponse
+    implementationPaths:
+      - src/services/service-api/bikes
+      - src/apps/web
+    tests: [CT-SVC-BIKE-001, CT-UI-BIKE-001]
+    releaseGate: official-station-snapshot-and-honest-bike-estimate-disclosure
+  FR-BIKE-002:
+    title: 서로 다른 대여소 사이 직선거리와 시속 15km 예상시간
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/components/schemas/BikeRideEstimate
+    implementationPaths:
+      - src/services/service-api/bikes
+    tests: [UT-SVC-BIKE-DURATION-001, CT-SVC-BIKE-001]
+    releaseGate: deterministic-straight-line-duration-and-station-reference-invariants
+  FR-BIKE-003:
+    title: 기존 경로 순위와 분리하고 계산 방식·실시간 수량 미제공 표시
+    owner: service-product
+    contracts:
+      - src/contracts/openapi/service-public.v1.yaml#/components/schemas/BikeOptionsResponse
+    implementationPaths:
+      - src/apps/web
+    tests: [CT-UI-BIKE-001, A11Y-BIKE-001]
+    releaseGate: supplemental-bike-option-and-honest-disclosure-rendered
   FR-ROUTE-010:
     title: strict budget은 taxi upper cost 기준
     owner: routing-intelligence

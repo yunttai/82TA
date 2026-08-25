@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Budget Route Service Public API
-  version: 1.5.0
+  version: 1.6.0
 servers:
   - url: https://api.example.invalid
 security: []
@@ -137,6 +137,44 @@ paths:
         '400': {$ref: '#/components/responses/Problem'}
         '429': {$ref: '#/components/responses/Problem'}
         '502': {$ref: '#/components/responses/Problem'}
+  /api/v1/bike-options:
+    get:
+      operationId: getBikeOptions
+      description: >-
+        Returns the nearest Seoul Bike stations for an origin and destination plus
+        a simple station-to-station cycling estimate. The estimate uses straight-line
+        distance and an assumed speed of 15 km/h; live bicycle availability is not provided.
+        Station lists are sorted by straight-line distance and then station ID. Stations
+        farther than 5 km are omitted, so coordinates outside the service area return
+        empty lists and a null estimate with HTTP 200. The estimate references the first
+        pickup and nearest return station with a different station ID. Both referenced
+        IDs must occur in their respective station lists. The estimate is null when the
+        pickup list is empty or the return list has no station distinct from that first pickup.
+      parameters:
+        - in: query
+          name: originLon
+          required: true
+          schema: {type: number, minimum: 124, maximum: 132}
+        - in: query
+          name: originLat
+          required: true
+          schema: {type: number, minimum: 33, maximum: 39.5}
+        - in: query
+          name: destinationLon
+          required: true
+          schema: {type: number, minimum: 124, maximum: 132}
+        - in: query
+          name: destinationLat
+          required: true
+          schema: {type: number, minimum: 33, maximum: 39.5}
+      responses:
+        '200':
+          description: Nearby Seoul Bike stations and a clearly disclosed simple cycling estimate
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BikeOptionsResponse'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
   /api/v1/route-searches:
     post:
       operationId: createRouteSearch
@@ -617,6 +655,81 @@ components:
         application/problem+json:
           schema: {$ref: './common/components.v1.yaml#/components/schemas/ProblemDetails'}
   schemas:
+    BikeStationOption:
+      type: object
+      additionalProperties: false
+      required: [stationId, name, district, address, coordinate, rackCount, distanceFromPointMeters]
+      properties:
+        stationId: {type: string, minLength: 1}
+        name: {type: string, minLength: 1, maxLength: 200}
+        district: {type: string, minLength: 1, maxLength: 100}
+        address: {type: [string, 'null'], maxLength: 300}
+        coordinate: {$ref: './common/components.v1.yaml#/components/schemas/Coordinate'}
+        rackCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: Installed rack count in the published station snapshot, not live bicycle availability. Null means unknown and zero means a confirmed zero.
+        distanceFromPointMeters:
+          type: integer
+          minimum: 0
+          description: Straight-line distance from the requested origin or destination to this station.
+    BikeRideEstimate:
+      type: object
+      additionalProperties: false
+      required: [pickupStationId, returnStationId, distanceMeters, durationSeconds, assumedSpeedKph, distanceMethod]
+      properties:
+        pickupStationId:
+          type: string
+          minLength: 1
+          description: References one stationId in pickupStations.
+        returnStationId:
+          type: string
+          minLength: 1
+          description: References a different stationId in returnStations.
+        distanceMeters: {type: integer, minimum: 0}
+        durationSeconds: {type: integer, minimum: 0}
+        assumedSpeedKph: {type: number, const: 15}
+        distanceMethod: {type: string, const: STRAIGHT_LINE}
+    BikeDataSource:
+      type: object
+      additionalProperties: false
+      required: [name, url, license, publishedAt]
+      properties:
+        name: {type: string, minLength: 1}
+        url: {type: string, format: uri}
+        license: {type: string, minLength: 1}
+        publishedAt: {type: string, format: date}
+    BikeOptionsResponse:
+      type: object
+      additionalProperties: false
+      required: [pickupStations, returnStations, rideEstimate, searchRadiusMeters, stationDataMonth, availabilityStatus, dataSource]
+      properties:
+        pickupStations:
+          type: array
+          maxItems: 5
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/BikeStationOption'}
+        returnStations:
+          type: array
+          maxItems: 5
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/BikeStationOption'}
+        rideEstimate:
+          oneOf:
+            - {$ref: '#/components/schemas/BikeRideEstimate'}
+            - {type: 'null'}
+        searchRadiusMeters:
+          type: integer
+          const: 5000
+        stationDataMonth:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: Month identified by the official station snapshot; it does not claim a day-level observation date.
+        availabilityStatus:
+          type: string
+          const: NOT_PROVIDED
+          description: Live bicycle and empty-rack counts are intentionally not claimed by this endpoint.
+        dataSource: {$ref: '#/components/schemas/BikeDataSource'}
     PublicRouteSearchRequest:
       type: object
       additionalProperties: false

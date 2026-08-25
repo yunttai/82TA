@@ -4,7 +4,7 @@
 - 날짜: 2026-08-25
 - 결정자: Service Product, Routing & Intelligence contract reviewers
 - 관련 요구사항: UJ-005, FR-IAM-003, SP-FR-008
-- 관련 계약: Public Service OpenAPI 1.5.0, Service DBML, CCR-20260825-FAVORITE-QUICK-SEARCH
+- 관련 계약: Public Service OpenAPI 1.6.0, Service DBML, CCR-20260825-FAVORITE-QUICK-SEARCH
 
 ## Context
 
@@ -19,7 +19,7 @@ Public 1.4의 `FavoriteJourney.defaultConstraints`는 임의 object라 generated
 
 ## Decision
 
-Public 1.5에 optional `FavoriteJourney.searchConditions`를 추가한다. V1 조건은 다음
+Public 1.6에 optional `FavoriteJourney.searchConditions`를 추가한다. V1 조건은 다음
 필드만 갖는 closed schema다.
 
 - `schemaVersion=1`

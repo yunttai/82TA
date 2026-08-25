@@ -151,7 +151,7 @@ erDiagram
     }
 ```
 
-`FAVORITE_JOURNEY.default_constraints`의 물리 shape는 Public 1.5에서도 JSONB로
+`FAVORITE_JOURNEY.default_constraints`의 물리 shape는 Public 1.6에서도 JSONB로
 유지한다. 새 row는 strict `FavoriteJourneySearchConditionsV1`을 저장하고, 기존 opaque
 row는 backfill하거나 기본값을 추측하지 않는다. 임의 장소 즐겨찾기 생성 시 두
 `SAVED_PLACE`, 한 `FAVORITE_JOURNEY`, 한 `FAVORITE_CREATION_IDEMPOTENCY` row는 같은

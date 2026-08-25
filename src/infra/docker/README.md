@@ -16,10 +16,35 @@ curl --fail http://127.0.0.1:8080/api/v1/health
 ```
 
 Then open `http://127.0.0.1:8080`. Local Compose deliberately uses Stub mode
-and a disposable SQLite database; it is not a production topology. Managed or
-multi-node GCE database migrations must run as a separate one-off process and are
-never inferred merely from the container entry point. Images are built from the
-repository root so generated clients remain the only API DTO source.
+and a disposable SQLite database; it is not a production topology. Service
+rate-limit and idempotency coordination uses a dedicated Redis container on an
+internal-only Compose network. Redis publishes no host port, persists AOF data
+in the `service-redis-data` volume, and must be healthy before Django starts.
+In other words, route recommendations are Stub data in this stack, while Service
+coordination is backed by a real Redis server rather than `fakeredis` or a mock.
+The fixed key-derivation secret in this Compose file is local-development-only.
+Managed or multi-node GCE database migrations must run as a separate one-off
+process and are never inferred merely from the container entry point. Images are
+built from the repository root so generated clients remain the only API DTO
+source.
+
+Confirm the selected backend and inspect opaque coordination keys without
+publishing Redis to the host:
+
+```bash
+docker compose -f src/infra/docker/compose.service-product.yml \
+  exec -T service-api python manage.py shell \
+  -c "from django.conf import settings; print(settings.COORDINATION_BACKEND)"
+docker compose -f src/infra/docker/compose.service-product.yml \
+  exec -T service-redis redis-cli --scan --pattern '82ta:service:local:*'
+```
+
+Redis failure remains fail-closed: requests that require distributed rate-limit
+or idempotency coordination fail instead of switching to process-local state.
+`docker compose stop service-redis` can be used for an outage smoke test; restart
+it with `docker compose start service-redis`. A normal `docker compose down`
+preserves coordination data for restart testing. Use `down -v` only when the
+local Redis volume is intentionally disposable.
 
 To enable real Kakao Local search without committing credentials, export the
 server REST key only in the launching shell. Kakao Maps JS requires the

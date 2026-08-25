@@ -75,7 +75,7 @@ Routing & Intelligence owns Routing DB.
 
 `saveToHistory=false` 검색은 결과 조회·idempotency에 필요한 짧은 TTL만 사용한다. `true`는 로그인 사용자와 현재 `SEARCH_HISTORY` 동의를 요구한다. owner 경계는 user 또는 anonymous session 중 정확히 하나여야 하며 Routing에는 어느 owner 식별자도 전달하지 않는다.
 
-Public 1.5 favorite quick search는 기존 `favorite_journey.default_constraints` JSONB에 검증된 `FavoriteJourneySearchConditionsV1`을 저장한다. 별도 column이나 backfill은 필요하지 않다. 기존 arbitrary object는 그대로 보존하고 typed 값으로 추론하지 않으며, 사용자가 다시 저장하기 전에는 quick search를 비활성화한다. 같은 JSONB에는 절대 출발시각, 도착 마감, `saveToHistory`, 경로 결과·추천 ID·ranking provenance를 저장하지 않는다.
+Public 1.6 favorite quick search는 기존 `favorite_journey.default_constraints` JSONB에 검증된 `FavoriteJourneySearchConditionsV1`을 저장한다. 별도 column이나 backfill은 필요하지 않다. 기존 arbitrary object는 그대로 보존하고 typed 값으로 추론하지 않으며, 사용자가 다시 저장하기 전에는 quick search를 비활성화한다. 같은 JSONB에는 절대 출발시각, 도착 마감, `saveToHistory`, 경로 결과·추천 ID·ranking provenance를 저장하지 않는다.
 
 임의 장소 즐겨찾기 생성은 두 `saved_place`, 한 `favorite_journey`, 한 `favorite_creation_idempotency` receipt를 같은 Service DB transaction에 기록한다. 실패 시 네 row를 모두 rollback한다. 원장은 owner/key HMAC digest unique constraint로 동시 생성을 직렬화하고 24시간 동안 DB-authoritative replay를 보장한다. raw key·request/response·label·display name·좌표는 원장에 저장하지 않는다. 만료 row만 cleanup하며, digest key rotation은 unexpired row의 이전 version을 유지한다. active receipt의 세 resource FK는 hard delete를 막고 soft delete 뒤 replay는 resource를 복구하지 않는다. 계정 hard delete는 ledger를 먼저 지우며 사용자 export에는 장소·즐겨찾기만 포함하고 내부 digest/ledger는 제외한다. 이 과정과 history summary는 Service 내부이며 Routing DB나 Routing request에 saved-place label, user ID 또는 favorite ID를 추가하지 않는다.
 

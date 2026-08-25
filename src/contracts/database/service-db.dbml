@@ -48,7 +48,7 @@ Table saved_place {
 }
 
 Table favorite_journey {
-  Note: 'default_constraints remains JSONB for Public 1.x overlap. Public 1.5 writes a validated FavoriteJourneySearchConditionsV1 value; legacy opaque rows are not inferred and remain unavailable for quick search until re-saved.'
+  Note: 'default_constraints remains JSONB for Public 1.x overlap. Public 1.6 writes a validated FavoriteJourneySearchConditionsV1 value; legacy opaque rows are not inferred and remain unavailable for quick search until re-saved.'
   id uuid [pk]
   user_id uuid [not null, ref: > auth_user.id]
   origin_saved_place_id uuid [ref: > saved_place.id]

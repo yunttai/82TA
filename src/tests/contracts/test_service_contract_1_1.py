@@ -167,7 +167,7 @@ class ServiceContract11Tests(unittest.TestCase):
             ["properties"]["contractVersion"]["const"],
             "1.0",
         )
-        self.assertEqual(self.public["info"]["version"], "1.5.0")
+        self.assertEqual(self.public["info"]["version"], "1.6.0")
         self.assertEqual(self.private["info"]["version"], "1.2.0")
         manifest = json.loads(
             (ROOT / "src/contracts/CONTEXT_MANIFEST.json").read_text(encoding="utf-8")
@@ -177,10 +177,10 @@ class ServiceContract11Tests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["contextVersion"], "1.5.1")
-        self.assertEqual(manifest["contractVersion"], "1.5.0")
-        self.assertEqual(versions["contextVersion"], "1.5.1")
-        self.assertEqual(versions["contractVersion"], "1.5.0")
+        self.assertEqual(manifest["contextVersion"], "1.6.0")
+        self.assertEqual(manifest["contractVersion"], "1.6.0")
+        self.assertEqual(versions["contextVersion"], "1.6.0")
+        self.assertEqual(versions["contractVersion"], "1.6.0")
         self.assertEqual(versions["databaseContractVersion"], "1.3.0")
         self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
         self.assertEqual(versions["rankingPolicyVersion"], "rank-0.2.0")

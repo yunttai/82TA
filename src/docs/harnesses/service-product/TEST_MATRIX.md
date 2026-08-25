@@ -82,7 +82,7 @@
 
 ## Contract-gap Gate
 
-Public 1.5.0 resolves email registration/login with nickname and consent capture, guest/session inspection and revoke, consent-driven automatic history plus display-only request summary, saved-place/favorite CRUD, typed favorite conditions, atomic favorite creation from arbitrary places, preference ETag conflict, consent CRUD, and asynchronous export/deletion jobs. The following remain `BLOCKED` rather than being simulated with local API shapes: account recovery/email verification and guest merge, individual history delete/retention setting, consent-document distribution, typed privacy preferences/feedback bus outcome/transit details, canonical baseline saved-time, public degraded/failure copy registries, and a server-owned freshness threshold.
+Public 1.6.0 resolves email registration/login with nickname and consent capture, guest/session inspection and revoke, consent-driven automatic history plus display-only request summary, saved-place/favorite CRUD, typed favorite conditions, atomic favorite creation from arbitrary places, preference ETag conflict, consent CRUD, and asynchronous export/deletion jobs. The following remain `BLOCKED` rather than being simulated with local API shapes: account recovery/email verification and guest merge, individual history delete/retention setting, consent-document distribution, typed privacy preferences/feedback bus outcome/transit details, canonical baseline saved-time, public degraded/failure copy registries, and a server-owned freshness threshold.
 
 ## Security
 
