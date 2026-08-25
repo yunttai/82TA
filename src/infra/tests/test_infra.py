@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -90,7 +91,7 @@ class InfrastructureContractTests(unittest.TestCase):
         active_workflows = sorted(
             path.name for path in (ROOT / ".github/workflows").glob("*.yml")
         )
-        self.assertEqual(active_workflows, ["cd-gce.yml"])
+        self.assertEqual(active_workflows, ["cd-gce.yml", "pr-service-product.yml"])
 
         deployment_text = "\n".join(
             path.read_text(encoding="utf-8", errors="ignore")
@@ -213,6 +214,34 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn("access_log off", nginx)
         self.assertIn('"--access-logfile", "/dev/null"', service_dockerfile)
 
+    def test_service_product_redis_is_private_persistent_and_required(self) -> None:
+        compose = self.read("docker/compose.service-product.yml")
+        redis_block = compose.split("  service-redis:", 1)[1].split("  service-api:", 1)[0]
+        service_block = compose.split("  service-api:", 1)[1].split("  web:", 1)[0]
+
+        self.assertIn("image: redis:7.4-alpine", redis_block)
+        self.assertIn(
+            '["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]',
+            redis_block,
+        )
+        self.assertIn("restart: unless-stopped", redis_block)
+        self.assertIn('["CMD", "redis-cli", "ping"]', redis_block)
+        self.assertIn("service-redis-data:/data", redis_block)
+        self.assertNotIn("ports:", redis_block)
+        self.assertIn("service-coordination:\n    internal: true", compose)
+
+        self.assertIn("SERVICE_REDIS_URL: redis://service-redis:6379/0", service_block)
+        self.assertIn("service-redis:\n        condition: service_healthy", service_block)
+        self.assertIn("- service-coordination", service_block)
+        self.assertNotIn("SERVICE_SINGLE_NODE_MODE", compose)
+
+        secret = re.search(
+            r"SERVICE_REDIS_KEY_DERIVATION_SECRET:\s*([^\s]+)",
+            service_block,
+        )
+        self.assertIsNotNone(secret)
+        self.assertGreaterEqual(len(secret.group(1)), 32)
+
     def test_active_gce_cd_matches_build_certificate_and_deploy_sequence(self) -> None:
         workflow = (ROOT / ".github/workflows/cd-gce.yml").read_text(encoding="utf-8")
         for dockerfile in (
@@ -234,6 +263,11 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn("82ta-certificate-renew.timer", workflow)
         self.assertIn("HTTP health check timed out", workflow)
         self.assertIn("HTTPS health check timed out", workflow)
+        self.assertIn(
+            "Verify Service coordination backend matches current GCE topology",
+            workflow,
+        )
+        self.assertIn('[[ "$coordination_backend" != "local" ]]', workflow)
         self.assertLess(
             workflow.index("Bootstrap the blank server"),
             workflow.index("Start bootstrap provider egress proxy"),
@@ -245,6 +279,12 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertLess(
             workflow.index("Probe Providers and create runtime evidence"),
             workflow.index("Start HTTP stack in dependency order"),
+        )
+        self.assertLess(
+            workflow.index("Start HTTP stack in dependency order"),
+            workflow.index(
+                "Verify Service coordination backend matches current GCE topology"
+            ),
         )
         self.assertLess(
             workflow.index("Start HTTP stack in dependency order"),
@@ -266,6 +306,55 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn('ROUTING_ALLOW_FIXTURE_BACKEND: "false"', compose)
         self.assertIn("routing-db:\n    image: postgis/postgis:16-3.4", compose)
         self.assertIn("routing-redis:\n    image: redis:7.4-alpine", compose)
+        self.assertNotIn("\n  service-redis:", compose)
+        self.assertIn(
+            "# SERVICE_REDIS_URL: intentionally unset; Service uses its local coordination backend.",
+            compose,
+        )
+
+    def test_service_product_pr_workflow_is_active_pinned_and_uses_real_redis(self) -> None:
+        active = (ROOT / ".github/workflows/pr-service-product.yml").read_text(
+            encoding="utf-8"
+        )
+        template = self.read("ci/github-actions/pr-service-product.yml")
+        cd_gce = (ROOT / ".github/workflows/cd-gce.yml").read_text(encoding="utf-8")
+        gce_compose = self.read("gce/docker-compose.prod.yml")
+        self.assertEqual(active, template)
+        self.assertIn("pull_request:", active)
+        privacy_version = re.search(
+            r"^\s*VITE_PRIVACY_DOCUMENT_VERSION:\s*(\S+)\s*$",
+            active,
+            re.MULTILINE,
+        )
+        cd_privacy_version = re.search(
+            r"VITE_PRIVACY_DOCUMENT_VERSION=(\S+)", cd_gce
+        )
+        service_privacy_version = re.search(
+            r"SERVICE_CONSENT_DOCUMENT_VERSION:\s*(\S+)", gce_compose
+        )
+        self.assertIsNotNone(privacy_version)
+        self.assertIsNotNone(cd_privacy_version)
+        self.assertIsNotNone(service_privacy_version)
+        self.assertEqual(privacy_version.group(1), cd_privacy_version.group(1))
+        self.assertEqual(privacy_version.group(1), service_privacy_version.group(1))
+        self.assertIn("Start Service Product with real Redis", active)
+        self.assertIn("service-redis redis-cli PING", active)
+        self.assertIn('[[ "$backend" == "redis" ]]', active)
+        self.assertIn('[[ "$first_rate" == "True" ]]', active)
+        self.assertIn('[[ "$second_rate" == "False" ]]', active)
+        self.assertIn('[[ "$first_idempotency" == "CLAIMED" ]]', active)
+        self.assertIn('[[ "$second_idempotency" == "IN_PROGRESS" ]]', active)
+        self.assertIn("down -v --remove-orphans", active)
+        self.assertNotIn("fakeredis", active.lower())
+        self.assertIn(
+            "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25",
+            active,
+        )
+
+        action_refs = re.findall(r"uses:\s*([^\s#]+)", active)
+        self.assertTrue(action_refs)
+        for action_ref in action_refs:
+            self.assertRegex(action_ref, r"^[^@]+@[0-9a-f]{40}$")
 
     def test_gce_blank_server_bootstrap_generates_runtime_and_refresh_jobs(self) -> None:
         bootstrap = self.read("gce/bootstrap-host.sh")
