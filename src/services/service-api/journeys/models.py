@@ -9,6 +9,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -292,6 +293,62 @@ class FavoriteJourney(models.Model):
                 )
 
 
+class FavoriteCreationIdempotency(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        ServiceUser,
+        on_delete=models.PROTECT,
+        related_name="favorite_creation_receipts",
+    )
+    key_digest = models.CharField(max_length=64)
+    request_fingerprint = models.CharField(max_length=64)
+    digest_key_version = models.PositiveIntegerField()
+    favorite_journey = models.ForeignKey(
+        FavoriteJourney,
+        on_delete=models.PROTECT,
+        related_name="creation_receipts",
+    )
+    origin_saved_place = models.ForeignKey(
+        SavedPlace,
+        on_delete=models.PROTECT,
+        related_name="favorite_origin_creation_receipts",
+    )
+    destination_saved_place = models.ForeignKey(
+        SavedPlace,
+        on_delete=models.PROTECT,
+        related_name="favorite_destination_creation_receipts",
+    )
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "favorite_creation_idempotency"
+        indexes = [
+            models.Index(
+                fields=["expires_at"],
+                name="ix_fav_create_idemp_expiry",
+            )
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "key_digest"],
+                name="uq_favorite_create_owner_key_digest",
+            ),
+            models.CheckConstraint(
+                condition=~Q(origin_saved_place=models.F("destination_saved_place")),
+                name="ck_favorite_create_distinct_places",
+            ),
+            models.CheckConstraint(
+                condition=Q(digest_key_version__gt=0),
+                name="ck_favorite_create_digest_key_version",
+            ),
+            models.CheckConstraint(
+                condition=Q(expires_at=models.F("created_at") + timedelta(hours=24)),
+                name="ck_favorite_create_24h_expiry",
+            ),
+        ]
+
+
 class AnonymousSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     token_hash = models.CharField(max_length=128, unique=True)
@@ -346,7 +403,12 @@ class RouteSearchManager(models.Manager):
                 .order_by("-recorded_at", "-id")
                 .first()
             )
-            if latest is None or not latest.accepted:
+            if (
+                latest is None
+                or not latest.accepted
+                or latest.document_version
+                != settings.CONSENT_DOCUMENT_VERSIONS.get("SEARCH_HISTORY")
+            ):
                 raise ValidationError("Current SEARCH_HISTORY consent is required.")
             maximum_retention = now + timedelta(days=90)
         else:

@@ -98,7 +98,7 @@ requirements:
     tests: [CT-SVC-IAM-REGISTER-001, CT-SVC-IAM-CONSENT-001, CT-SVC-IAM-LOGIN-001, SEC-IAM-BRUTEFORCE-001, SEC-IAM-SESSION-001]
     releaseGate: password-hashing-profile-consent-generic-failure-csrf-and-session-revocation
   FR-IAM-003:
-    title: 검색 기록·저장 장소·즐겨찾기
+    title: 검색 기록·저장 장소·typed 즐겨찾기 quick search
     owner: service-product
     contracts:
       - src/contracts/openapi/service-public.v1.yaml
@@ -106,8 +106,8 @@ requirements:
     implementationPaths:
       - src/services/service-api
       - src/apps/web
-    tests: [CT-SVC-HISTORY-001, CT-SVC-SAVED-PLACE-001, CT-SVC-FAVORITE-001, SEC-IDOR-RESOURCE-001]
-    releaseGate: owner-scoped-history-and-resource-crud
+    tests: [CT-SVC-HISTORY-001, CT-SVC-HISTORY-SUMMARY-001, CT-SVC-SAVED-PLACE-001, CT-SVC-FAVORITE-001, CT-SVC-FAVORITE-TYPED-001, CT-SVC-FAVORITE-ATOMIC-001, CT-SVC-FAVORITE-IDEMPOTENCY-001, CT-SVC-FAVORITE-DURABLE-REPLAY-001, SEC-IDOR-RESOURCE-001, SEC-FAVORITE-LOCATION-CONSENT-001, SEC-FAVORITE-LEDGER-REDACTION-001]
+    releaseGate: owner-scoped-history-typed-favorite-atomicity-idempotency-and-redaction
   FR-IAM-004:
     title: 이동 선호 설정과 optimistic concurrency
     owner: service-product

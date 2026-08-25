@@ -98,7 +98,7 @@ GBIS 좌석 데이터가 없더라도 transit·taxi 경로를 `PARTIAL`로 제�
 
 ### UJ-005 기록과 즐겨찾기
 
-비회원은 즉시 검색 가능하다. 회원은 동의에 따라 검색 이력·저장 장소·즐겨찾기·선호를 관리하고 삭제·내보내기를 요청할 수 있다.
+비회원은 즉시 검색 가능하다. 회원은 동의에 따라 검색 이력·저장 장소·즐겨찾기·선호를 관리하고 삭제·내보내기를 요청할 수 있다. 즐겨찾기는 두 Service 소유 저장 장소와 버전이 지정된 검색 조건을 보존하며, 한 번의 사용자 동작으로 클릭 시점의 새 `DEPART_AT` 검색을 시작한다. 과거 결과나 절대 출발시각은 재사용하지 않는다.
 
 ## 7. 기능 요구사항
 
@@ -193,6 +193,9 @@ Service 계정·개인정보 계약은 다음을 만족한다.
 - `saveToHistory=true`는 로그인 사용자와 유효한 `SEARCH_HISTORY` 동의를 요구한다. guest 검색 결과는 응답·idempotency TTL 동안만 보유하고 이력 목록에 넣지 않는다.
 - preference GET은 version ETag를 반환하며, first-party update는 `If-Match`로 충돌을 검출한다. 1.0 consumer의 무조건 PUT은 migration window 동안만 허용한다.
 - saved place와 favorite journey의 update/delete는 owner 검증과 soft delete를 적용한다.
+- 임의 장소 두 곳으로 즐겨찾기를 만드는 작업은 두 saved place, favorite journey, digest-only idempotency receipt를 하나의 Service DB transaction으로 생성한다. 부분 성공은 허용하지 않는다. 동일 owner·key·body는 24시간 동안 재시작이나 Redis 장애 뒤에도 같은 불변 ID receipt를 반환한다. 첫 생성만 현재 `PRECISE_LOCATION` 동의와 write quota를 소비하고, receipt replay는 새 위치 write가 아니므로 이를 다시 요구하지 않는다.
+- 즐겨찾기의 검색 조건은 canonical taxi budget·Public 검색 preference·추천 종류만 버전과 함께 저장한다. 출발시각은 클릭 시점에 timezone-aware `DEPART_AT`으로 생성하고, `saveToHistory`는 저장하지 않고 현재 `SEARCH_HISTORY` 동의로 판단한다.
+- 검색 기록 응답의 선택적 request summary는 표시명·출발시각·예산·preference만 포함하며 좌표·주소·Provider ID가 없어 재검색 입력으로 사용할 수 없다.
 - export와 deletion은 비동기 job이며 owner만 상태를 조회한다. export download URL은 짧은 수명이고 계정 삭제는 관련 위치·장소·검색·동의·feedback의 retention/backup 삭제 정책까지 추적한다.
 
 ### 7.7 운영

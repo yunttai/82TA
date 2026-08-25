@@ -41,7 +41,7 @@ class FavoriteOwnershipTests(TestCase):
         favorite = FavoriteRepository.create(
             user_id=self.owner.id,
             origin_saved_place_id=self.place.id,
-            destination_saved_place_id=None,
+            destination_saved_place_id=self.place.id,
             nickname="통근",
             default_constraints={},
         )
@@ -51,8 +51,16 @@ class FavoriteOwnershipTests(TestCase):
         self.assertTrue(FavoriteRepository.delete(user_id=self.owner.id, favorite_id=favorite.id))
 
     def test_soft_deleted_place_is_not_visible_or_reusable(self) -> None:
+        FavoriteRepository.create(
+            user_id=self.owner.id,
+            origin_saved_place_id=self.place.id,
+            destination_saved_place_id=self.place.id,
+            nickname="삭제될 경로",
+            default_constraints={},
+        )
         self.assertTrue(SavedPlaceRepository.soft_delete(user_id=self.owner.id, place_id=self.place.id))
         self.assertEqual(list(SavedPlaceRepository.list_owned(user_id=self.owner.id)), [])
+        self.assertEqual(list(FavoriteRepository.list_owned(user_id=self.owner.id)), [])
         with self.assertRaises(ValidationError):
             FavoriteRepository.create(
                 user_id=self.owner.id,

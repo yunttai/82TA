@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import threading
 import time
+from uuid import UUID
 
 from django.conf import settings
 from django.http import HttpRequest
+from django.views.decorators.debug import sensitive_variables
 
 from .api_common import ApiProblem
 from .cache import BoundedTTLCache
@@ -18,10 +22,25 @@ _buckets = BoundedTTLCache[str, tuple[int, int]](
 )
 
 
-def enforce_rate_limit(request: HttpRequest, *, scope: str, limit: int, title: str) -> None:
+@sensitive_variables("owner_id", "subject")
+def enforce_rate_limit(
+    request: HttpRequest,
+    *,
+    scope: str,
+    limit: int,
+    title: str,
+    owner_id: UUID | str | None = None,
+) -> None:
     if limit <= 0:
         return
-    subject = client_ip(request)
+    if owner_id is None:
+        subject = client_ip(request)
+    else:
+        subject = hmac.new(
+            settings.COORDINATION_HMAC_KEY,
+            f"owner-rate-limit-v1\x00{scope}\x00{owner_id}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
     if settings.COORDINATION_BACKEND == "redis":
         try:
             allowed = redis_coordination().enforce_rate_limit(

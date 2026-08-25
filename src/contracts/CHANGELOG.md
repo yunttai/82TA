@@ -1,5 +1,32 @@
 # Contract Changelog
 
+## 1.5.0 — 2026-08-25
+
+- Added versioned `FavoriteJourneySearchConditionsV1` while retaining the required,
+  deprecated opaque `defaultConstraints` field for Public 1.x compatibility.
+- Added idempotent `POST /api/v1/me/favorite-journeys/from-places` so two saved places,
+  their favorite and a digest-only receipt are committed or rolled back together.
+  The DB-authoritative immutable ID receipt replays for 24 hours across restart/Redis
+  failure; current `PRECISE_LOCATION` and write quota apply to first creation only.
+- Added optional coordinate/provider-free `RouteSearchRequestSummary` for owner-only
+  history display. It cannot reconstruct a route request.
+- Defined favorite departure as a fresh timezone-aware `DEPART_AT` value created at
+  click time. Absolute timestamps, history consent state, result IDs and ranks are not
+  stored in favorite conditions.
+- Reused the existing favorite JSONB without backfill and added the Service-owned
+  `favorite_creation_idempotency` ledger table. Private Routing contracts, generated
+  Python client, events, codes, ranking and budget semantics are unchanged.
+- Clarified that SavedPlace creation and coordinate-changing PATCH require current
+  `PRECISE_LOCATION` consent, while label/sensitivity updates and deletion remain
+  available after consent withdrawal; documented their canonical Problem responses.
+- Preserved nonempty arbitrary legacy `defaultConstraints` properties in generated
+  clients as `Record<string, unknown>` while keeping typed `searchConditions` closed.
+- Documented canonical `429 RATE_LIMITED` responses for SavedPlace/FavoriteJourney
+  POST, PATCH and DELETE under the shared write quota; GET behavior is unchanged.
+- Synchronized legacy FavoriteJourney CRUD with producer Problem responses: POST now
+  declares 400/401/403/404, PATCH 400/401, and DELETE 401. Success and atomic-create
+  semantics are unchanged.
+
 ## 1.4.0 — 2026-08-24
 
 - Added optional `RouteLeg.waitDuration` and `RouteLeg.travelDuration` to preserve

@@ -10,12 +10,15 @@ from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from identity.artifacts import DataRightsArtifactStore, configured_artifact_store
+from journeys.contracts import CanonicalContracts
+from journeys.favorite_payload import typed_search_conditions
 from journeys.models import (
     AccountAuditEvent,
     AnonymousSession,
     AuthenticatedSession,
     ConsentRecord,
     DataRightsJob,
+    FavoriteCreationIdempotency,
     FavoriteJourney,
     RouteFeedback,
     RouteSearch,
@@ -30,6 +33,7 @@ GUEST_SEARCH_RETENTION = timedelta(days=7)
 MEMBER_SEARCH_RETENTION = timedelta(days=90)
 ACCOUNT_DELETION_GRACE = timedelta(days=30)
 AUDIT_RETENTION = timedelta(days=365)
+_contracts = CanonicalContracts()
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,7 @@ class PurgeReport:
     expired_guest_searches: int = 0
     expired_member_searches: int = 0
     expired_export_artifacts: int = 0
+    expired_favorite_creation_idempotency: int = 0
     hard_deleted_accounts: int = 0
     expired_audit_events: int = 0
 
@@ -50,6 +55,23 @@ def _delete_count(queryset: QuerySet[Any]) -> int:
     count = queryset.count()
     queryset.delete()
     return count
+
+
+def _purge_expired_favorite_creation_receipts(*, now) -> int:
+    receipts = FavoriteCreationIdempotency.objects.filter(expires_at__lte=now)
+    owner_ids = list(
+        receipts.order_by().values_list("user_id", flat=True).distinct()
+    )
+    if owner_ids:
+        # Keep the global mutation order aligned with atomic creation and account
+        # deletion: owner first, then the durable receipt/resource rows.
+        list(
+            ServiceUser.objects.select_for_update()
+            .filter(id__in=owner_ids)
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+    return _delete_count(receipts)
 
 
 @transaction.atomic
@@ -117,6 +139,7 @@ def hard_delete_user_data(
         event_type="DATA_DELETION_COMPLETED",
         safe_metadata={},
     )
+    FavoriteCreationIdempotency.objects.filter(user=user).delete()
     user.delete()
     return True
 
@@ -128,6 +151,9 @@ def purge_service_data(
     artifact_store: DataRightsArtifactStore | None = None,
 ) -> PurgeReport:
     now = now or timezone.now()
+    expired_favorite_creation_idempotency = _purge_expired_favorite_creation_receipts(
+        now=now
+    )
     expired_guest_searches = _delete_count(
         RouteSearch.objects.filter(
             anonymous_session__isnull=False,
@@ -187,6 +213,7 @@ def purge_service_data(
         expired_guest_searches=expired_guest_searches,
         expired_member_searches=expired_member_searches,
         expired_export_artifacts=expired_export_artifacts,
+        expired_favorite_creation_idempotency=expired_favorite_creation_idempotency,
         hard_deleted_accounts=hard_deleted_accounts,
         expired_audit_events=expired_audit_events,
     )
@@ -254,6 +281,12 @@ def export_user_data(*, user_id: UUID | str) -> dict[str, Any]:
                 if favorite.destination_saved_place_id
                 else None,
                 "defaultConstraints": favorite.default_constraints,
+                "searchConditions": typed_search_conditions(
+                    favorite.default_constraints,
+                    validator=lambda candidate: _contracts.validate(
+                        "public", "FavoriteJourneySearchConditionsV1", candidate
+                    ),
+                ),
                 "createdAt": favorite.created_at.isoformat(),
                 "updatedAt": favorite.updated_at.isoformat(),
                 "deletedAt": favorite.deleted_at.isoformat() if favorite.deleted_at else None,

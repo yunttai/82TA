@@ -1330,6 +1330,24 @@ td {
 .signup-consents a { color: var(--forest); font-weight: 800; }
 .consent-help { padding-top: 0.25rem; border-top: 1px solid var(--line); line-height: 1.5; }
 
+.auth-recovery {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.auth-recovery button {
+  width: fit-content;
+  min-height: 44px;
+  border: 1px solid currentColor;
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
 .privacy-grid {
   display: grid;
   gap: 1rem;
@@ -3108,6 +3126,281 @@ footer {
 
   footer {
     display: none;
+  }
+}
+
+/* Owner-bound history and favorite quick-search */
+.history-list li,
+.favorite-list li {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.history-card,
+.favorite-card {
+  display: grid;
+  min-width: 0;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.history-card-link {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.history-card-link:hover {
+  background: color-mix(in srgb, var(--mint) 34%, var(--surface));
+}
+
+.history-card-link:focus-visible,
+.favorite-route-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--app-green) 42%, transparent);
+  outline-offset: -3px;
+}
+
+.history-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+}
+
+.history-card-heading strong {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 0.35rem 0.55rem;
+  color: var(--green-800);
+  background: var(--mint);
+  font-size: 0.72rem;
+}
+
+.history-card-heading time {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.history-card h2,
+.favorite-route-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+}
+
+.history-card h2 span,
+.favorite-route-title > span:nth-child(2) {
+  color: var(--muted);
+}
+
+.history-card h2,
+.favorite-route-title,
+.favorite-card-name,
+.legacy-guidance,
+.favorite-error {
+  overflow-wrap: anywhere;
+}
+
+.favorite-card {
+  gap: 0;
+  padding: 0;
+}
+
+.favorite-route-action {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 0.85rem;
+  border: 0;
+  border-radius: inherit;
+  padding: 1rem;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background-color 160ms ease;
+}
+
+.favorite-route-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--mint) 34%, var(--surface));
+}
+
+.favorite-route-action:disabled {
+  cursor: not-allowed;
+}
+
+.favorite-route-action:disabled .card-primary-action {
+  opacity: 0.55;
+}
+
+.favorite-route-title {
+  width: 100%;
+}
+
+.favorite-card-name {
+  display: grid;
+  min-width: 0;
+  color: var(--green-800);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.condition-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.condition-chips span {
+  border-radius: 999px;
+  padding: 0.42rem 0.58rem;
+  color: var(--green-800);
+  background: var(--surface-muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.card-primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  color: white;
+  background: var(--green-800);
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.card-primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.favorite-card .item-actions {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem !important;
+  margin: 0 1rem 1rem;
+}
+
+.favorite-card .item-actions button {
+  width: 100%;
+  padding-inline: 0.7rem;
+}
+
+.legacy-guidance,
+.favorite-error,
+.privacy-cta p,
+.form-announcement {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.favorite-error {
+  color: #a63427;
+  font-weight: 700;
+}
+
+.favorite-card > .favorite-error {
+  margin: 0 1rem 1rem;
+}
+
+.history-empty {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  padding: 1.1rem;
+  border: 1px dashed var(--app-border);
+  border-radius: 1rem;
+  background: var(--surface-muted);
+}
+
+.history-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.favorite-add-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 1.15rem;
+}
+
+.favorite-create-form {
+  min-width: 0;
+  scroll-margin-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
+.favorite-create-form .field,
+.favorite-create-form .place-combobox,
+.favorite-create-form input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.favorite-create-form .primary-button {
+  width: 100%;
+  min-height: 48px;
+}
+
+.privacy-cta {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem;
+  border-radius: 0.8rem;
+  color: var(--green-800);
+  background: #fff4dc;
+}
+
+.privacy-cta a {
+  min-height: 44px;
+  padding-block: 0.65rem;
+  color: var(--green-800);
+  font-weight: 850;
+}
+
+.form-announcement:empty {
+  display: none;
+}
+
+@media (max-width: 22rem) {
+  .history-card,
+  .favorite-route-action,
+  .favorite-create-form {
+    padding: 0.85rem;
+  }
+
+  .history-card h2,
+  .favorite-route-title {
+    gap: 0.35rem;
+    font-size: 0.9rem;
+  }
+
+  .favorite-card .item-actions {
+    margin: 0 0.85rem 0.85rem;
   }
 }
 

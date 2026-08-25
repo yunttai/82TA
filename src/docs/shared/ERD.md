@@ -15,6 +15,8 @@ erDiagram
     AUTH_USER ||--o| USER_PREFERENCE : configures
     AUTH_USER ||--o{ SAVED_PLACE : owns
     AUTH_USER ||--o{ FAVORITE_JOURNEY : owns
+    AUTH_USER ||--o{ FAVORITE_CREATION_IDEMPOTENCY : owns
+    FAVORITE_JOURNEY ||--|| FAVORITE_CREATION_IDEMPOTENCY : receipts
     AUTH_USER ||--o{ ROUTE_SEARCH : performs
     ANONYMOUS_SESSION ||--o{ ROUTE_SEARCH : performs
     ROUTE_SEARCH ||--o{ ROUTE_SEARCH_RESULT : contains
@@ -68,6 +70,18 @@ erDiagram
         jsonb default_constraints
         string nickname
         datetime created_at
+    }
+    FAVORITE_CREATION_IDEMPOTENCY {
+        uuid id PK
+        uuid user_id FK
+        char64 key_digest UK
+        char64 request_fingerprint
+        int digest_key_version
+        uuid favorite_journey_id FK
+        uuid origin_saved_place_id FK
+        uuid destination_saved_place_id FK
+        datetime created_at
+        datetime expires_at
     }
     ANONYMOUS_SESSION {
         uuid id PK
@@ -136,6 +150,14 @@ erDiagram
         datetime created_at
     }
 ```
+
+`FAVORITE_JOURNEY.default_constraints`의 물리 shape는 Public 1.5에서도 JSONB로
+유지한다. 새 row는 strict `FavoriteJourneySearchConditionsV1`을 저장하고, 기존 opaque
+row는 backfill하거나 기본값을 추측하지 않는다. 임의 장소 즐겨찾기 생성 시 두
+`SAVED_PLACE`, 한 `FAVORITE_JOURNEY`, 한 `FAVORITE_CREATION_IDEMPOTENCY` row는 같은
+Service transaction에서 함께 commit 또는 rollback한다. additive ledger는 owner와
+versioned domain-separated HMAC key digest로 24시간 receipt replay를 보장하며 raw key,
+body, response, label, display name, 좌표를 저장하지 않는다. 기존 table의 column 변경은 없다.
 
 ## 3. Routing DB
 

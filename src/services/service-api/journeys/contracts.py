@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
+from django.views.decorators.debug import sensitive_variables
 from jsonschema import Draft202012Validator, FormatChecker
+import yaml
 
 
 SRC_ROOT = Path(__file__).resolve().parents[3]
@@ -73,6 +74,7 @@ class CanonicalContracts:
         schema = document["components"]["schemas"][schema_name]
         return self._dereference(copy.deepcopy(schema), source)
 
+    @sensitive_variables("value")
     def validate(self, api: str, schema_name: str, value: Any) -> list[Any]:
         validator = Draft202012Validator(
             self.schema(api, schema_name), format_checker=FormatChecker()

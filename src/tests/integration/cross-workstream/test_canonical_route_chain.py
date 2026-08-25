@@ -25,6 +25,7 @@ from _canonical_route_chain import (  # noqa: E402
     REPOSITORY_ROOT,
     build_chain,
     canonical_application,
+    public_projection_for_fixture_comparison,
 )
 from journeys.gateway import PUBLIC_ROUTING_PROBLEM_ALLOWLIST  # noqa: E402
 from routing_api.application import _semantic_response_is_valid  # noqa: E402
@@ -70,7 +71,25 @@ class CanonicalRouteChainTests(unittest.TestCase):
         self.assertEqual(self.actual_public_request, self.public_request)
         self.assertEqual(self.actual_private_request, self.private_request)
         self.assertEqual(self.actual_private_response, self.private_response)
-        self.assertEqual(self.actual_public_response, self.public_response)
+        self.assertEqual(
+            public_projection_for_fixture_comparison(self.actual_public_response),
+            public_projection_for_fixture_comparison(self.public_response),
+        )
+        for route in (
+            self.actual_public_response["baseline"],
+            *self.actual_public_response["recommendations"].values(),
+        ):
+            if route is None:
+                continue
+            self.assertEqual(
+                route["legs"][0]["from"]["name"],
+                self.public_request["origin"]["displayName"],
+            )
+            self.assertEqual(
+                route["legs"][-1]["to"]["name"],
+                self.public_request["destination"]["displayName"],
+            )
+        self.assertNotIn("Sanitized R1", json.dumps(self.actual_public_response))
         self.assertNotEqual(
             self.public_response["searchId"],
             self.private_response["requestId"],
@@ -198,14 +217,14 @@ class CanonicalRouteChainTests(unittest.TestCase):
             versions["contextVersion"],
             versions["contractVersion"],
         }
-        self.assertEqual(public_metadata_versions, {"1.4.0"})
+        self.assertEqual(public_metadata_versions, {"1.5.0"})
         private_metadata_versions = {
             private_spec["info"]["version"],
             validator.contract_version,
             canonical_application().version()["contractVersion"],
         }
         self.assertEqual(private_metadata_versions, {"1.2.0"})
-        self.assertEqual(versions["databaseContractVersion"], "1.2.0")
+        self.assertEqual(versions["databaseContractVersion"], "1.3.0")
         self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
         self.assertEqual(self.private_request["contractVersion"], "1.0")
         self.assertEqual(self.private_response["contractVersion"], "1.0")

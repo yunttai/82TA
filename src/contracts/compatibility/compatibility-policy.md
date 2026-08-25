@@ -94,6 +94,44 @@ major URL 또는 compatibility adapter가 필요하다.
 - DBML, migration, event, code registry와 optimize request wire family `1.0`은
   변경하지 않는다.
 
+## 1.5.0 compatibility decision
+
+- 분류: backward-compatible Public API minor. 기존 endpoint와 required
+  `FavoriteJourney.defaultConstraints`를 유지하면서 optional typed
+  `searchConditions`, optional `requestSummary`, 신규 atomic create endpoint를
+  추가한다.
+- 기존 opaque favorite row는 그대로 유효하다. Service는 legacy JSON을 typed
+  조건으로 추측하지 않고 `searchConditions`를 null/absent로 반환하며 새 consumer는
+  quick search를 비활성화한다. opaque field는 arbitrary JSON property를 허용하고
+  generated TypeScript에서는 `Record<string, unknown>`으로 보존한다. 제거·narrowing은
+  Public major에서만 한다.
+- `PublicRouteSearchPreferences` 추출은 기존 inline schema와 field·required·enum·범위가
+  동일한 구조적 refactor이며 기존 route-search wire 의미를 바꾸지 않는다.
+- 기존 `favorite_journey.default_constraints` JSONB가 새 versioned value를 수용하므로
+  DDL과 backfill이 없다. old Service binary는 이를 opaque object로 round-trip할 수 있다.
+- `POST /api/v1/me/favorite-journeys/from-places`는 additive endpoint다. 두 saved
+  place, favorite, digest-only ledger receipt를 한 transaction으로 만들며 24시간
+  DB-authoritative owner-scoped idempotency를 제공한다. 1.5는 미출시 상태이므로 mutable
+  object 묶음 draft를 immutable ID receipt로 좁힌 것은 1.4 consumer를 깨지 않는다.
+  기존 collection CRUD는 유지한다.
+- additive Service DB ledger table은 database contract 1.3.0 expand다. old Service는
+  table을 무시할 수 있고 기존 table/column에는 backfill이나 narrowing이 없다. endpoint
+  rollback은 unexpired receipt drain/reader overlap 뒤 table contract를 수행한다.
+- SavedPlace POST의 current `PRECISE_LOCATION` gate와 표준 400/401/403 응답,
+  coordinate-changing PATCH의 400/401 응답은 위치 보존 정책과 이미 등록된 Problem을
+  명시한 additive response-set correction이다. label/`isSensitive`-only PATCH와 DELETE는
+  위치 동의 철회 뒤에도 가능하며 기존 USER·owner·CSRF 검증은 바뀌지 않는다.
+- SavedPlace/FavoriteJourney POST·PATCH·DELETE의 `429 RATE_LIMITED`는 producer의 공유
+  `favorite-location-write` quota를 문서화한 additive response다. GET에는 적용하지 않는다.
+- Legacy FavoriteJourney POST의 400/401/403/404, PATCH의 400/401, DELETE의 401은
+  producer가 이미 반환하는 canonical Problem status를 명시한 additive response-set
+  correction이다. 성공 body, owner/consent 의미와 atomic from-places endpoint는 바뀌지 않는다.
+- `requestSummary`는 optional coordinate/provider-free history display data다. 필드가
+  없는 old response와 legacy row는 계속 유효하며 consumer는 summary를 route request로
+  사용하지 않는다.
+- Private Routing OpenAPI, generated Python client, Routing DB, event, error-code registry,
+  route/ranking/budget semantics은 변경하지 않는다.
+
 ## `rank-0.2.0` / `strategy-2.0.0` policy decision
 
 - 분류: wire-compatible executable-policy revision. Existing request/response keys,

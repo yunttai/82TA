@@ -47,11 +47,14 @@ class ProductionSettingsTests(SimpleTestCase):
         "KAKAO_REST_API_KEY",
         "SERVICE_RATE_LIMIT_PER_MINUTE",
         "SERVICE_GUEST_SESSION_RATE_LIMIT_PER_MINUTE",
+        "SERVICE_FAVORITE_WRITE_RATE_LIMIT_PER_MINUTE",
         "SERVICE_PLACE_RATE_LIMIT_PER_MINUTE",
         "SERVICE_RATE_LIMIT_CACHE_TTL_SECONDS",
         "SERVICE_IDEMPOTENCY_CACHE_TTL_SECONDS",
         "SERVICE_IDEMPOTENCY_LEASE_SECONDS",
         "SERVICE_REDIS_KEY_DERIVATION_SECRET",
+        "SERVICE_FAVORITE_IDEMPOTENCY_DIGEST_KEY_VERSION",
+        "SERVICE_FAVORITE_IDEMPOTENCY_RETENTION_SECONDS",
         "SERVICE_ROUTING_MAX_RESPONSE_BYTES",
         "SERVICE_KAKAO_LOCAL_MAX_RESPONSE_BYTES",
     }
@@ -216,6 +219,22 @@ class ProductionSettingsTests(SimpleTestCase):
         self.assertNotEqual(kakao_limit.returncode, 0)
         self.assertIn("KAKAO_LOCAL_MAX_RESPONSE_BYTES", kakao_limit.stderr)
 
+    def test_favorite_idempotency_version_and_retention_are_contract_locked(self) -> None:
+        common = {"DATABASE_URL": "postgresql://service:secret@db.internal/service"}
+        rotated_without_key_ring = self._import_settings(
+            **common,
+            SERVICE_FAVORITE_IDEMPOTENCY_DIGEST_KEY_VERSION="2",
+        )
+        shortened = self._import_settings(
+            **common,
+            SERVICE_FAVORITE_IDEMPOTENCY_RETENTION_SECONDS="3600",
+        )
+
+        self.assertNotEqual(rotated_without_key_ring.returncode, 0)
+        self.assertIn("must remain 1 until key-ring lookup is implemented", rotated_without_key_ring.stderr)
+        self.assertNotEqual(shortened.returncode, 0)
+        self.assertIn("must remain 86400", shortened.stderr)
+
     def test_production_requires_kakao_local_capability_key(self) -> None:
         result = self._import_settings(
             DATABASE_URL="postgresql://service:secret@db.internal/service",
@@ -277,6 +296,9 @@ class ProductionSettingsTests(SimpleTestCase):
     def test_production_rejects_disabled_rate_limits_and_short_coordination_ttls(self) -> None:
         common = {"DATABASE_URL": "postgresql://service:secret@db.internal/service"}
         disabled = self._import_settings(**common, SERVICE_RATE_LIMIT_PER_MINUTE="0")
+        disabled_favorite = self._import_settings(
+            **common, SERVICE_FAVORITE_WRITE_RATE_LIMIT_PER_MINUTE="0"
+        )
         short_rate = self._import_settings(**common, SERVICE_RATE_LIMIT_CACHE_TTL_SECONDS="59")
         short_idempotency = self._import_settings(
             **common,
@@ -286,6 +308,8 @@ class ProductionSettingsTests(SimpleTestCase):
 
         self.assertNotEqual(disabled.returncode, 0)
         self.assertIn("rate limits must be positive", disabled.stderr)
+        self.assertNotEqual(disabled_favorite.returncode, 0)
+        self.assertIn("rate limits must be positive", disabled_favorite.stderr)
         self.assertNotEqual(short_rate.returncode, 0)
         self.assertIn("must cover the one-minute rate window", short_rate.stderr)
         self.assertNotEqual(short_idempotency.returncode, 0)

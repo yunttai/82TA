@@ -103,6 +103,12 @@ class PublicApi11Tests(TestCase):
 
     def test_saved_places_and_favorites_are_owner_bound_and_soft_deleted(self) -> None:
         self.login()
+        ConsentRepository.record(
+            user_id=self.user.id,
+            consent_type="PRECISE_LOCATION",
+            document_version=settings.CONSENT_DOCUMENT_VERSIONS["PRECISE_LOCATION"],
+            accepted=True,
+        )
         place_payload = {
             "label": "집",
             "place": {
@@ -154,6 +160,7 @@ class PublicApi11Tests(TestCase):
         )
         self.assertEqual(self.client.delete(f"/api/v1/me/saved-places/{origin['id']}").status_code, 204)
         self.assertIsNotNone(SavedPlace.objects.get(id=origin["id"]).deleted_at)
+        self.assertEqual(self.client.get("/api/v1/me/favorite-journeys").json(), [])
 
     def test_consent_and_data_rights_jobs_are_owner_bound(self) -> None:
         self.login()

@@ -766,22 +766,23 @@ Replay bundle에는 다음을 고정한다.
 | 12 | `GET /api/v1/me/preferences` | `getPreferences` | USER session | 사용자 기본 경로 선호 조회 | 200, 401 |
 | 13 | `PUT /api/v1/me/preferences` | `updatePreferences` | USER session | 선호 전체 갱신, optional `If-Match` 낙관적 동시성 | 200, 409 |
 | 14 | `GET /api/v1/me/saved-places` | `listSavedPlaces` | USER session | 저장 장소 목록 | 200 |
-| 15 | `POST /api/v1/me/saved-places` | `createSavedPlace` | USER session | 민감 가능 장소 저장 | 201 |
-| 16 | `PATCH /api/v1/me/saved-places/{savedPlaceId}` | `updateSavedPlace` | USER session | 저장 장소 일부 갱신 | 200, 403, 404 |
-| 17 | `DELETE /api/v1/me/saved-places/{savedPlaceId}` | `deleteSavedPlace` | USER session | 저장 장소 삭제 | 204, 403, 404 |
+| 15 | `POST /api/v1/me/saved-places` | `createSavedPlace` | USER session + 현재 위치 동의 | 정확한 장소 저장 | 201, 400, 401, 403, 429 |
+| 16 | `PATCH /api/v1/me/saved-places/{savedPlaceId}` | `updateSavedPlace` | USER session | 저장 장소 일부 갱신; 좌표 변경만 현재 위치 동의 | 200, 400, 401, 403, 404, 429 |
+| 17 | `DELETE /api/v1/me/saved-places/{savedPlaceId}` | `deleteSavedPlace` | USER session | 위치 동의 철회 뒤에도 저장 장소 삭제 | 204, 401, 403, 404, 429 |
 | 18 | `GET /api/v1/me/favorite-journeys` | `listFavoriteJourneys` | USER session | 즐겨찾는 여정 목록 | 200 |
-| 19 | `POST /api/v1/me/favorite-journeys` | `createFavoriteJourney` | USER session | 출발/도착 저장 장소와 기본 제약을 즐겨찾기 | 201 |
-| 20 | `PATCH /api/v1/me/favorite-journeys/{favoriteJourneyId}` | `updateFavoriteJourney` | USER session | 즐겨찾는 여정 일부 갱신 | 200, 403, 404 |
-| 21 | `DELETE /api/v1/me/favorite-journeys/{favoriteJourneyId}` | `deleteFavoriteJourney` | USER session | 즐겨찾는 여정 삭제 | 204, 403, 404 |
-| 22 | `GET /api/v1/me/consents` | `listConsents` | USER session | privacy·history·location·analytics·feedback 동의 조회 | 200, 401 |
-| 23 | `PUT /api/v1/me/consents/{consentType}` | `recordConsent` | USER session | 동의/철회 및 문서 버전 기록 | 200, 400, 401 |
-| 24 | `POST /api/v1/me/data-exports` | `createDataExport` | USER session | 개인정보 export 비동기 job 생성 | 202, 401, 409 |
-| 25 | `GET /api/v1/me/data-exports/{jobId}` | `getDataExport` | USER session | export job 상태 조회 | 200, 403, 404 |
-| 26 | `POST /api/v1/me/data-deletions` | `createDataDeletion` | USER session | 개인정보 삭제 비동기 job 생성 | 202, 401, 409 |
-| 27 | `GET /api/v1/me/data-deletions/{jobId}` | `getDataDeletion` | USER session | 삭제 job 상태 조회 | 200, 403, 404 |
-| 28 | `DELETE /api/v1/me/data` | `deleteUserData` | USER session | deprecated 삭제 compatibility alias | 202, 401 |
-| 29 | `GET /api/v1/support/capabilities` | `getPublicCapabilities` | 공개 | 지원 지역·기능·Bus coverage 조회 | 200 |
-| 30 | `GET /api/v1/health` | `publicHealth` | 공개 | 공개 서비스 health | 200 |
+| 19 | `POST /api/v1/me/favorite-journeys` | `createFavoriteJourney` | USER session | 출발/도착 저장 장소와 기본 제약을 즐겨찾기 | 201, 400, 401, 403, 404, 429 |
+| 20 | `POST /api/v1/me/favorite-journeys/from-places` | `createFavoriteJourneyFromPlaces` | USER session + 첫 생성 위치 동의 | 원자 생성과 24시간 불변 receipt replay | 201, 400, 401, 403, 409, 429 |
+| 21 | `PATCH /api/v1/me/favorite-journeys/{favoriteJourneyId}` | `updateFavoriteJourney` | USER session | 즐겨찾는 여정 일부 갱신 | 200, 400, 401, 403, 404, 429 |
+| 22 | `DELETE /api/v1/me/favorite-journeys/{favoriteJourneyId}` | `deleteFavoriteJourney` | USER session | 즐겨찾는 여정 삭제 | 204, 401, 403, 404, 429 |
+| 23 | `GET /api/v1/me/consents` | `listConsents` | USER session | privacy·history·location·analytics·feedback 동의 조회 | 200, 401 |
+| 24 | `PUT /api/v1/me/consents/{consentType}` | `recordConsent` | USER session | 동의/철회 및 문서 버전 기록 | 200, 400, 401 |
+| 25 | `POST /api/v1/me/data-exports` | `createDataExport` | USER session | 개인정보 export 비동기 job 생성 | 202, 401, 409 |
+| 26 | `GET /api/v1/me/data-exports/{jobId}` | `getDataExport` | USER session | export job 상태 조회 | 200, 403, 404 |
+| 27 | `POST /api/v1/me/data-deletions` | `createDataDeletion` | USER session | 개인정보 삭제 비동기 job 생성 | 202, 401, 409 |
+| 28 | `GET /api/v1/me/data-deletions/{jobId}` | `getDataDeletion` | USER session | 삭제 job 상태 조회 | 200, 403, 404 |
+| 29 | `DELETE /api/v1/me/data` | `deleteUserData` | USER session | deprecated 삭제 compatibility alias | 202, 401 |
+| 30 | `GET /api/v1/support/capabilities` | `getPublicCapabilities` | 공개 | 지원 지역·기능·Bus coverage 조회 | 200 |
+| 31 | `GET /api/v1/health` | `publicHealth` | 공개 | 공개 서비스 health | 200 |
 
 ### 4.3 핵심 Public API: `POST /api/v1/route-searches`
 

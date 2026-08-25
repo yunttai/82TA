@@ -10,6 +10,9 @@
 | Reason/warning | registry | label renderer | 1:1·generic fallback |
 | Service DB | DBML/migration | ORM/query | null·index·retention |
 | Privacy | request/log | log sink | exact coordinate·token 없음 |
+| History | accepted route search | history list/card | current consent auto-save exactly once; coordinate-free summary; no replay |
+| Favorite create | atomic from-places API | favorite form/list | two places+favorite all-or-nothing; consent/idempotency/owner |
+| Favorite quick search | typed favorite+saved places | route-search POST/result navigation | click-time request exactly once; mount/back/reload do not submit |
 
 ## Fixture Matrix
 
@@ -60,6 +63,8 @@
 | Preference | GET ETag, PUT If-Match, saved response ETag, version conflict/reload/reconfirm |
 | Consent | each canonical type accepted/declined, document version, consent-required recovery |
 | Data rights | export/delete PENDING, RUNNING, COMPLETE, FAILED, conflict, not-found, expired download URL |
+| History | logged out, consent off, loading, empty, summary present/null, expired, retryable error |
+| Favorite | empty, create consent-required/submitting/conflict/success, typed ready, legacy invalid, deleted place, quick-search loading/error |
 
 ## Accessibility Matrix
 
@@ -72,15 +77,20 @@
 | Contrast | WCAG 2.2 AA; selection/error/mode not color-only; forced-colors usable |
 | Motion | reduced-motion removes nonessential pan, shimmer, and transitions |
 | Device assistive tech | VoiceOver smoke on iOS; TalkBack smoke on Android |
+| Favorite actions | `바로 길찾기`와 추가/삭제가 44×44 이상; submit 중 해당 카드만 disabled; status 중복 announce 없음 |
+| iPhone keyboard | favorite 장소 combobox·조건 form의 오류/primary action이 software keyboard와 safe area에 가려지지 않음 |
 
 ## Contract-gap Gate
 
-Public 1.3.0 resolves email registration/login with nickname and consent capture, guest/session inspection and revoke, saved-place/favorite CRUD, preference ETag conflict, consent CRUD, and asynchronous export/deletion jobs. The following remain `BLOCKED` rather than being simulated with local API shapes: account recovery/email verification and guest merge, individual history delete/retention setting, consent-document distribution, typed favorite constraints/privacy preferences/feedback bus outcome/transit details, canonical baseline saved-time, public degraded/failure copy registries, and a server-owned freshness threshold.
+Public 1.5.0 resolves email registration/login with nickname and consent capture, guest/session inspection and revoke, consent-driven automatic history plus display-only request summary, saved-place/favorite CRUD, typed favorite conditions, atomic favorite creation from arbitrary places, preference ETag conflict, consent CRUD, and asynchronous export/deletion jobs. The following remain `BLOCKED` rather than being simulated with local API shapes: account recovery/email verification and guest merge, individual history delete/retention setting, consent-document distribution, typed privacy preferences/feedback bus outcome/transit details, canonical baseline saved-time, public degraded/failure copy registries, and a server-owned freshness threshold.
 
 ## Security
 
 - IDOR on search/history/favorite
 - CSRF state changes
+- USER/current consent enforcement for history and exact-location favorite creation
+- atomic rollback and owner-scoped idempotency conflict for favorite from-places
+- deleted/other-owner saved-place quick search fail closed
 - XSS place/provider strings
 - guest token guess/reuse
 - login brute force/rate limit

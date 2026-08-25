@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import hashlib
 import hmac
 import json
@@ -176,6 +177,41 @@ def canonical_public_response(
     if errors:
         raise RuntimeError(f"canonical Service projection is invalid: {errors}")
     return response
+
+
+def public_projection_for_fixture_comparison(
+    response: dict[str, Any],
+) -> dict[str, Any]:
+    """Remove request-derived presentation fields from a Public fixture comparison.
+
+    The canonical response example deliberately uses sanitized placeholder labels,
+    while the live Service projection replaces those placeholders with the user's
+    Public request labels and removes internal-looking transit directions. Public
+    1.5 also adds a persisted, privacy-safe request summary. Those additive or
+    request-derived fields are asserted separately by the integration tests; the
+    remaining response must retain exact semantic parity with the canonical fixture.
+    """
+
+    comparable = copy.deepcopy(response)
+    comparable.pop("requestSummary", None)
+    routes = [comparable.get("baseline")]
+    recommendations = comparable.get("recommendations")
+    if isinstance(recommendations, dict):
+        routes.extend(recommendations.values())
+    for route in routes:
+        if not isinstance(route, dict):
+            continue
+        for leg in route.get("legs", []):
+            if not isinstance(leg, dict):
+                continue
+            for endpoint in ("from", "to"):
+                stop = leg.get(endpoint)
+                if isinstance(stop, dict):
+                    stop.pop("name", None)
+            transit = leg.get("transit")
+            if isinstance(transit, dict):
+                transit.pop("direction", None)
+    return comparable
 
 
 def build_chain() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:

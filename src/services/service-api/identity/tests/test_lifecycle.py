@@ -5,6 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.apps import apps
 from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
@@ -21,6 +22,7 @@ from journeys.models import (
     AccountAuditEvent,
     AnonymousSession,
     ConsentRecord,
+    FavoriteCreationIdempotency,
     FavoriteJourney,
     RouteFeedback,
     RouteSearch,
@@ -65,6 +67,7 @@ class ServiceDataModelTests(TestCase):
             "user_preference",
             "saved_place",
             "favorite_journey",
+            "favorite_creation_idempotency",
             "anonymous_session",
             "authenticated_session",
             "route_search",
@@ -155,7 +158,7 @@ class ServiceDataModelTests(TestCase):
         ConsentRecord.objects.create(
             user=self.user,
             consent_type="SEARCH_HISTORY",
-            document_version="1.1",
+            document_version=settings.CONSENT_DOCUMENT_VERSIONS["SEARCH_HISTORY"],
             accepted=True,
             recorded_at=now,
         )
@@ -168,6 +171,68 @@ class ServiceDataModelTests(TestCase):
         )
         self.assertTrue(search.save_to_history)
         self.assertEqual(search.retention_until, now + timedelta(days=90))
+
+    def test_favorite_creation_receipt_enforces_dbml_constraints(self) -> None:
+        origin = SavedPlace.objects.create(
+            user=self.user,
+            label="집",
+            display_name="집",
+            coordinate={"lon": 127.0, "lat": 37.0},
+        )
+        destination = SavedPlace.objects.create(
+            user=self.user,
+            label="회사",
+            display_name="회사",
+            coordinate={"lon": 127.1, "lat": 37.1},
+        )
+        favorite = FavoriteJourney.objects.create(
+            user=self.user,
+            origin_saved_place=origin,
+            destination_saved_place=destination,
+            nickname="출근",
+            default_constraints={},
+        )
+        created_at = timezone.now()
+        values = {
+            "user": self.user,
+            "key_digest": "1" * 64,
+            "request_fingerprint": "2" * 64,
+            "digest_key_version": 1,
+            "favorite_journey": favorite,
+            "origin_saved_place": origin,
+            "destination_saved_place": destination,
+            "created_at": created_at,
+            "expires_at": created_at + timedelta(hours=24),
+        }
+        FavoriteCreationIdempotency.objects.create(**values)
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            FavoriteCreationIdempotency.objects.create(**values)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            FavoriteCreationIdempotency.objects.create(
+                **{
+                    **values,
+                    "key_digest": "3" * 64,
+                    "origin_saved_place": origin,
+                    "destination_saved_place": origin,
+                }
+            )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            FavoriteCreationIdempotency.objects.create(
+                **{
+                    **values,
+                    "key_digest": "4" * 64,
+                    "digest_key_version": 0,
+                }
+            )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            FavoriteCreationIdempotency.objects.create(
+                **{
+                    **values,
+                    "key_digest": "5" * 64,
+                    "expires_at": created_at + timedelta(hours=23),
+                }
+            )
 
 
 class DataLifecycleTests(TestCase):
@@ -233,7 +298,35 @@ class DataLifecycleTests(TestCase):
             recorded_at=now,
         )
 
+    def make_favorite_creation_receipt(self, *, created_at=None):
+        created_at = created_at or timezone.now()
+        destination = SavedPlace.objects.create(
+            user=self.user,
+            label="회사",
+            display_name="다른 민감 장소",
+            coordinate={"lon": 127.2, "lat": 37.3},
+        )
+        favorite = FavoriteJourney.objects.create(
+            user=self.user,
+            origin_saved_place=self.place,
+            destination_saved_place=destination,
+            default_constraints={},
+            nickname="원자 생성 통근",
+        )
+        return FavoriteCreationIdempotency.objects.create(
+            user=self.user,
+            key_digest="a" * 64,
+            request_fingerprint="b" * 64,
+            digest_key_version=1,
+            favorite_journey=favorite,
+            origin_saved_place=self.place,
+            destination_saved_place=destination,
+            created_at=created_at,
+            expires_at=created_at + timedelta(hours=24),
+        )
+
     def test_export_contains_subject_data_but_no_auth_or_routing_secrets(self) -> None:
+        self.make_favorite_creation_receipt()
         exported = export_user_data(user_id=self.user.id)
         encoded = json.dumps(exported, ensure_ascii=False)
         self.assertIn("민감 장소", encoded)
@@ -241,6 +334,9 @@ class DataLifecycleTests(TestCase):
         self.assertNotIn("password_hash", encoded)
         self.assertNotIn("token_hash", encoded)
         self.assertNotIn("opaque-routing-request", encoded)
+        self.assertNotIn("a" * 64, encoded)
+        self.assertNotIn("request_fingerprint", encoded)
+        self.assertNotIn("favorite_creation_idempotency", encoded)
         self.assertEqual(exported["routeSearches"][0]["results"], [{"routeId": "opaque-route"}])
 
     def test_deletion_schedule_is_idempotent_and_soft_deletes_places(self) -> None:
@@ -259,6 +355,7 @@ class DataLifecycleTests(TestCase):
 
     def test_retention_hard_deletes_account_and_preserves_safe_audit(self) -> None:
         now = timezone.now()
+        self.make_favorite_creation_receipt(created_at=now)
         schedule_user_deletion(
             user_id=self.user.id,
             requested_at=now - ACCOUNT_DELETION_GRACE - timedelta(seconds=1),
@@ -267,9 +364,22 @@ class DataLifecycleTests(TestCase):
         self.assertEqual(report.hard_deleted_accounts, 1)
         self.assertFalse(ServiceUser.objects.filter(id=self.user.id).exists())
         self.assertFalse(RouteSearch.objects.filter(id=self.search.id).exists())
+        self.assertFalse(FavoriteCreationIdempotency.objects.filter(user_id=self.user.id).exists())
         completion = AccountAuditEvent.objects.get(event_type="DATA_DELETION_COMPLETED")
         self.assertIsNone(completion.user_id)
         self.assertEqual(completion.safe_metadata, {})
+
+    def test_expired_favorite_creation_receipts_are_purged(self) -> None:
+        now = timezone.now()
+        receipt = self.make_favorite_creation_receipt(
+            created_at=now - timedelta(hours=25)
+        )
+
+        report = purge_service_data(now=now)
+
+        self.assertEqual(report.expired_favorite_creation_idempotency, 1)
+        self.assertFalse(FavoriteCreationIdempotency.objects.filter(id=receipt.id).exists())
+        self.assertTrue(FavoriteJourney.objects.filter(id=receipt.favorite_journey_id).exists())
 
     def test_expired_anonymous_session_cascades_guest_search(self) -> None:
         now = timezone.now()

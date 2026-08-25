@@ -4,6 +4,7 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from journeys.models import FavoriteJourney, SavedPlace, ServiceUser
@@ -27,15 +28,26 @@ class SavedPlaceRepository:
         return place
 
     @staticmethod
+    @transaction.atomic
     def soft_delete(*, user_id: UUID | str, place_id: UUID | str) -> bool:
         now = timezone.now()
-        return bool(
-            SavedPlace.objects.filter(
+        place = (
+            SavedPlace.objects.select_for_update().filter(
                 id=place_id,
                 user_id=user_id,
                 deleted_at__isnull=True,
-            ).update(deleted_at=now, updated_at=now)
+            ).first()
         )
+        if place is None:
+            return False
+        place.deleted_at = now
+        place.save(update_fields=["deleted_at", "updated_at"])
+        FavoriteJourney.objects.filter(
+            Q(origin_saved_place=place) | Q(destination_saved_place=place),
+            user_id=user_id,
+            deleted_at__isnull=True,
+        ).update(deleted_at=now, updated_at=now)
+        return True
 
     @staticmethod
     def update(
@@ -59,11 +71,26 @@ class SavedPlaceRepository:
 class FavoriteRepository:
     @staticmethod
     def list_owned(*, user_id: UUID | str):
-        return FavoriteJourney.objects.filter(user_id=user_id, deleted_at__isnull=True).order_by("created_at")
+        return FavoriteJourney.objects.filter(
+            user_id=user_id,
+            deleted_at__isnull=True,
+            origin_saved_place__isnull=False,
+            destination_saved_place__isnull=False,
+            origin_saved_place__deleted_at__isnull=True,
+            destination_saved_place__deleted_at__isnull=True,
+        ).order_by("created_at")
 
     @staticmethod
     def get_owned(*, user_id: UUID | str, favorite_id: UUID | str) -> FavoriteJourney:
-        return FavoriteJourney.objects.get(id=favorite_id, user_id=user_id, deleted_at__isnull=True)
+        return FavoriteJourney.objects.get(
+            id=favorite_id,
+            user_id=user_id,
+            deleted_at__isnull=True,
+            origin_saved_place__isnull=False,
+            destination_saved_place__isnull=False,
+            origin_saved_place__deleted_at__isnull=True,
+            destination_saved_place__deleted_at__isnull=True,
+        )
 
     @staticmethod
     @transaction.atomic
@@ -76,7 +103,9 @@ class FavoriteRepository:
         default_constraints: dict,
     ) -> FavoriteJourney:
         user = ServiceUser.objects.get(id=user_id, is_active=True, deleted_at__isnull=True)
-        place_ids = [place_id for place_id in (origin_saved_place_id, destination_saved_place_id) if place_id]
+        if origin_saved_place_id is None or destination_saved_place_id is None:
+            raise ValidationError("Favorite journey requires active origin and destination places.")
+        place_ids = [origin_saved_place_id, destination_saved_place_id]
         owned = set(
             SavedPlace.objects.filter(
                 user=user,
@@ -125,6 +154,8 @@ class FavoriteRepository:
         favorite = FavoriteRepository.get_owned(user_id=user_id, favorite_id=favorite_id)
         for name, value in changes.items():
             setattr(favorite, name, value)
+        if favorite.origin_saved_place_id is None or favorite.destination_saved_place_id is None:
+            raise ValidationError("Favorite journey requires active origin and destination places.")
         favorite.full_clean()
         favorite.save(update_fields=[*sorted(changes), "updated_at"])
         return favorite

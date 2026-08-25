@@ -30,6 +30,8 @@ const commercialCanonicalResponse = {
 
 async function mockPublicApi(page: Page) {
   let authenticated = false;
+  let consentDocumentVersion = "e2e-privacy";
+  let searchHistoryAccepted = false;
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -78,7 +80,16 @@ async function mockPublicApi(page: Page) {
     }
     if ((path === "/api/v1/auth/register" || path === "/api/v1/auth/login") && request.method() === "POST") {
       authenticated = true;
+      if (path.endsWith("register")) {
+        const registration = request.postDataJSON() as { documentVersion?: string; optionalConsents?: { SEARCH_HISTORY?: boolean } };
+        consentDocumentVersion = registration.documentVersion ?? consentDocumentVersion;
+        searchHistoryAccepted = registration.optionalConsents?.SEARCH_HISTORY === true;
+      }
       await route.fulfill({ status: path.endsWith("register") ? 201 : 200, json: { subjectType: "USER", authenticated: true, expiresAt: "2099-08-24T07:40:00+09:00", email: "user@example.com", nickname: "팔이타" } });
+      return;
+    }
+    if (path === "/api/v1/me/consents" && request.method() === "GET" && authenticated) {
+      await route.fulfill({ json: { items: [{ consentType: "SEARCH_HISTORY", documentVersion: consentDocumentVersion, accepted: searchHistoryAccepted, recordedAt: "2026-08-25T00:00:00+09:00" }] } });
       return;
     }
     if (path === "/api/v1/route-searches" && request.method() === "GET" && authenticated) {
@@ -126,7 +137,7 @@ test("guest can register and then open authenticated history", async ({ page }) 
   await page.getByLabel("[필수] 개인정보 처리와 데이터 권리 안내 동의").check();
   await page.getByRole("button", { name: "계정 만들기" }).click();
   await expect(page).toHaveURL(/\/history$/);
-  await expect(page.getByText("아직 표시할 항목이 없습니다.")).toBeVisible();
+  await expect(page.getByText("검색 기록 저장이 꺼져 있어요")).toBeVisible();
 });
 
 test("iPhone account actions keep comfortable vertical spacing", async ({ page }) => {
@@ -195,8 +206,8 @@ test("320px layout has no horizontal page overflow and no serious accessibility 
   await bottomNav.getByRole("link", { name: "길찾기", exact: true }).click();
   await expect(page.getByText("세부 조건", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("checkbox", { name: "대중교통 사이 짧은 택시 이동 허용" })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "검색 기록에 저장" })).toBeVisible();
-  await expect(page.getByRole("checkbox")).toHaveCount(2);
+  await expect(page.getByRole("checkbox", { name: "검색 기록에 저장" })).toHaveCount(0);
+  await expect(page.getByRole("checkbox")).toHaveCount(1);
   const searchSizes = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
   expect(searchSizes.content).toBeLessThanOrEqual(searchSizes.viewport);
 
@@ -253,7 +264,9 @@ test("offline state is explicit and does not pretend API data is available", asy
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
   const cachedPaths = await page.evaluate(async () => {
-    const requests = await (await caches.open("82ta-shell-v5")).keys();
+    const shellCacheName = (await caches.keys()).find((name) => name.startsWith("82ta-shell-"));
+    if (shellCacheName === undefined) return [];
+    const requests = await (await caches.open(shellCacheName)).keys();
     return requests.map((request) => new URL(request.url).pathname);
   });
   expect(cachedPaths).toContain("/");

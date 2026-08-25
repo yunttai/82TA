@@ -48,15 +48,41 @@ Table saved_place {
 }
 
 Table favorite_journey {
+  Note: 'default_constraints remains JSONB for Public 1.x overlap. Public 1.5 writes a validated FavoriteJourneySearchConditionsV1 value; legacy opaque rows are not inferred and remain unavailable for quick search until re-saved.'
   id uuid [pk]
   user_id uuid [not null, ref: > auth_user.id]
   origin_saved_place_id uuid [ref: > saved_place.id]
   destination_saved_place_id uuid [ref: > saved_place.id]
-  default_constraints jsonb [not null]
+  default_constraints jsonb [not null, note: 'Versioned typed search conditions or legacy opaque compatibility object; no result, rank, absolute departure time, or save-to-history state.']
   nickname varchar [not null]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
   deleted_at timestamptz
+}
+
+Table favorite_creation_idempotency {
+  Note: 'DB-authoritative 24-hour receipt ledger for atomic favorite-from-places creation. Stores only versioned HMAC digests and immutable resource IDs; raw keys, request/response JSON, labels, display names and coordinates are forbidden. Resource hard delete is protected while the receipt is active; account deletion removes ledger rows first.'
+  id uuid [pk]
+  user_id uuid [not null, ref: > auth_user.id]
+  key_digest char(64) [not null, note: 'Hex HMAC digest with favorite-create-key domain separation; never the raw Idempotency-Key.']
+  request_fingerprint char(64) [not null, note: 'Hex HMAC of the canonical request with a distinct favorite-create-body domain; not a plain hash.']
+  digest_key_version integer [not null, note: 'Positive derivation-key version. Every version used by an unexpired row remains available for replay lookup.']
+  favorite_journey_id uuid [not null, ref: > favorite_journey.id]
+  origin_saved_place_id uuid [not null, ref: > saved_place.id]
+  destination_saved_place_id uuid [not null, ref: > saved_place.id]
+  created_at timestamptz [not null]
+  expires_at timestamptz [not null]
+
+  indexes {
+    (user_id, key_digest) [unique, name: 'uq_favorite_create_owner_key_digest']
+    expires_at [name: 'ix_fav_create_idemp_expiry']
+  }
+
+  checks {
+    `origin_saved_place_id <> destination_saved_place_id` [name: 'ck_favorite_create_distinct_places']
+    `digest_key_version > 0` [name: 'ck_favorite_create_digest_key_version']
+    `expires_at = created_at + interval '24 hours'` [name: 'ck_favorite_create_24h_expiry']
+  }
 }
 
 Table anonymous_session {

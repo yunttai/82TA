@@ -15,6 +15,9 @@ export type SavedPlace = components["schemas"]["SavedPlace"];
 export type SavedPlaceInput = components["schemas"]["SavedPlaceInput"];
 export type FavoriteJourney = components["schemas"]["FavoriteJourney"];
 export type FavoriteJourneyInput = components["schemas"]["FavoriteJourneyInput"];
+export type FavoriteJourneyFromPlacesInput = components["schemas"]["FavoriteJourneyFromPlacesInput"];
+export type FavoriteJourneyFromPlacesResult = components["schemas"]["FavoriteJourneyFromPlacesResult"];
+export type FavoriteJourneySearchConditionsV1 = components["schemas"]["FavoriteJourneySearchConditionsV1"];
 export type RouteFeedbackInput = components["schemas"]["RouteFeedbackInput"];
 export type GuestSessionCredential = components["schemas"]["GuestSessionCredential"];
 export type SessionContext = components["schemas"]["SessionContext"];
@@ -203,6 +206,15 @@ export async function createFavoriteJourney(body: FavoriteJourneyInput) {
   return client().POST("/api/v1/me/favorite-journeys", {
     credentials: "same-origin",
     headers: await mutationHeaders(),
+    body,
+  });
+}
+
+export async function createFavoriteJourneyFromPlaces(body: FavoriteJourneyFromPlacesInput, idempotencyKey = requestKey()) {
+  return client().POST("/api/v1/me/favorite-journeys/from-places", {
+    credentials: "same-origin",
+    headers: await mutationHeaders(),
+    params: { header: { "Idempotency-Key": idempotencyKey } },
     body,
   });
 }

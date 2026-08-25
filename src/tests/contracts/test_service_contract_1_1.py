@@ -102,7 +102,11 @@ class ServiceContract11Tests(unittest.TestCase):
 
     def test_mapping_fields_are_optional_and_pass_through_capable(self) -> None:
         request = self.public["components"]["schemas"]["PublicRouteSearchRequest"]
-        preferences = request["properties"]["preferences"]
+        self.assertEqual(
+            request["properties"]["preferences"],
+            {"$ref": "#/components/schemas/PublicRouteSearchPreferences"},
+        )
+        preferences = self.public["components"]["schemas"]["PublicRouteSearchPreferences"]
         self.assertIn("allowedModes", preferences["properties"])
         self.assertNotIn("allowedModes", preferences["required"])
         private_preference = self.common["components"]["schemas"]["OptimizationPreference"]
@@ -163,7 +167,7 @@ class ServiceContract11Tests(unittest.TestCase):
             ["properties"]["contractVersion"]["const"],
             "1.0",
         )
-        self.assertEqual(self.public["info"]["version"], "1.4.0")
+        self.assertEqual(self.public["info"]["version"], "1.5.0")
         self.assertEqual(self.private["info"]["version"], "1.2.0")
         manifest = json.loads(
             (ROOT / "src/contracts/CONTEXT_MANIFEST.json").read_text(encoding="utf-8")
@@ -173,11 +177,11 @@ class ServiceContract11Tests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["contextVersion"], "1.4.0")
-        self.assertEqual(manifest["contractVersion"], "1.4.0")
-        self.assertEqual(versions["contextVersion"], "1.4.0")
-        self.assertEqual(versions["contractVersion"], "1.4.0")
-        self.assertEqual(versions["databaseContractVersion"], "1.2.0")
+        self.assertEqual(manifest["contextVersion"], "1.5.0")
+        self.assertEqual(manifest["contractVersion"], "1.5.0")
+        self.assertEqual(versions["contextVersion"], "1.5.0")
+        self.assertEqual(versions["contractVersion"], "1.5.0")
+        self.assertEqual(versions["databaseContractVersion"], "1.3.0")
         self.assertEqual(versions["codeRegistryVersion"], "1.3.0")
         self.assertEqual(versions["rankingPolicyVersion"], "rank-0.2.0")
         self.assertEqual(versions["strategyPolicyVersion"], "strategy-2.0.0")
@@ -207,6 +211,14 @@ class ServiceContract11Tests(unittest.TestCase):
             ("GuestSessionCredential", "public-guest-session-response.json"),
             ("ConsentRecord", "public-consent-response.json"),
             ("DataRightsJob", "public-data-rights-job-response.json"),
+            (
+                "FavoriteJourneyFromPlacesInput",
+                "public-favorite-journey-from-places-request.json",
+            ),
+            (
+                "FavoriteJourneyFromPlacesResult",
+                "public-favorite-journey-from-places-response.json",
+            ),
         ]
         for schema, example in cases:
             self.assertEqual(
@@ -293,15 +305,293 @@ class ServiceContract11Tests(unittest.TestCase):
             )
             self.assertTrue(errors, schema_name)
 
+    def test_atomic_favorite_from_places_operation_is_additive_and_idempotent(self) -> None:
+        operation = self.public["paths"]["/api/v1/me/favorite-journeys/from-places"]["post"]
+        self.assertEqual(operation["operationId"], "createFavoriteJourneyFromPlaces")
+        self.assertEqual(operation["security"], [{"sessionCookie": []}])
+        idempotency = next(
+            parameter
+            for parameter in operation["parameters"]
+            if parameter["name"] == "Idempotency-Key"
+        )
+        self.assertTrue(idempotency["required"])
+        self.assertEqual(idempotency["schema"]["minLength"], 8)
+        self.assertEqual(
+            set(operation["responses"]),
+            {"201", "400", "401", "403", "409", "429"},
+        )
+        self.assertIn("PRECISE_LOCATION", operation["description"])
+        self.assertIn("24 hours", operation["description"])
+        self.assertIn("without creating location data", operation["description"])
+        self.assertIn("without", operation["description"])
+        self.assertIn("IDEMPOTENCY_CONFLICT", operation["description"])
+        self.assertEqual(
+            operation["responses"]["201"]["headers"]["Cache-Control"]["schema"]["const"],
+            "no-store",
+        )
+        for code in (
+            "INVALID_COORDINATE",
+            "CONSTRAINT_OUT_OF_RANGE",
+            "AUTH_REQUIRED",
+            "SESSION_EXPIRED",
+            "CONSENT_REQUIRED",
+            "RATE_LIMITED",
+        ):
+            self.assertIn(code, operation["description"])
+
+        receipt = self.public["components"]["schemas"]["FavoriteJourneyFromPlacesResult"]
+        self.assertEqual(
+            set(receipt["required"]),
+            {
+                "favoriteJourneyId",
+                "originSavedPlaceId",
+                "destinationSavedPlaceId",
+                "createdAt",
+                "idempotencyExpiresAt",
+            },
+        )
+        self.assertEqual(set(receipt["properties"]), set(receipt["required"]))
+        self.assertFalse(receipt["additionalProperties"])
+        forbidden = {
+            "favoriteJourney",
+            "originSavedPlace",
+            "destinationSavedPlace",
+            "place",
+            "coordinate",
+            "label",
+            "request",
+            "response",
+        }
+        self.assertTrue(forbidden.isdisjoint(receipt["properties"]))
+
+    def test_saved_place_location_consent_scope_and_problem_responses_are_explicit(self) -> None:
+        paths = self.public["paths"]
+        collection = paths["/api/v1/me/saved-places"]
+        detail = paths["/api/v1/me/saved-places/{savedPlaceId}"]
+
+        create = collection["post"]
+        self.assertEqual(
+            set(create["responses"]),
+            {"201", "400", "401", "403", "429"},
+        )
+        for value in (
+            "PRECISE_LOCATION",
+            "INVALID_COORDINATE",
+            "CONSTRAINT_OUT_OF_RANGE",
+            "AUTH_REQUIRED",
+            "SESSION_EXPIRED",
+            "CONSENT_REQUIRED",
+        ):
+            self.assertIn(value, create["description"])
+
+        update = detail["patch"]
+        self.assertEqual(
+            set(update["responses"]),
+            {"200", "400", "401", "403", "404", "429"},
+        )
+        self.assertIn("PRECISE_LOCATION", update["description"])
+        self.assertIn("only when", update["description"])
+        self.assertIn("Label-only", update["description"])
+        self.assertIn("isSensitive-only", update["description"])
+
+        delete = detail["delete"]
+        self.assertEqual(
+            set(delete["responses"]),
+            {"204", "401", "403", "404", "429"},
+        )
+        self.assertIn("PRECISE_LOCATION consent is not required", delete["description"])
+        self.assertIn("other-owner resource is returned as 404", delete["description"])
+
+    def test_favorite_location_write_quota_is_declared_only_on_mutations(self) -> None:
+        paths = self.public["paths"]
+        mutation_operations = (
+            paths["/api/v1/me/saved-places"]["post"],
+            paths["/api/v1/me/saved-places/{savedPlaceId}"]["patch"],
+            paths["/api/v1/me/saved-places/{savedPlaceId}"]["delete"],
+            paths["/api/v1/me/favorite-journeys"]["post"],
+            paths["/api/v1/me/favorite-journeys/from-places"]["post"],
+            paths["/api/v1/me/favorite-journeys/{favoriteJourneyId}"]["patch"],
+            paths["/api/v1/me/favorite-journeys/{favoriteJourneyId}"]["delete"],
+        )
+        problem = {"$ref": "#/components/responses/Problem"}
+        for operation in mutation_operations:
+            self.assertEqual(operation["responses"]["429"], problem)
+
+        self.assertNotIn(
+            "429",
+            paths["/api/v1/me/saved-places"]["get"]["responses"],
+        )
+        self.assertNotIn(
+            "429",
+            paths["/api/v1/me/favorite-journeys"]["get"]["responses"],
+        )
+
+    def test_legacy_favorite_crud_declares_producer_problem_statuses(self) -> None:
+        paths = self.public["paths"]
+        collection = paths["/api/v1/me/favorite-journeys"]
+        detail = paths["/api/v1/me/favorite-journeys/{favoriteJourneyId}"]
+        self.assertEqual(
+            set(collection["post"]["responses"]),
+            {"201", "400", "401", "403", "404", "429"},
+        )
+        self.assertEqual(
+            set(detail["patch"]["responses"]),
+            {"200", "400", "401", "403", "404", "429"},
+        )
+        self.assertEqual(
+            set(detail["delete"]["responses"]),
+            {"204", "401", "403", "404", "429"},
+        )
+        problem = {"$ref": "#/components/responses/Problem"}
+        for operation, statuses in (
+            (collection["post"], ("400", "401", "403", "404", "429")),
+            (detail["patch"], ("400", "401", "403", "404", "429")),
+            (detail["delete"], ("401", "403", "404", "429")),
+        ):
+            for status in statuses:
+                self.assertEqual(operation["responses"][status], problem)
+
+    def test_legacy_favorite_remains_valid_and_typed_conditions_are_strict(self) -> None:
+        validator = load_example_validator()
+        spec_path = ROOT / "src/contracts/openapi/service-public.v1.yaml"
+        document = validator.load_yaml(spec_path)
+        input_schema = validator.dereference(
+            document["components"]["schemas"]["FavoriteJourneyInput"],
+            document,
+            spec_path,
+        )
+        legacy = {
+            "nickname": "등교",
+            "originSavedPlaceId": "71ddc751-95ac-45e1-ac93-1e64e6559f4e",
+            "destinationSavedPlaceId": "548214e9-c4c8-4762-bea6-221e7c9873c0",
+            "defaultConstraints": {"legacyClientField": "preserved"},
+        }
+        self.assertEqual(
+            list(Draft202012Validator(input_schema, format_checker=FormatChecker()).iter_errors(legacy)),
+            [],
+        )
+        output_schema = validator.dereference(
+            document["components"]["schemas"]["FavoriteJourney"],
+            document,
+            spec_path,
+        )
+        legacy_output = {
+            "id": "cd9fbe06-1eef-4f2f-9c92-3a2a197a5ac5",
+            **legacy,
+            "searchConditions": None,
+            "createdAt": "2026-08-25T09:00:00+09:00",
+        }
+        self.assertEqual(
+            list(Draft202012Validator(output_schema, format_checker=FormatChecker()).iter_errors(legacy_output)),
+            [],
+        )
+
+        conditions_schema = validator.dereference(
+            document["components"]["schemas"]["FavoriteJourneySearchConditionsV1"],
+            document,
+            spec_path,
+        )
+        valid = json.loads(
+            (ROOT / "src/contracts/openapi/examples/public-favorite-journey-from-places-request.json")
+            .read_text(encoding="utf-8")
+        )["searchConditions"]
+        conditions_validator = Draft202012Validator(
+            conditions_schema,
+            format_checker=FormatChecker(),
+        )
+        self.assertEqual(list(conditions_validator.iter_errors(valid)), [])
+        for invalid in (
+            {key: value for key, value in valid.items() if key != "departurePolicy"},
+            {**valid, "departurePolicy": "SAVED_TIMESTAMP"},
+            {**valid, "unknown": True},
+            {**valid, "requestedRecommendations": []},
+        ):
+            self.assertTrue(list(conditions_validator.iter_errors(invalid)), invalid)
+
+    def test_legacy_default_constraints_generated_type_remains_opaque(self) -> None:
+        schemas = self.public["components"]["schemas"]
+        for schema_name in (
+            "FavoriteJourneyInput",
+            "FavoriteJourney",
+            "FavoriteJourneyUpdate",
+        ):
+            default_constraints = schemas[schema_name]["properties"]["defaultConstraints"]
+            self.assertEqual(default_constraints["type"], "object")
+            self.assertIs(default_constraints["additionalProperties"], True)
+        self.assertIs(
+            schemas["FavoriteJourneySearchConditionsV1"]["additionalProperties"],
+            False,
+        )
+
+        generated = (
+            ROOT / "src/generated/service-client-ts/schema.gen.ts"
+        ).read_text(encoding="utf-8")
+        self.assertGreaterEqual(generated.count("[key: string]: unknown;"), 3)
+        self.assertNotIn("defaultConstraints: Record<string, never>;", generated)
+        self.assertNotIn("defaultConstraints?: Record<string, never>;", generated)
+        self.assertNotIn("[key: string]: never;", generated)
+
+    def test_route_search_request_summary_is_coordinate_and_provider_free(self) -> None:
+        validator = load_example_validator()
+        spec_path = ROOT / "src/contracts/openapi/service-public.v1.yaml"
+        document = validator.load_yaml(spec_path)
+        schema = validator.dereference(
+            document["components"]["schemas"]["RouteSearchRequestSummary"],
+            document,
+            spec_path,
+        )
+        forbidden = {"coordinate", "coordinates", "address", "provider", "providerPlaceId", "regionCode"}
+        self.assertTrue(forbidden.isdisjoint(schema["properties"]))
+        summary = {
+            "originDisplayName": "광교중앙역",
+            "destinationDisplayName": "세종대학교",
+            "departureTime": "2026-08-25T09:10:00+09:00",
+            "arrivalDeadline": None,
+            "taxiBudget": {"currency": "KRW", "maxAmount": 7000, "strict": True},
+            "preferences": {
+                "maxWalkSeconds": 7200,
+                "maxTransfers": 8,
+                "maxTaxiLegs": 3,
+                "optimization": "BALANCED",
+            },
+        }
+        summary_validator = Draft202012Validator(schema, format_checker=FormatChecker())
+        self.assertEqual(list(summary_validator.iter_errors(summary)), [])
+        self.assertTrue(
+            list(summary_validator.iter_errors({**summary, "coordinate": {"lon": 127, "lat": 37}}))
+        )
+
     def test_service_db_expansion_is_owner_local(self) -> None:
         dbml = (ROOT / "src/contracts/database/service-db.dbml").read_text(encoding="utf-8")
         ownership = load_yaml("src/contracts/database/schema-ownership.yaml")
         self.assertIn("Table authenticated_session", dbml)
         self.assertIn("Table data_rights_job", dbml)
+        self.assertIn("Table favorite_creation_idempotency", dbml)
+        self.assertIn("(user_id, key_digest) [unique", dbml)
+        self.assertIn("request_fingerprint char(64)", dbml)
+        self.assertIn("digest_key_version integer", dbml)
+        self.assertIn("ix_fav_create_idemp_expiry", dbml)
+        self.assertNotIn("ix_favorite_create_idempotency_expiry", dbml)
+        self.assertIn("expires_at = created_at + interval '24 hours'", dbml)
+        for forbidden in (
+            "raw_idempotency_key",
+            "request_body",
+            "response_body",
+            "coordinate geography",
+        ):
+            ledger = dbml.split("Table favorite_creation_idempotency", 1)[1].split(
+                "\nTable ", 1
+            )[0]
+            self.assertNotIn(forbidden, ledger)
         tables = ownership["schemas"]["service"]["tables"]
         self.assertIn("authenticated_session", tables)
         self.assertIn("data_rights_job", tables)
+        self.assertIn("favorite_creation_idempotency", tables)
         self.assertNotIn("authenticated_session", ownership["schemas"]["routing"]["tables"])
+        self.assertNotIn(
+            "favorite_creation_idempotency",
+            ownership["schemas"]["routing"]["tables"],
+        )
 
 
 if __name__ == "__main__":

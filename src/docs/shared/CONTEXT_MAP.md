@@ -52,6 +52,7 @@ flowchart LR
 | Preferences | walk·transfer·taxi budget 기본값 | Service DB | Service Product |
 | Place | Kakao Local proxy, 저장 장소 | Service DB·Cache | Service Product |
 | Journey Search | public input, Routing Gateway, history | Service DB | Service Product |
+| Favorite Quick Search | owner-bound saved places, versioned search conditions, atomic create | Service DB | Service Product |
 | Public Projection | 내부 결과를 사용자 안전 응답으로 축약 | Service DB snapshot | Service Product |
 | Provider Integration | transit·walk·taxi·GBIS·KMA·GITS | Routing Cache·Raw Store | Routing |
 | Entity Mapping | Provider ID↔canonical route·stop | Routing DB | Routing |

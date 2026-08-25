@@ -20,6 +20,12 @@ from typing import Any
 
 import httpx
 
+CURRENT_DIRECTORY = Path(__file__).resolve().parent
+if str(CURRENT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(CURRENT_DIRECTORY))
+
+from _canonical_route_chain import public_projection_for_fixture_comparison  # noqa: E402
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 SERVICE_ROOT = REPOSITORY_ROOT / "src/services/service-api"
@@ -448,7 +454,45 @@ class RealHttpCrossWorkstreamTests(unittest.TestCase):
 
         public_actual = self._public_post(127.187456, "public-parity-key-0001").json()
         public_canonical = json.loads(PUBLIC_RESPONSE_FIXTURE.read_text(encoding="utf-8"))
-        self.assertEqual(set(public_actual), set(public_canonical))
+        public_request = json.loads(PUBLIC_FIXTURE.read_text(encoding="utf-8"))
+        self.assertEqual(set(public_canonical), set(public_actual) - {"requestSummary"})
+        self.assertIn("requestSummary", public_actual)
+        summary = public_actual["requestSummary"]
+        self.assertEqual(
+            set(summary),
+            {
+                "originDisplayName",
+                "destinationDisplayName",
+                "departureTime",
+                "arrivalDeadline",
+                "taxiBudget",
+                "preferences",
+            },
+        )
+        self.assertEqual(summary["originDisplayName"], public_request["origin"]["displayName"])
+        self.assertEqual(
+            summary["destinationDisplayName"],
+            public_request["destination"]["displayName"],
+        )
+        self.assertEqual(summary["taxiBudget"], public_request["taxiBudget"])
+        encoded_summary = json.dumps(summary, ensure_ascii=False)
+        for forbidden in ("coordinate", "providerPlaceId", "providerId"):
+            self.assertNotIn(forbidden, encoded_summary)
+        for route in (
+            public_actual["baseline"],
+            *public_actual["recommendations"].values(),
+        ):
+            if route is None:
+                continue
+            self.assertEqual(
+                route["legs"][0]["from"]["name"],
+                public_request["origin"]["displayName"],
+            )
+            self.assertEqual(
+                route["legs"][-1]["to"]["name"],
+                public_request["destination"]["displayName"],
+            )
+        self.assertNotIn("Sanitized R1", json.dumps(public_actual))
         self.assertEqual(
             set(public_actual["recommendations"]),
             set(public_canonical["recommendations"]),
@@ -467,7 +511,10 @@ class RealHttpCrossWorkstreamTests(unittest.TestCase):
         public_actual = public_actual_response.json()
         public_canonical = json.loads(PUBLIC_RESPONSE_FIXTURE.read_text(encoding="utf-8"))
         public_actual["searchId"] = public_canonical["searchId"]
-        self.assertEqual(public_actual, public_canonical)
+        self.assertEqual(
+            public_projection_for_fixture_comparison(public_actual),
+            public_projection_for_fixture_comparison(public_canonical),
+        )
         self.assertEqual(
             public_actual_response.headers["X-Correlation-Id"],
             "canonical-r1-http-public",

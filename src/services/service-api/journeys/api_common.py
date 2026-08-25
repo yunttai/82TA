@@ -12,6 +12,7 @@ from typing import Any
 from django.core.exceptions import RequestDataTooBig
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_variables
 
 from .contracts import CanonicalContracts
 from .models import AnonymousSession, AuthenticatedSession, ServiceUser
@@ -73,6 +74,7 @@ def problem_response(problem: ApiProblem, request: HttpRequest | None = None) ->
     return response
 
 
+@sensitive_variables("value")
 def json_body(request: HttpRequest) -> dict[str, Any]:
     if not request.content_type or request.content_type.split(";", 1)[0].strip() != "application/json":
         raise ApiProblem(400, "CONSTRAINT_OUT_OF_RANGE", "Content-Type must be application/json")
@@ -87,6 +89,7 @@ def json_body(request: HttpRequest) -> dict[str, Any]:
     return value
 
 
+@sensitive_variables("value")
 def validate_schema(api: str, schema: str, value: Any) -> None:
     errors = contracts.validate(api, schema, value)
     if not errors:

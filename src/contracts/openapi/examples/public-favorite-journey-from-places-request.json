@@ -1,0 +1,52 @@
+{
+  "nickname": "등교",
+  "originPlace": {
+    "label": "집 근처",
+    "place": {
+      "displayName": "광교중앙역",
+      "coordinate": {
+        "lon": 127.0511,
+        "lat": 37.2886
+      },
+      "provider": "KAKAO_LOCAL",
+      "providerPlaceId": "sanitized-origin"
+    },
+    "isSensitive": true
+  },
+  "destinationPlace": {
+    "label": "학교",
+    "place": {
+      "displayName": "세종대학교",
+      "coordinate": {
+        "lon": 127.0738,
+        "lat": 37.5509
+      },
+      "provider": "KAKAO_LOCAL",
+      "providerPlaceId": "sanitized-destination"
+    },
+    "isSensitive": true
+  },
+  "searchConditions": {
+    "schemaVersion": 1,
+    "departurePolicy": "DEPART_AT_CLICK",
+    "taxiBudget": {
+      "currency": "KRW",
+      "maxAmount": 7000,
+      "strict": true
+    },
+    "preferences": {
+      "maxWalkSeconds": 7200,
+      "maxTransfers": 8,
+      "maxTaxiLegs": 3,
+      "allowTaxiBridge": true,
+      "avoidHighBusSeatRisk": false,
+      "allowedModes": ["WALK", "WAIT", "TRANSFER", "TAXI", "BUS", "SUBWAY", "GTX", "TRAIN"],
+      "optimization": "BALANCED",
+      "accessibility": {
+        "avoidStairs": false,
+        "wheelchair": false
+      }
+    },
+    "requestedRecommendations": ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"]
+  }
+}
