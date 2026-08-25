@@ -25,6 +25,8 @@ description: "Service 기능이 완성될 때마다 Public API 응답↔generate
 
 ## 필수 교차 비교
 
+아래 pair 중 실제 diff가 건드린 경계만 필수다. 목록 전체를 모든 수정에 적용하지 않는다.
+
 - Public serializer 실제 shape ↔ TS client/hook 기대 shape
 - Routing fixture ↔ generated Python client ↔ projection
 - DBML ↔ model ↔ migration ↔ serializer
@@ -39,6 +41,7 @@ description: "Service 기능이 완성될 때마다 Public API 응답↔generate
 - vertical slice 완료 시 mock E2E
 - staging 합류 시 real Routing E2E
 - release 시 `integration-coherence-qa`로 승격
+- local 또는 PR-CI 완료 요청은 그 환경까지만 검증한다. 배포된 GCE 검증은 GCE 배포·staging·release를 명시한 요청에만 추가하며 AWS evidence는 요구하지 않는다.
 
 ## 출력
 

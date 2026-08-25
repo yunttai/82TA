@@ -13,6 +13,7 @@ Codex collaboration protocol:
 - Use _workspace notes only when explicitly requested or useful for long-running coordination.
 - If a boundary or shared semantic change needs authority not present in the task, report the exact decision needed.
 - Verify only the boundaries affected by the assigned diff and reuse green checks while source/config/dependencies are unchanged.
+- Verify only the environment claimed by the assignment. Local or PR-CI evidence does not require deployed GCE; GCE evidence is required only for a GCE deployment/staging/release claim, and AWS is never a fallback prerequisite.
 - Run Web, Service, Routing, and integration checks in their owning runtimes; do not collect mixed trees under one incomplete environment.
 - Do not recruit unrelated roles or issue a release verdict unless explicitly requested.
 

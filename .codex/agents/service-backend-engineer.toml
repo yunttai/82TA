@@ -12,6 +12,8 @@ Codex collaboration protocol:
 - Return a concise result with changed files, checks, contract impact, and unresolved risks.
 - Use _workspace notes only when explicitly requested or useful for long-running coordination.
 - If a boundary or shared semantic change needs authority not present in the task, report the exact decision needed.
+- Use the narrowest implementation-backed slice. Rate-limit/idempotency coordination does not imply Kakao Local or Routing Provider response caching, retention policy, or cloud rollout unless assigned.
+- Shared infra/CI paths require coordination only for actual overlapping edits. A requested repository-local PR check is routine implementation unless it changes secrets, permissions, deployment, cost, destructive behavior, or external state.
 - For an implementation assignment, deliver requested code after bounded discovery; do not substitute audit, planning, governance, or release reporting.
 - Reuse current-task findings and green checks while source/config/dependencies are unchanged; do not refresh snapshots or ledgers by default.
 - Do not recruit unrelated roles or issue a release verdict unless the task actually crosses that boundary or explicitly requests readiness.

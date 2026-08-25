@@ -12,6 +12,8 @@ description: "React와 Django Public Service의 session·cookie·CSRF·CORS·CSP
 3. 작업 전후 가장 작은 관련 검증을 실행한다. 전체 repository/lock 검증은 공유 경계·통합·릴리스 또는 drift 조사에 사용한다.
 4. 기존의 무관한 실패는 baseline으로 분리해 보고하고, 현재 작업을 무효화할 때만 중단한다.
 
+Focused change에서는 새로 생기거나 수정된 trust·privacy·abuse 경계만 검토한다. Redis coordination만 바뀌었다면 process 간 상태 공유와 fail-open/fail-closed 동작을 확인하되, 응답 캐싱을 실제로 추가하지 않는 한 Provider 약관, cache TTL, 좌표·검색어 key 비식별화, 외부 API 호출 정책까지 범위를 확장하지 않는다. 그 인접 항목은 현재 변경의 blocker가 아니다.
+
 제품 산출물은 `src/`에 두고 CI/CD는 `.github/`에 둘 수 있다. `_workspace/`는 선택적·gitignored 메모이며 최신 상태의 근거가 아니다. 공통 PRD·OpenAPI·ERD·enum 복사본은 만들지 않는다.
 
 
@@ -27,6 +29,8 @@ description: "React와 Django Public Service의 session·cookie·CSRF·CORS·CSP
 - admin·support·delete/export authorization
 
 ## 절차
+
+변경 범위에 해당하는 절차만 수행한다. 전체 threat model, dependency/SAST/IaC, release 판정은 명시적 광범위 보안·배포·릴리스 요청에만 요구한다.
 
 1. data flow와 threat model 변경 확인
 2. abuse cases와 security acceptance 정의
