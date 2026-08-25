@@ -10,6 +10,7 @@ import {
   type PublicRouteSearchResponse,
 } from "../../shared/api/publicService";
 import { ensureSearchSession } from "../../shared/session/sessionMemory";
+import { checkCurrentConsent } from "../../shared/privacy/consentPolicy";
 
 type ResponsePhase = PublicRouteSearchResponse["status"];
 
@@ -123,7 +124,7 @@ function validateDraft(draft: SearchDraft): ValidationResult {
   };
 }
 
-function buildRequest(draft: SearchDraft, valid: ValidDraft): PublicRouteSearchRequest {
+function buildRequest(draft: SearchDraft, valid: ValidDraft, saveToHistory: boolean): PublicRouteSearchRequest {
   return {
     origin: {
       displayName: draft.originName.trim(),
@@ -147,7 +148,7 @@ function buildRequest(draft: SearchDraft, valid: ValidDraft): PublicRouteSearchR
       accessibility: { avoidStairs: draft.avoidStairs, wheelchair: draft.wheelchair },
     },
     requestedRecommendations: ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"],
-    saveToHistory: draft.saveToHistory,
+    saveToHistory,
   };
 }
 
@@ -198,7 +199,8 @@ export function useRouteSearch() {
       return;
     }
 
-    const request = buildRequest(draft, validation.value);
+    const saveToHistory = await checkCurrentConsent("SEARCH_HISTORY");
+    const request = buildRequest(draft, validation.value, saveToHistory);
     const idempotencyKey = createIdempotencyKey();
     lastAttempt.current = { request, idempotencyKey };
     setState({ phase: "SEARCHING", errors: [] });

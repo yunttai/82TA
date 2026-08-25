@@ -192,6 +192,7 @@ export interface paths {
         };
         get: operations["listSavedPlaces"];
         put?: never;
+        /** @description Creates one owner-bound saved place containing an exact coordinate. Requires an authenticated USER session, CSRF protection, and current accepted PRECISE_LOCATION consent. Invalid place or coordinate data uses INVALID_COORDINATE or CONSTRAINT_OUT_OF_RANGE; a missing or expired session uses AUTH_REQUIRED or SESSION_EXPIRED; missing current location consent uses CONSENT_REQUIRED. The response is owner-only and Cache-Control no-store. */
         post: operations["createSavedPlace"];
         delete?: never;
         options?: never;
@@ -209,9 +210,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
+        /** @description Soft-deletes an owner-bound saved place. PRECISE_LOCATION consent is not required so a user can delete retained location data after withdrawing consent. Authentication, owner authorization, and CSRF protection still apply; a missing or other-owner resource is returned as 404. */
         delete: operations["deleteSavedPlace"];
         options?: never;
         head?: never;
+        /** @description Partially updates an owner-bound saved place. Current accepted PRECISE_LOCATION consent is required only when the request contains place and therefore changes the exact coordinate. Label-only and isSensitive-only updates remain available after location-consent withdrawal. Authentication, owner authorization, and CSRF protection still apply; a missing or other-owner resource is returned as 404. */
         patch: operations["updateSavedPlace"];
         trace?: never;
     };
@@ -225,6 +228,23 @@ export interface paths {
         get: operations["listFavoriteJourneys"];
         put?: never;
         post: operations["createFavoriteJourney"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/favorite-journeys/from-places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Atomically creates two owner-bound saved places and the favorite journey that references them. First creation requires current PRECISE_LOCATION consent. Repeating the same owner, Idempotency-Key, and canonical request body within 24 hours returns the original immutable 201 receipt without creating location data, consuming the write quota, or requiring current PRECISE_LOCATION consent again. After expiry the request is a new creation and the current consent gate applies. Reusing an unexpired key with another body returns IDEMPOTENCY_CONFLICT. Invalid coordinates use INVALID_COORDINATE; invalid labels or conditions use CONSTRAINT_OUT_OF_RANGE; a missing or expired USER session uses AUTH_REQUIRED or SESSION_EXPIRED; missing current location consent uses CONSENT_REQUIRED; quota rejection uses RATE_LIMITED. CSRF protection is required. The response is owner-only and Cache-Control no-store. */
+        post: operations["createFavoriteJourneyFromPlaces"];
         delete?: never;
         options?: never;
         head?: never;
@@ -458,18 +478,7 @@ export interface components {
             /** Format: date-time */
             arrivalDeadline?: string | null;
             taxiBudget: components["schemas"]["TaxiBudget"];
-            preferences: {
-                maxWalkSeconds: number;
-                maxTransfers: number;
-                maxTaxiLegs: number;
-                allowTaxiBridge?: boolean;
-                avoidHighBusSeatRisk?: boolean;
-                /** @description Passed to Routing without Service-side ranking or cost interpretation. Omission uses all canonical modes. */
-                allowedModes?: ("WALK" | "WAIT" | "TRANSFER" | "TAXI" | "BUS" | "SUBWAY" | "GTX" | "TRAIN")[];
-                /** @enum {string} */
-                optimization: "FASTEST" | "STABLE" | "EFFICIENT" | "BALANCED";
-                accessibility?: components["schemas"]["Accessibility"];
-            };
+            preferences: components["schemas"]["PublicRouteSearchPreferences"];
             requestedRecommendations: ("FASTEST" | "STABLE" | "EFFICIENT" | "PUBLIC_TRANSIT_ONLY")[];
             /**
              * @description Service-local opt-in. It is never forwarded to Routing and requires an authenticated owner with current SEARCH_HISTORY consent when true.
@@ -502,6 +511,30 @@ export interface components {
             warnings: string[];
             support: components["schemas"]["PublicCapabilities"];
             history?: components["schemas"]["HistoryMetadata"];
+            /** @description Optional owner-visible, coordinate-free input summary for history display. It is not sufficient to recreate a route search and must not be used as a quick-search request. */
+            requestSummary?: components["schemas"]["RouteSearchRequestSummary"] | null;
+        };
+        PublicRouteSearchPreferences: {
+            maxWalkSeconds: number;
+            maxTransfers: number;
+            maxTaxiLegs: number;
+            allowTaxiBridge?: boolean;
+            avoidHighBusSeatRisk?: boolean;
+            /** @description Passed to Routing without Service-side ranking or cost interpretation. Omission uses all canonical modes. */
+            allowedModes?: ("WALK" | "WAIT" | "TRANSFER" | "TAXI" | "BUS" | "SUBWAY" | "GTX" | "TRAIN")[];
+            /** @enum {string} */
+            optimization: "FASTEST" | "STABLE" | "EFFICIENT" | "BALANCED";
+            accessibility?: components["schemas"]["Accessibility"];
+        };
+        RouteSearchRequestSummary: {
+            originDisplayName: string;
+            destinationDisplayName: string;
+            /** Format: date-time */
+            departureTime: string;
+            /** Format: date-time */
+            arrivalDeadline?: string | null;
+            taxiBudget: components["schemas"]["TaxiBudget"];
+            preferences: components["schemas"]["PublicRouteSearchPreferences"];
         };
         HistoryMetadata: {
             saved: boolean;
@@ -600,7 +633,14 @@ export interface components {
             originSavedPlaceId: string;
             /** Format: uuid */
             destinationSavedPlaceId: string;
-            defaultConstraints: Record<string, never>;
+            /**
+             * @deprecated
+             * @description Opaque Public 1.x compatibility payload. New consumers must not interpret it.
+             */
+            defaultConstraints: {
+                [key: string]: unknown;
+            };
+            searchConditions?: components["schemas"]["FavoriteJourneySearchConditionsV1"];
         };
         FavoriteJourney: {
             /** Format: uuid */
@@ -610,7 +650,14 @@ export interface components {
             originSavedPlaceId: string;
             /** Format: uuid */
             destinationSavedPlaceId: string;
-            defaultConstraints: Record<string, never>;
+            /**
+             * @deprecated
+             * @description Opaque Public 1.x compatibility payload. New consumers must not interpret it.
+             */
+            defaultConstraints: {
+                [key: string]: unknown;
+            };
+            searchConditions?: components["schemas"]["FavoriteJourneySearchConditionsV1"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -622,7 +669,45 @@ export interface components {
             originSavedPlaceId?: string;
             /** Format: uuid */
             destinationSavedPlaceId?: string;
-            defaultConstraints?: Record<string, never>;
+            /**
+             * @deprecated
+             * @description Opaque Public 1.x compatibility payload. New consumers must not interpret it.
+             */
+            defaultConstraints?: {
+                [key: string]: unknown;
+            };
+            searchConditions?: components["schemas"]["FavoriteJourneySearchConditionsV1"];
+        };
+        FavoriteJourneySearchConditionsV1: {
+            /** @constant */
+            schemaVersion: 1;
+            /** @constant */
+            departurePolicy: "DEPART_AT_CLICK";
+            taxiBudget: components["schemas"]["TaxiBudget"];
+            preferences: components["schemas"]["PublicRouteSearchPreferences"];
+            requestedRecommendations: ("FASTEST" | "STABLE" | "EFFICIENT" | "PUBLIC_TRANSIT_ONLY")[];
+        };
+        FavoriteJourneyFromPlacesInput: {
+            nickname: string;
+            originPlace: components["schemas"]["SavedPlaceInput"];
+            destinationPlace: components["schemas"]["SavedPlaceInput"];
+            searchConditions: components["schemas"]["FavoriteJourneySearchConditionsV1"];
+        };
+        /** @description Immutable receipt returned for both first creation and same-body replay during the 24-hour idempotency window. It intentionally contains no coordinates, labels, request body, or mutable resource representation. */
+        FavoriteJourneyFromPlacesResult: {
+            /** Format: uuid */
+            favoriteJourneyId: string;
+            /** Format: uuid */
+            originSavedPlaceId: string;
+            /** Format: uuid */
+            destinationSavedPlaceId: string;
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description Exclusive end of the 24-hour durable replay window.
+             */
+            idempotencyExpiresAt: string;
         };
         /** @enum {string} */
         ConsentType: "SERVICE_PRIVACY" | "SEARCH_HISTORY" | "PRECISE_LOCATION" | "PRODUCT_ANALYTICS" | "ROUTING_FEEDBACK";
@@ -1298,6 +1383,10 @@ export interface operations {
                     "application/json": components["schemas"]["SavedPlace"];
                 };
             };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     deleteSavedPlace: {
@@ -1318,8 +1407,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     updateSavedPlace: {
@@ -1346,8 +1437,11 @@ export interface operations {
                     "application/json": components["schemas"]["SavedPlace"];
                 };
             };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     listFavoriteJourneys: {
@@ -1392,6 +1486,44 @@ export interface operations {
                     "application/json": components["schemas"]["FavoriteJourney"];
                 };
             };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
+    createFavoriteJourneyFromPlaces: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FavoriteJourneyFromPlacesInput"];
+            };
+        };
+        responses: {
+            /** @description Immutable creation receipt; clients refresh owner-scoped lists for current representations */
+            201: {
+                headers: {
+                    /** @description Sensitive owner data must not be stored by shared or browser caches. */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FavoriteJourneyFromPlacesResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     deleteFavoriteJourney: {
@@ -1412,8 +1544,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     updateFavoriteJourney: {
@@ -1440,8 +1574,11 @@ export interface operations {
                     "application/json": components["schemas"]["FavoriteJourney"];
                 };
             };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     listConsents: {

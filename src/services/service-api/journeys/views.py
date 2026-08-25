@@ -229,6 +229,28 @@ def gateway_dependencies() -> tuple[LockedFixtures, Any]:
     return _dependencies()
 
 
+def _request_summary(search: RouteSearch) -> dict[str, Any] | None:
+    constraints = search.constraints if isinstance(search.constraints, dict) else {}
+    preferences = constraints.get("preferences")
+    candidate = {
+        "originDisplayName": search.origin_display_name,
+        "destinationDisplayName": search.destination_display_name,
+        "departureTime": search.departure_time.isoformat(),
+        "arrivalDeadline": (
+            search.arrival_deadline.isoformat() if search.arrival_deadline else None
+        ),
+        "taxiBudget": {
+            "currency": "KRW",
+            "maxAmount": search.taxi_budget_max,
+            "strict": search.strict_budget,
+        },
+        "preferences": preferences,
+    }
+    if _contracts.validate("public", "RouteSearchRequestSummary", candidate):
+        return None
+    return candidate
+
+
 def _search_response(search: RouteSearch) -> dict[str, Any]:
     now = timezone.now()
     metadata = search.constraints.get("_publicMetadata", {}) if isinstance(search.constraints, dict) else {}
@@ -262,6 +284,9 @@ def _search_response(search: RouteSearch) -> dict[str, Any]:
             "retainedUntil": search.retention_until.isoformat(),
         },
     }
+    summary = _request_summary(search)
+    if summary is not None:
+        response["requestSummary"] = summary
     return response
 
 
@@ -343,6 +368,9 @@ def _persist_search(
         "ownerKind": subject.kind,
         "retainedUntil": retention_until.isoformat(),
     }
+    summary = _request_summary(search)
+    if summary is not None:
+        public_response["requestSummary"] = summary
     return public_response
 
 

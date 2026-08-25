@@ -1,14 +1,14 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.5.1",
-  "contractVersion": "1.5.0",
+  "contextVersion": "1.6.0",
+  "contractVersion": "1.6.0",
   "publicApiMajor": 1,
   "routingApiMajor": 1,
-  "databaseContractVersion": "1.2.0",
+  "databaseContractVersion": "1.3.0",
   "codeRegistryVersion": "1.3.0",
   "rankingPolicyVersion": "rank-0.2.0",
   "strategyPolicyVersion": "strategy-2.0.0",
   "mappingPolicyVersion": "0.1.0-planned",
   "featureSchemaVersion": "0.1.0-planned",
-  "status": "SEOUL_BIKE_OPTIONS_GCE_ONLY_CONTEXT_1_5_1"
+  "status": "TYPED_FAVORITE_QUICK_SEARCH_AND_SEOUL_BIKE_1_6_GCE_ONLY"
 }

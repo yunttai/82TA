@@ -1,0 +1,7 @@
+{
+  "favoriteJourneyId": "cd9fbe06-1eef-4f2f-9c92-3a2a197a5ac5",
+  "originSavedPlaceId": "71ddc751-95ac-45e1-ac93-1e64e6559f4e",
+  "destinationSavedPlaceId": "548214e9-c4c8-4762-bea6-221e7c9873c0",
+  "createdAt": "2026-08-25T09:00:00+09:00",
+  "idempotencyExpiresAt": "2026-08-26T09:00:00+09:00"
+}

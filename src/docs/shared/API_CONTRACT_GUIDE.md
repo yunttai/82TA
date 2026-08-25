@@ -41,6 +41,7 @@ GET/PUT /api/v1/me/preferences
 GET/POST /api/v1/me/saved-places
 PATCH/DELETE /api/v1/me/saved-places/{savedPlaceId}
 GET/POST /api/v1/me/favorite-journeys
+POST   /api/v1/me/favorite-journeys/from-places
 PATCH/DELETE /api/v1/me/favorite-journeys/{favoriteJourneyId}
 GET      /api/v1/me/consents
 PUT      /api/v1/me/consents/{consentType}
@@ -53,6 +54,18 @@ GET    /api/v1/support/capabilities
 ```
 
 Public API는 내부 provider status 전체, 원문 번호판, raw payload, artifact URI, feature vector를 노출하지 않는다.
+
+### Favorite quick search와 history summary
+
+- `POST /api/v1/me/saved-places`는 정확한 좌표를 새로 보존하므로 현재 `PRECISE_LOCATION` 동의를 요구한다. `PATCH`는 `place`를 포함해 좌표를 바꿀 때만 같은 동의를 요구한다. label/`isSensitive`만 바꾸거나 저장 장소를 삭제할 때는 동의 철회 후에도 데이터 정리 권리를 행사할 수 있도록 위치 동의를 요구하지 않는다. 모든 작업의 USER·owner·CSRF 검증은 유지한다.
+- SavedPlace와 FavoriteJourney의 POST·PATCH·DELETE는 공유 `favorite-location-write` quota를 적용하고 초과 시 canonical `429 RATE_LIMITED` Problem을 반환한다. 조회 GET에는 이 쓰기 quota를 적용하지 않는다.
+- 기존 FavoriteJourney CRUD도 producer와 같은 canonical Problem status를 선언한다. POST는 400/401/403/404/429, PATCH는 400/401/403/404/429, DELETE는 401/403/404/429이며 다른 owner 또는 없는 saved place/favorite은 존재를 숨기는 404다.
+- `POST /api/v1/me/favorite-journeys/from-places`의 첫 생성은 현재 `PRECISE_LOCATION` 동의를 가진 USER만 수행한다. 두 `SavedPlace`, 이를 참조하는 `FavoriteJourney`, digest-only receipt 원장을 한 transaction으로 만들고, 동일 owner·`Idempotency-Key`·canonical body의 24시간 내 재시도에는 같은 불변 ID receipt를 `201`로 반환한다. replay는 새 위치를 쓰지 않으므로 현재 위치 동의와 write quota를 다시 소비하지 않는다. unexpired key를 다른 body에 재사용하면 `IDEMPOTENCY_CONFLICT`이고, 만료 뒤 요청은 새 생성 정책을 적용한다.
+- atomic create receipt는 세 resource ID와 `createdAt`·`idempotencyExpiresAt`만 포함한다. 현재 label·장소 표현은 owner-scoped 목록을 refresh해 읽으며 receipt에는 좌표·표시명·요청·응답 snapshot이 없다.
+- Public 1.6 `searchConditions`는 `schemaVersion=1`, `DEPART_AT_CLICK`, canonical `taxiBudget`, `PublicRouteSearchPreferences`, 요청 recommendation 종류만 가진다. 절대시각·도착 마감·history 저장 여부·route/rank/result ID는 포함하지 않는다.
+- 기존 `defaultConstraints`는 Public 1.x overlap을 위해 arbitrary JSON property를 보존하는 required opaque field로 남고 deprecated된다. 생성 client도 `Record<string, unknown>`으로 표현하며, 새 consumer는 해석하지 않고 legacy row의 값을 typed 조건으로 추측하지 않는다.
+- 클릭 시 Web은 현재 owner의 두 active SavedPlace를 해석하고 timezone-aware 현재 시각으로 기존 `POST /api/v1/route-searches`를 한 번 호출한다. 현재 capability와 불일치하면 조건을 몰래 바꾸지 않는다.
+- optional `requestSummary`는 history 표시 전용이다. 좌표·주소·Provider ID가 없으므로 route request를 재구성하는 데 사용하지 않는다.
 
 ### Public→Private 정책
 

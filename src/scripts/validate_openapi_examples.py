@@ -89,6 +89,16 @@ def main() -> int:
         ("service-public.v1.yaml", "BikeOptionsResponse", "public-bike-options-response.json"),
         ("routing-private.v1.yaml", "OptimizeRouteRequest", "routing-optimize-request.json"),
         ("routing-private.v1.yaml", "OptimizeRouteResponse", "routing-optimize-response.json"),
+        (
+            "service-public.v1.yaml",
+            "FavoriteJourneyFromPlacesInput",
+            "public-favorite-journey-from-places-request.json",
+        ),
+        (
+            "service-public.v1.yaml",
+            "FavoriteJourneyFromPlacesResult",
+            "public-favorite-journey-from-places-response.json",
+        ),
     ]
     errors: list[str] = []
     for check in checks:

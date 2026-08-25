@@ -1,7 +1,7 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.5.1",
-  "contractVersion": "1.5.0",
+  "contextVersion": "1.6.0",
+  "contractVersion": "1.6.0",
   "canonicalFiles": [
     "src/docs/shared/PROJECT_CONTEXT.md",
     "src/docs/shared/PRD.md",
@@ -29,6 +29,8 @@
     "src/contracts/openapi/examples/public-guest-session-response.json",
     "src/contracts/openapi/examples/public-consent-response.json",
     "src/contracts/openapi/examples/public-data-rights-job-response.json",
+    "src/contracts/openapi/examples/public-favorite-journey-from-places-request.json",
+    "src/contracts/openapi/examples/public-favorite-journey-from-places-response.json",
     "src/contracts/openapi/examples/public-bike-options-response.json",
     "src/contracts/database/service-db.dbml",
     "src/contracts/database/routing-db.dbml",

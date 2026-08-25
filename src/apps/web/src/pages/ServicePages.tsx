@@ -1,13 +1,15 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { PlaceField } from "../features/place-search/PlaceField";
 import { ResultPanel } from "../features/route-results/ResultPanel";
 import {
-  createFavoriteJourney,
+  createFavoriteJourneyFromPlaces,
+  createIdempotencyKey,
   createDataDeletion,
   createDataExport,
   createGuestSession,
   createSavedPlace,
+  createRouteSearch,
   deleteFavoriteJourney,
   deleteSavedPlace,
   getDataDeletion,
@@ -28,16 +30,28 @@ import {
   updateFavoriteJourney,
   updateSavedPlace,
   type FavoriteJourney,
+  type FavoriteJourneyFromPlacesInput,
+  type FavoriteJourneySearchConditionsV1,
   type ConsentRecord,
   type ConsentType,
   type DataRightsJob,
   type PlaceRef,
   type PublicCapabilities,
   type PublicRouteSearchResponse,
+  type PublicRouteSearchRequest,
   type SavedPlace,
   type SessionContext,
   type UserPreferences,
 } from "../shared/api/publicService";
+import {
+  expectedFareCapToTaxiBudgetKrw,
+  maximumTaxiBudgetKrw,
+  taxiBudgetToExpectedFareCapKrw,
+} from "../features/route-search/fareBudget";
+import {
+  checkCurrentConsent,
+  hasCurrentConsent,
+} from "../shared/privacy/consentPolicy";
 import {
   clearSessionMemory,
   currentGuestToken,
@@ -78,31 +92,86 @@ function safeDownloadUrl(value: string | null | undefined): string | null {
   }
 }
 
+function canonicalRequestFingerprint(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(canonicalRequestFingerprint).join(",")}]`;
+  return `{${Object.entries(value)
+    .filter(([, item]) => item !== undefined)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => `${JSON.stringify(key)}:${canonicalRequestFingerprint(item)}`)
+    .join(",")}}`;
+}
+
+function formatDepartureTime(value: string): string {
+  const departureTime = new Date(value);
+  if (Number.isNaN(departureTime.getTime())) return "시각 확인 필요";
+  return departureTime.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
 export function HistoryPage() {
   const [items, setItems] = useState<PublicRouteSearchResponse[] | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [authRequired, setAuthRequired] = useState(false);
+  const [state, setState] = useState<"CHECKING" | "AUTH_REQUIRED" | "CONSENT_OFF" | "LOADING" | "READY" | "FAILED">("CHECKING");
+
   useEffect(() => {
     void inspectCurrentSession().then(async (session) => {
-      if (session?.subjectType !== "USER") { setAuthRequired(true); return; }
+      if (session?.subjectType !== "USER") { setState("AUTH_REQUIRED"); return; }
+      setState("LOADING");
+      const consents = await listConsents();
+      if (!consents.response.ok || consents.data === undefined) { setState("FAILED"); return; }
+      if (!hasCurrentConsent(consents.data.items, "SEARCH_HISTORY")) { setState("CONSENT_OFF"); return; }
       const { data, response } = await listRouteSearches();
-      if (!response.ok || data === undefined) setFailed(true);
-      else setItems(data.items);
-    }).catch(() => setFailed(true));
+      if (!response.ok || data === undefined) { setState("FAILED"); return; }
+      setItems(data.items);
+      setState("READY");
+    }).catch(() => setState("FAILED"));
   }, []);
+
+  const statusLabel: Readonly<Record<PublicRouteSearchResponse["status"], string>> = {
+    COMPLETE: "검색 완료",
+    PARTIAL: "일부 정보 제한",
+    NO_FEASIBLE_ROUTE: "조건에 맞는 경로 없음",
+    PROVIDER_UNAVAILABLE: "교통 정보 확인 실패",
+    FAILED: "검색 실패",
+    EXPIRED: "이전 검색",
+  };
 
   return (
     <PageFrame eyebrow="내 이동" title="검색 기록">
-      <p className="page-lead">기록 저장에 동의한 로그인 사용자에게만 표시됩니다.</p>
-      {authRequired ? <div className="auth-required"><strong>로그인이 필요한 기능이에요</strong><p>로그인하면 동의한 검색 기록을 안전하게 보관할 수 있어요.</p><a className="primary-link" href="/account?next=/history">로그인하기</a></div> : items === null || items.length === 0 ? <LoadMessage failed={failed} empty={items?.length === 0} /> : (
-        <ul className="resource-list">
+      <p className="page-lead">검색한 경로와 당시 조건을 다시 확인할 수 있어요.</p>
+      {state === "AUTH_REQUIRED" && <div className="auth-required"><strong>로그인이 필요한 기능이에요</strong><p>로그인하면 검색한 경로를 기록에서 다시 확인할 수 있어요.</p><a className="primary-link" href="/account?next=/history">로그인하기</a></div>}
+      {state === "CONSENT_OFF" && <div className="auth-required"><strong>검색 기록 저장이 꺼져 있어요</strong><p>동의하면 로그인 상태에서 검색할 때마다 기록이 저장됩니다.</p><a className="primary-link" href="/privacy">기록 저장 켜기</a></div>}
+      {(state === "CHECKING" || state === "LOADING") && <p className="empty-copy" role="status">검색 기록을 불러오는 중입니다.</p>}
+      {state === "FAILED" && <div className="degraded-notice" role="alert"><strong>검색 기록을 새로 불러오지 못했어요.</strong><p>잠시 후 다시 열어 주세요.</p></div>}
+      {state === "READY" && items?.length === 0 && <div className="history-empty"><strong>아직 검색 기록이 없어요</strong><p>길찾기를 하면 여기에 자동으로 저장됩니다.</p><a className="primary-link" href="/search">길찾기 시작</a></div>}
+      {state === "READY" && items !== null && items.length > 0 && (
+        <ul className="resource-list history-list">
           {items.map((item) => (
             <li key={item.searchId}>
-              <div><strong>{item.status}</strong><span>{new Date(item.generatedAt).toLocaleString("ko-KR")}</span></div>
-              <span>{item.history === undefined ? "저장 정보 확인 불가" : `${item.history.saved ? "기록 저장됨" : "기록 저장 안 함"} · ${item.history.ownerKind === "USER" ? "로그인 사용자" : "게스트"}`}</span>
-              {item.history?.retainedUntil != null && <span>보관 기한 {new Date(item.history.retainedUntil).toLocaleString("ko-KR")}</span>}
-              <a href={`/searches/${encodeURIComponent(item.searchId)}`}>
-                {item.status === "EXPIRED" || new Date(item.expiresAt).getTime() <= Date.now() ? "지난 결과 보기" : "저장 결과 확인"}
+              <a
+                className="history-card history-card-link"
+                href={`/searches/${encodeURIComponent(item.searchId)}`}
+                aria-label={item.requestSummary == null
+                  ? `${statusLabel[item.status]} 저장 결과 확인`
+                  : `${item.requestSummary.originDisplayName}에서 ${item.requestSummary.destinationDisplayName}까지 저장 결과 확인`}
+              >
+                <div className="history-card-heading"><strong>{statusLabel[item.status]}</strong><time dateTime={item.generatedAt}>{new Date(item.generatedAt).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })}</time></div>
+                {item.requestSummary == null ? <p className="legacy-guidance">이전 버전에서 저장한 기록이에요. 결과 화면에서 경로를 확인해 주세요.</p> : <>
+                  <h2>{item.requestSummary.originDisplayName}<span aria-hidden="true">→</span>{item.requestSummary.destinationDisplayName}</h2>
+                  <div className="condition-chips" aria-label="검색 조건">
+                    <span>{item.requestSummary.taxiBudget.maxAmount === maximumTaxiBudgetKrw ? "예상 요금 상한 무관" : `예상 요금 상한 ${taxiBudgetToExpectedFareCapKrw(item.requestSummary.taxiBudget.maxAmount).toLocaleString("ko-KR")}원`}</span>
+                    <span>{item.requestSummary.preferences.allowTaxiBridge === true ? "짧은 택시 이동 허용" : "대중교통 중심"}</span>
+                    <span>출발 <time dateTime={item.requestSummary.departureTime}>{formatDepartureTime(item.requestSummary.departureTime)}</time></span>
+                  </div>
+                </>}
+                <span className="card-primary-action" aria-hidden="true">저장 결과 확인</span>
               </a>
             </li>
           ))}
@@ -113,19 +182,35 @@ export function HistoryPage() {
 }
 
 export function StoredSearchPage({ searchId, routeId, legId }: { searchId: string; routeId?: string; legId?: string }) {
-  const [response, setResponse] = useState<PublicRouteSearchResponse | null>(null);
-  const [status, setStatus] = useState<"LOADING" | "NOT_FOUND" | "FORBIDDEN" | "FAILED">("LOADING");
+  type LoadStatus = "LOADING" | "READY" | "NOT_FOUND" | "FORBIDDEN" | "FAILED";
+  interface LoadState {
+    searchId: string;
+    status: LoadStatus;
+    response: PublicRouteSearchResponse | null;
+  }
+  const [loadState, setLoadState] = useState<LoadState>(() => ({ searchId, status: "LOADING", response: null }));
   useEffect(() => {
+    let active = true;
+    setLoadState({ searchId, status: "LOADING", response: null });
     void getRouteSearch(searchId, currentGuestToken()).then(({ data, error, response: rawResponse }) => {
-      if (data !== undefined) { setResponse(data); return; }
-      if (rawResponse.status === 404) setStatus("NOT_FOUND");
-      else if (rawResponse.status === 403) setStatus("FORBIDDEN");
+      if (!active) return;
+      if (data !== undefined) { setLoadState({ searchId, status: "READY", response: data }); return; }
+      if (rawResponse.status === 404) setLoadState({ searchId, status: "NOT_FOUND", response: null });
+      else if (rawResponse.status === 403) setLoadState({ searchId, status: "FORBIDDEN", response: null });
       else {
         void error;
-        setStatus("FAILED");
+        setLoadState({ searchId, status: "FAILED", response: null });
       }
-    }).catch(() => setStatus("FAILED"));
+    }).catch(() => {
+      if (active) setLoadState({ searchId, status: "FAILED", response: null });
+    });
+    return () => { active = false; };
   }, [searchId]);
+
+  const currentLoadState: LoadState = loadState.searchId === searchId
+    ? loadState
+    : { searchId, status: "LOADING", response: null };
+  const { response, status } = currentLoadState;
 
   if (response === null) {
     const message = status === "LOADING" ? "저장 결과를 불러오는 중…" : status === "NOT_FOUND" ? "검색 결과를 찾을 수 없습니다." : status === "FORBIDDEN" ? "이 검색 결과에 접근할 수 없습니다." : "검색 결과를 불러오지 못했습니다.";
@@ -154,6 +239,7 @@ export function SavedPlacesPage() {
   const [place, setPlace] = useState<PlaceRef | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"IDLE" | "SAVING" | "FAILED">("IDLE");
+  const [preciseLocationAllowed, setPreciseLocationAllowed] = useState<boolean | null>(null);
 
   async function reload() {
     const { data, response } = await listSavedPlaces();
@@ -161,11 +247,28 @@ export function SavedPlacesPage() {
     setItems(data);
   }
 
-  useEffect(() => { void reload().catch(() => setStatus("FAILED")); }, []);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const consents = await listConsents();
+        setPreciseLocationAllowed(consents.response.ok && consents.data !== undefined
+          ? hasCurrentConsent(consents.data.items, "PRECISE_LOCATION")
+          : false);
+      } catch {
+        setPreciseLocationAllowed(false);
+      }
+      try {
+        await reload();
+      } catch {
+        setStatus("FAILED");
+      }
+    })();
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (place === null) return;
+    if (!await checkCurrentConsent("PRECISE_LOCATION")) { setPreciseLocationAllowed(false); return; }
     const data = new FormData(event.currentTarget);
     const rawLabel = data.get("label");
     if (typeof rawLabel !== "string" || rawLabel.trim().length === 0) return;
@@ -207,7 +310,8 @@ export function SavedPlacesPage() {
       <form className="resource-form" onSubmit={(event) => void submit(event)}>
         <label className="field"><span>별칭</span><input name="label" maxLength={50} placeholder="집, 학교, 회사" required /></label>
         <PlaceField label="장소 검색" value={query} onLabelChange={setQuery} onPlaceSelected={(selected) => { setPlace(selected); setQuery(selected.displayName); }} />
-        <button className="primary-button" type="submit" disabled={place === null || status === "SAVING"}>민감 장소로 저장</button>
+        {preciseLocationAllowed === false && <div className="privacy-cta"><strong>정확한 위치 저장 동의가 필요해요</strong><p>새 장소를 저장하려면 현재 개인정보 안내에 동의해 주세요. 기존 장소의 별칭은 계속 수정할 수 있어요.</p><a href="/privacy">위치 저장 동의 확인</a></div>}
+        <button className="primary-button" type="submit" disabled={place === null || status === "SAVING" || preciseLocationAllowed !== true}>민감 장소로 저장</button>
         {status === "FAILED" && <p role="alert">저장 장소를 불러올 수 없습니다.</p>}
       </form>
       {items === null || items.length === 0 ? <LoadMessage failed={status === "FAILED"} empty={items?.length === 0} /> : (
@@ -226,38 +330,106 @@ export function SavedPlacesPage() {
 export function FavoritesPage() {
   const [favorites, setFavorites] = useState<FavoriteJourney[] | null>(null);
   const [places, setPlaces] = useState<SavedPlace[]>([]);
-  const [failed, setFailed] = useState(false);
-  const [authRequired, setAuthRequired] = useState(false);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [preciseLocationAllowed, setPreciseLocationAllowed] = useState(false);
+  const [taxiBridgeSupported, setTaxiBridgeSupported] = useState<boolean | null>(null);
+  const [pageState, setPageState] = useState<"LOADING" | "AUTH_REQUIRED" | "READY" | "FAILED">("LOADING");
+  const [showForm, setShowForm] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [originQuery, setOriginQuery] = useState("");
+  const [destinationQuery, setDestinationQuery] = useState("");
+  const [origin, setOrigin] = useState<PlaceRef | null>(null);
+  const [destination, setDestination] = useState<PlaceRef | null>(null);
+  const [fareCap, setFareCap] = useState("10000");
+  const [selectedFarePreset, setSelectedFarePreset] = useState<number | null>(10000);
+  const [allowTaxiBridge, setAllowTaxiBridge] = useState(true);
+  const [saveState, setSaveState] = useState<"IDLE" | "SAVING" | "DONE" | "FAILED" | "CONSENT_REQUIRED">("IDLE");
+  const [activeFavoriteIds, setActiveFavoriteIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [favoriteError, setFavoriteError] = useState<Record<string, string>>({});
+  const attempts = useRef(new Map<string, { idempotencyKey: string; request: PublicRouteSearchRequest }>());
+  const activeSearches = useRef(new Set<string>());
+  const favoriteCreateAttempt = useRef<{
+    fingerprint: string;
+    idempotencyKey: string;
+    body: FavoriteJourneyFromPlacesInput;
+  } | null>(null);
 
   async function reload() {
-    const [favoriteResult, placeResult] = await Promise.all([listFavoriteJourneys(), listSavedPlaces()]);
-    if (!favoriteResult.response.ok || favoriteResult.data === undefined || !placeResult.response.ok || placeResult.data === undefined) {
+    const [favoriteResult, placeResult, preferenceResult, consentResult, capabilityResult] = await Promise.all([
+      listFavoriteJourneys(),
+      listSavedPlaces(),
+      getPreferences(),
+      listConsents(),
+      getPublicCapabilities(),
+    ]);
+    if (!favoriteResult.response.ok || favoriteResult.data === undefined || !placeResult.response.ok || placeResult.data === undefined
+      || !preferenceResult.response.ok || preferenceResult.data === undefined || !consentResult.response.ok || consentResult.data === undefined) {
       throw new Error("Favorites unavailable");
     }
     setFavorites(favoriteResult.data);
     setPlaces(placeResult.data);
+    setPreferences(preferenceResult.data);
+    setPreciseLocationAllowed(hasCurrentConsent(consentResult.data.items, "PRECISE_LOCATION"));
+    setTaxiBridgeSupported(capabilityResult.response.ok && capabilityResult.data !== undefined
+      ? capabilityResult.data.features?.taxiBridge === true
+      : null);
   }
 
   useEffect(() => {
     void inspectCurrentSession().then((session) => {
-      if (session?.subjectType !== "USER") { setAuthRequired(true); return; }
-      void reload().catch(() => setFailed(true));
-    }).catch(() => setFailed(true));
+      if (session?.subjectType !== "USER") { setPageState("AUTH_REQUIRED"); return; }
+      void reload().then(() => setPageState("READY")).catch(() => setPageState("FAILED"));
+    }).catch(() => setPageState("FAILED"));
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const nickname = data.get("nickname");
-    const originSavedPlaceId = data.get("originSavedPlaceId");
-    const destinationSavedPlaceId = data.get("destinationSavedPlaceId");
-    if (typeof nickname !== "string" || typeof originSavedPlaceId !== "string" || typeof destinationSavedPlaceId !== "string") return;
+    if (origin === null || destination === null || preferences === null || nickname.trim().length === 0) return;
+    const expectedFareCap = Number(fareCap);
+    if (!Number.isInteger(expectedFareCap) || expectedFareCap < 0 || expectedFareCap > maximumTaxiBudgetKrw) { setSaveState("FAILED"); return; }
+    if (!await checkCurrentConsent("PRECISE_LOCATION")) { setPreciseLocationAllowed(false); setSaveState("CONSENT_REQUIRED"); return; }
+    const searchConditions: FavoriteJourneySearchConditionsV1 = {
+      schemaVersion: 1,
+      departurePolicy: "DEPART_AT_CLICK",
+      taxiBudget: {
+        currency: "KRW",
+        maxAmount: expectedFareCapToTaxiBudgetKrw(expectedFareCap, selectedFarePreset === maximumTaxiBudgetKrw),
+        strict: true,
+      },
+      preferences: {
+        maxWalkSeconds: preferences.maxWalkSeconds,
+        maxTransfers: preferences.maxTransfers,
+        maxTaxiLegs: preferences.maxTaxiLegs,
+        allowTaxiBridge: taxiBridgeSupported === true && allowTaxiBridge,
+        avoidHighBusSeatRisk: false,
+        allowedModes: ["WALK", "WAIT", "TRANSFER", "TAXI", "BUS", "SUBWAY", "GTX", "TRAIN"],
+        optimization: preferences.optimizationProfile,
+        ...(preferences.accessibility === undefined ? {} : { accessibility: preferences.accessibility }),
+      },
+      requestedRecommendations: ["FASTEST", "STABLE", "EFFICIENT", "PUBLIC_TRANSIT_ONLY"],
+    };
+    const body: FavoriteJourneyFromPlacesInput = {
+      nickname: nickname.trim(),
+      originPlace: { label: origin.displayName.slice(0, 50), place: origin, isSensitive: true },
+      destinationPlace: { label: destination.displayName.slice(0, 50), place: destination, isSensitive: true },
+      searchConditions,
+    };
+    const fingerprint = canonicalRequestFingerprint(body);
+    if (favoriteCreateAttempt.current?.fingerprint !== fingerprint) {
+      favoriteCreateAttempt.current = { fingerprint, idempotencyKey: createIdempotencyKey(), body };
+    }
+    const attempt = favoriteCreateAttempt.current;
+    setSaveState("SAVING");
     try {
-      const result = await createFavoriteJourney({ nickname, originSavedPlaceId, destinationSavedPlaceId, defaultConstraints: {} });
-      if (!result.response.ok) throw new Error("Favorite save failed");
+      const result = await createFavoriteJourneyFromPlaces(attempt.body, attempt.idempotencyKey);
+      if (result.response.status !== 201 || result.data === undefined) throw new Error("Favorite save failed");
       await reload();
+      favoriteCreateAttempt.current = null;
+      setNickname(""); setOriginQuery(""); setDestinationQuery(""); setOrigin(null); setDestination(null);
+      setShowForm(false);
+      setSaveState("DONE");
     } catch {
-      setFailed(true);
+      setSaveState("FAILED");
     }
   }
 
@@ -268,7 +440,7 @@ export function FavoritesPage() {
       const result = await updateFavoriteJourney(item.id, { nickname });
       if (!result.response.ok) throw new Error("Favorite update failed");
       await reload();
-    } catch { setFailed(true); }
+    } catch { setPageState("FAILED"); }
   }
 
   async function remove(item: FavoriteJourney) {
@@ -277,23 +449,103 @@ export function FavoritesPage() {
       const result = await deleteFavoriteJourney(item.id);
       if (result.response.status !== 204) throw new Error("Favorite delete failed");
       await reload();
-    } catch { setFailed(true); }
+    } catch { setFavoriteError((current) => ({ ...current, [item.id]: "즐겨찾기를 삭제하지 못했어요. 잠시 후 다시 시도해 주세요." })); }
+  }
+
+  function routeRequest(item: FavoriteJourney, originPlace: SavedPlace, destinationPlace: SavedPlace): PublicRouteSearchRequest | null {
+    if (item.searchConditions == null) return null;
+    return {
+      origin: originPlace.place,
+      destination: destinationPlace.place,
+      departure: { type: "DEPART_AT", time: new Date().toISOString() },
+      arrivalDeadline: null,
+      taxiBudget: item.searchConditions.taxiBudget,
+      preferences: item.searchConditions.preferences,
+      requestedRecommendations: item.searchConditions.requestedRecommendations,
+      saveToHistory: false,
+    };
+  }
+
+  async function quickSearch(item: FavoriteJourney, originPlace: SavedPlace, destinationPlace: SavedPlace) {
+    if (activeSearches.current.has(item.id) || !navigator.onLine) return;
+    activeSearches.current.add(item.id);
+    setActiveFavoriteIds((current) => new Set([...current, item.id]));
+    setFavoriteError((current) => ({ ...current, [item.id]: "" }));
+    let navigationStarted = false;
+    try {
+      let attempt = attempts.current.get(item.id);
+      if (attempt === undefined) {
+        const request = routeRequest(item, originPlace, destinationPlace);
+        if (request === null) throw new Error("LEGACY");
+        request.saveToHistory = await checkCurrentConsent("SEARCH_HISTORY");
+        attempt = { idempotencyKey: createIdempotencyKey(), request };
+        attempts.current.set(item.id, attempt);
+      }
+      const result = await createRouteSearch(attempt.request, attempt.idempotencyKey);
+      if (!result.response.ok || result.data === undefined) throw new Error("SEARCH_FAILED");
+      attempts.current.delete(item.id);
+      const destinationPath = `/searches/${encodeURIComponent(result.data.searchId)}`;
+      navigationStarted = true;
+      window.history.pushState(null, "", destinationPath);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } catch (error) {
+      setFavoriteError((current) => ({ ...current, [item.id]: error instanceof Error && error.message === "LEGACY"
+        ? "저장 조건이 없는 이전 즐겨찾기예요. 새로 저장해 주세요."
+        : "경로를 찾지 못했어요. 저장한 조건은 그대로 유지됩니다." }));
+    } finally {
+      if (!navigationStarted) {
+        activeSearches.current.delete(item.id);
+        setActiveFavoriteIds((current) => {
+          const next = new Set(current);
+          next.delete(item.id);
+          return next;
+        });
+      }
+    }
   }
 
   return (
-    <PageFrame eyebrow="내 이동" title="즐겨찾는 여정">
-      <p className="page-lead">저장 장소 두 곳을 연결해 자주 쓰는 여정을 만듭니다.</p>
-      {authRequired ? <div className="auth-required"><strong>로그인이 필요한 기능이에요</strong><p>로그인하면 자주 가는 여정을 여러 기기에서 관리할 수 있어요.</p><a className="primary-link" href="/account?next=/favorites">로그인하기</a></div> : places.length >= 2 ? (
-        <form className="resource-form compact-form" onSubmit={(event) => void submit(event)}>
-          <label className="field"><span>여정 이름</span><input name="nickname" maxLength={100} required /></label>
-          <label className="field"><span>출발 장소</span><select name="originSavedPlaceId">{places.map((place) => <option key={place.id} value={place.id}>{place.label}</option>)}</select></label>
-          <label className="field"><span>도착 장소</span><select name="destinationSavedPlaceId">{places.map((place) => <option key={place.id} value={place.id}>{place.label}</option>)}</select></label>
-          <button className="primary-button" type="submit">즐겨찾기 저장</button>
-        </form>
-      ) : <p className="degraded-notice">즐겨찾기를 만들려면 저장 장소가 두 개 이상 필요합니다.</p>}
-      {!authRequired && (favorites === null || favorites.length === 0 ? <LoadMessage failed={failed} empty={favorites?.length === 0} /> : (
-        <ul className="resource-list">{favorites.map((item) => <li key={item.id}><strong>{item.nickname}</strong><span>{new Date(item.createdAt).toLocaleDateString("ko-KR")}</span><div className="item-actions"><button type="button" onClick={() => void rename(item)}>이름 수정</button><button type="button" onClick={() => void remove(item)}>삭제</button></div></li>)}</ul>
-      ))}
+    <PageFrame eyebrow="내 이동" title="즐겨찾기">
+      <p className="page-lead">자주 가는 경로와 조건을 저장하고, 버튼 한 번으로 바로 길찾기해요.</p>
+      {pageState === "AUTH_REQUIRED" && <div className="auth-required"><strong>로그인이 필요한 기능이에요</strong><p>로그인하면 자주 가는 경로를 안전하게 저장할 수 있어요.</p><a className="primary-link" href="/account?next=/favorites">로그인하기</a></div>}
+      {pageState === "LOADING" && <p className="empty-copy" role="status">즐겨찾기를 불러오는 중입니다.</p>}
+      {pageState === "FAILED" && <p className="degraded-notice" role="alert">즐겨찾기를 불러오지 못했어요. 잠시 후 다시 열어 주세요.</p>}
+      {pageState === "READY" && <>
+        <button className="primary-button favorite-add-button" type="button" onClick={() => setShowForm((current) => !current)} aria-expanded={showForm} aria-controls="favorite-create-form">{showForm ? "추가 닫기" : "자주 가는 경로 추가"}</button>
+        {showForm && <form id="favorite-create-form" className="resource-form favorite-create-form" onSubmit={(event) => void submit(event)}>
+          <label className="field"><span>이름</span><input value={nickname} onChange={(event) => setNickname(event.currentTarget.value)} maxLength={100} placeholder="출근길, 학교 가는 길" required /></label>
+          <PlaceField label="출발지" value={originQuery} onLabelChange={(value) => { setOriginQuery(value); setOrigin(null); }} onPlaceSelected={(place) => { setOrigin(place); setOriginQuery(place.displayName); }} />
+          <PlaceField label="목적지" value={destinationQuery} onLabelChange={(value) => { setDestinationQuery(value); setDestination(null); }} onPlaceSelected={(place) => { setDestination(place); setDestinationQuery(place.displayName); }} />
+          <div className="budget-section">
+            <span className="budget-title">예상 요금 상한</span>
+            <div className="budget-presets" role="group" aria-label="즐겨찾기 예상 요금 상한 빠른 선택">{([[maximumTaxiBudgetKrw, "무관"], [5000, "5천원"], [10000, "1만원"], [20000, "2만원"]] as const).map(([amount, label]) => <button key={amount} type="button" aria-pressed={selectedFarePreset === amount} onClick={() => { setSelectedFarePreset(amount); setFareCap(String(amount)); }}>{label}</button>)}</div>
+            <label className="field budget-field"><span>요금 상한 직접 입력</span><span className="input-suffix"><input inputMode="numeric" min={0} max={maximumTaxiBudgetKrw} value={selectedFarePreset === maximumTaxiBudgetKrw ? "" : fareCap} placeholder={selectedFarePreset === maximumTaxiBudgetKrw ? "무관 선택됨" : undefined} onFocus={() => { if (selectedFarePreset === maximumTaxiBudgetKrw) setFareCap(""); setSelectedFarePreset(null); }} onChange={(event) => { setSelectedFarePreset(null); setFareCap(event.currentTarget.value); }} required={selectedFarePreset !== maximumTaxiBudgetKrw} /><span>원</span></span></label>
+          </div>
+          <label className="check-field"><input type="checkbox" checked={taxiBridgeSupported === true && allowTaxiBridge} disabled={taxiBridgeSupported !== true} onChange={(event) => setAllowTaxiBridge(event.currentTarget.checked)} /><span>대중교통 사이 짧은 택시 이동 허용</span></label>
+          {!preciseLocationAllowed && <div className="privacy-cta"><strong>정확한 위치 저장 동의가 필요해요</strong><p>즐겨찾기는 선택한 출발지와 목적지를 계정에 저장합니다.</p><a href="/privacy">위치 저장 동의 확인</a></div>}
+          <button className="primary-button" type="submit" disabled={saveState === "SAVING" || origin === null || destination === null || preferences === null || !preciseLocationAllowed}>{saveState === "SAVING" ? "저장하는 중…" : "즐겨찾기에 저장"}</button>
+        </form>}
+        <div className="form-announcement" aria-live="polite">{saveState === "DONE" ? "즐겨찾기에 저장했어요. 아래 버튼을 한 번 누르면 바로 길찾기합니다." : saveState === "FAILED" ? "즐겨찾기를 저장하지 못했어요. 입력한 내용은 그대로 두었습니다." : saveState === "CONSENT_REQUIRED" ? "위치 저장 동의를 다시 확인해 주세요." : ""}</div>
+        {favorites?.length === 0 && <div className="history-empty"><strong>아직 즐겨찾는 경로가 없어요</strong><p>자주 가는 출발지와 목적지, 예상 요금 상한을 저장해 보세요.</p></div>}
+        {favorites !== null && favorites.length > 0 && <ul className="resource-list favorite-list">{favorites.map((item) => {
+          const originPlace = places.find((place) => place.id === item.originSavedPlaceId);
+          const destinationPlace = places.find((place) => place.id === item.destinationSavedPlaceId);
+          const conditions = item.searchConditions;
+          const unsupported = conditions?.preferences.allowTaxiBridge === true && taxiBridgeSupported !== true;
+          const runnable = originPlace !== undefined && destinationPlace !== undefined && conditions != null && !unsupported;
+          return <li key={item.id}><article className="favorite-card">
+            <button className="favorite-route-action" type="button" disabled={!runnable || activeFavoriteIds.has(item.id) || !navigator.onLine} onClick={() => { if (originPlace !== undefined && destinationPlace !== undefined) void quickSearch(item, originPlace, destinationPlace); }}>
+              <span className="favorite-card-name">{item.nickname}</span>
+              <span className="favorite-route-title"><span>{originPlace?.place.displayName ?? "저장 장소 확인 필요"}</span><span aria-hidden="true">→</span><span>{destinationPlace?.place.displayName ?? "저장 장소 확인 필요"}</span></span>
+              {conditions == null ? <span className="legacy-guidance">저장 조건이 없는 이전 즐겨찾기예요. 새 조건으로 다시 저장해 주세요.</span> : <span className="condition-chips"><span>{conditions.taxiBudget.maxAmount === maximumTaxiBudgetKrw ? "예상 요금 상한 무관" : `예상 요금 상한 ${taxiBudgetToExpectedFareCapKrw(conditions.taxiBudget.maxAmount).toLocaleString("ko-KR")}원`}</span><span>{conditions.preferences.allowTaxiBridge === true ? "짧은 택시 이동 허용" : "대중교통 중심"}</span></span>}
+              {unsupported && <span className="legacy-guidance">현재는 짧은 택시 이동 지원 여부를 확인할 수 없어 이 조건으로 검색할 수 없어요.</span>}
+              <span className="card-primary-action">{activeFavoriteIds.has(item.id) ? `‘${item.nickname}’ 경로를 찾는 중…` : navigator.onLine ? "이 경로로 바로 길찾기" : "인터넷 연결 후 길찾기"}</span>
+            </button>
+            <div className="item-actions"><button type="button" onClick={() => void rename(item)}>이름 수정</button><button type="button" onClick={() => void remove(item)}>삭제</button></div>
+            {favoriteError[item.id] && <p className="favorite-error" role="alert">{favoriteError[item.id]}</p>}
+          </article></li>;
+        })}</ul>}
+      </>}
     </PageFrame>
   );
 }
@@ -408,7 +660,7 @@ export function AccountPage() {
   const [guestToken, setGuestToken] = useState<string | undefined>(currentGuestToken());
   const [status, setStatus] = useState<"LOADING" | "READY" | "SIGNED_OUT" | "FAILED">("LOADING");
   const [mode, setMode] = useState<"LOGIN" | "REGISTER">("LOGIN");
-  const [authStatus, setAuthStatus] = useState<"IDLE" | "SENDING" | "INVALID" | "DUPLICATE" | "FAILED">("IDLE");
+  const [authStatus, setAuthStatus] = useState<"IDLE" | "SENDING" | "INVALID" | "INVALID_INPUT" | "PRIVACY_REQUIRED" | "UPDATE_REQUIRED" | "SECURITY_EXPIRED" | "RATE_LIMITED" | "OFFLINE" | "DUPLICATE" | "FAILED">("IDLE");
 
   useEffect(() => {
     void inspectCurrentSession().then((current) => {
@@ -447,15 +699,22 @@ export function AccountPage() {
     const email = form.get("email");
     const password = form.get("password");
     if (typeof email !== "string" || typeof password !== "string") return;
+    const privacyAccepted = form.get("requiredPrivacyAccepted") === "on";
+    if (mode === "REGISTER" && !privacyAccepted) { setAuthStatus("PRIVACY_REQUIRED"); return; }
     setAuthStatus("SENDING");
     try {
+      const documentVersion = import.meta.env.VITE_PRIVACY_DOCUMENT_VERSION;
+      if (mode === "REGISTER" && (documentVersion === undefined || documentVersion.length === 0)) {
+        setAuthStatus("UPDATE_REQUIRED");
+        return;
+      }
       const result = mode === "LOGIN"
         ? await loginWithEmail({ email: email.trim(), password })
         : await registerWithEmail({
             email: email.trim(),
             password,
             nickname: String(form.get("nickname") ?? "").trim(),
-            documentVersion: import.meta.env.VITE_PRIVACY_DOCUMENT_VERSION ?? "local-development",
+            documentVersion: documentVersion ?? "",
             requiredPrivacyAccepted: true,
             optionalConsents: {
               SEARCH_HISTORY: form.get("SEARCH_HISTORY") === "on",
@@ -466,6 +725,16 @@ export function AccountPage() {
           });
       if (result.response.status === 401) { setAuthStatus("INVALID"); return; }
       if (result.response.status === 409) { setAuthStatus("DUPLICATE"); return; }
+      if (result.response.status === 400) {
+        const policyChanged = result.error?.violations.some((violation) => violation.field === "documentVersion") === true;
+        setAuthStatus(policyChanged ? "UPDATE_REQUIRED" : "INVALID_INPUT");
+        if (policyChanged && "serviceWorker" in navigator) {
+          void navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => undefined);
+        }
+        return;
+      }
+      if (result.response.status === 403) { setAuthStatus("SECURITY_EXPIRED"); return; }
+      if (result.response.status === 429) { setAuthStatus("RATE_LIMITED"); return; }
       if (!result.response.ok || result.data === undefined) throw new Error("Authentication failed");
       rememberUserSession(result.data);
       setGuestToken(undefined);
@@ -475,7 +744,7 @@ export function AccountPage() {
       const next = new URLSearchParams(window.location.search).get("next");
       if (next === "/history" || next === "/favorites") window.location.assign(next);
     } catch {
-      setAuthStatus("FAILED");
+      setAuthStatus(navigator.onLine ? "FAILED" : "OFFLINE");
     }
   }
 
@@ -497,6 +766,12 @@ export function AccountPage() {
             {mode === "REGISTER" && <fieldset className="signup-consents"><legend>개인정보와 데이터 권리</legend><label><input name="requiredPrivacyAccepted" type="checkbox" required /><span><strong>[필수] 개인정보 처리와 데이터 권리 안내 동의</strong><small>서비스 제공, 계정 관리와 데이터 열람·삭제 요청 처리를 위한 안내입니다. <a href="/privacy" target="_blank">내용 보기</a></small></span></label><p>선택 동의</p><label><input name="SEARCH_HISTORY" type="checkbox" /><span>검색 기록 저장</span></label><label><input name="PRECISE_LOCATION" type="checkbox" /><span>정확한 저장 장소</span></label><label><input name="PRODUCT_ANALYTICS" type="checkbox" /><span>제품 개선 분석</span></label><label><input name="ROUTING_FEEDBACK" type="checkbox" /><span>경로 의견 활용</span></label><small className="consent-help">선택 항목은 동의하지 않아도 가입할 수 있고, 언제든 내 정보에서 바꿀 수 있어요.</small></fieldset>}
             <button className="primary-button" type="submit" disabled={authStatus === "SENDING"}>{authStatus === "SENDING" ? "확인 중…" : mode === "LOGIN" ? "로그인" : "계정 만들기"}</button>
             {authStatus === "INVALID" && <p className="auth-error" role="alert">이메일 또는 비밀번호가 올바르지 않습니다.</p>}
+            {authStatus === "INVALID_INPUT" && <p className="auth-error" role="alert">입력 내용을 확인해 주세요. 닉네임은 2~20자, 비밀번호는 12자 이상이어야 합니다.</p>}
+            {authStatus === "PRIVACY_REQUIRED" && <p className="auth-error" role="alert">필수 개인정보 안내에 동의해야 계정을 만들 수 있습니다.</p>}
+            {authStatus === "UPDATE_REQUIRED" && <div className="auth-error auth-recovery" role="alert"><span>앱 버전이 서버와 맞지 않습니다. 새 버전을 불러온 뒤 다시 가입해 주세요.</span><button type="button" onClick={() => window.location.reload()}>새 버전 불러오기</button></div>}
+            {authStatus === "SECURITY_EXPIRED" && <div className="auth-error auth-recovery" role="alert"><span>보안 확인이 만료되었습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.</span><button type="button" onClick={() => window.location.reload()}>새로고침</button></div>}
+            {authStatus === "RATE_LIMITED" && <p className="auth-error" role="alert">가입 요청이 많습니다. 1분 뒤 다시 시도해 주세요.</p>}
+            {authStatus === "OFFLINE" && <p className="auth-error" role="alert">인터넷 연결을 확인한 뒤 다시 시도해 주세요.</p>}
             {authStatus === "DUPLICATE" && <p className="auth-error" role="alert">이미 가입된 이메일입니다. 로그인해 주세요.</p>}
             {authStatus === "FAILED" && <p className="auth-error" role="alert">지금은 계정 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.</p>}
           </form>

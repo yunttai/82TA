@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Budget Route Service Public API
-  version: 1.5.0
+  version: 1.6.0
 servers:
   - url: https://api.example.invalid
 security: []
@@ -320,6 +320,13 @@ paths:
                 items: {$ref: '#/components/schemas/SavedPlace'}
     post:
       operationId: createSavedPlace
+      description: >-
+        Creates one owner-bound saved place containing an exact coordinate. Requires
+        an authenticated USER session, CSRF protection, and current accepted
+        PRECISE_LOCATION consent. Invalid place or coordinate data uses
+        INVALID_COORDINATE or CONSTRAINT_OUT_OF_RANGE; a missing or expired session
+        uses AUTH_REQUIRED or SESSION_EXPIRED; missing current location consent uses
+        CONSENT_REQUIRED. The response is owner-only and Cache-Control no-store.
       security: [{sessionCookie: []}]
       requestBody:
         required: true
@@ -332,9 +339,20 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SavedPlace'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
   /api/v1/me/saved-places/{savedPlaceId}:
     patch:
       operationId: updateSavedPlace
+      description: >-
+        Partially updates an owner-bound saved place. Current accepted
+        PRECISE_LOCATION consent is required only when the request contains place and
+        therefore changes the exact coordinate. Label-only and isSensitive-only
+        updates remain available after location-consent withdrawal. Authentication,
+        owner authorization, and CSRF protection still apply; a missing or
+        other-owner resource is returned as 404.
       security: [{sessionCookie: []}]
       parameters:
         - {$ref: '#/components/parameters/SavedPlaceId'}
@@ -349,17 +367,27 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SavedPlace'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
         '403': {$ref: '#/components/responses/Problem'}
         '404': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
     delete:
       operationId: deleteSavedPlace
+      description: >-
+        Soft-deletes an owner-bound saved place. PRECISE_LOCATION consent is not
+        required so a user can delete retained location data after withdrawing
+        consent. Authentication, owner authorization, and CSRF protection still
+        apply; a missing or other-owner resource is returned as 404.
       security: [{sessionCookie: []}]
       parameters:
         - {$ref: '#/components/parameters/SavedPlaceId'}
       responses:
         '204': {description: Saved place deleted}
+        '401': {$ref: '#/components/responses/Problem'}
         '403': {$ref: '#/components/responses/Problem'}
         '404': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
   /api/v1/me/favorite-journeys:
     get:
       operationId: listFavoriteJourneys
@@ -386,6 +414,53 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/FavoriteJourney'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+  /api/v1/me/favorite-journeys/from-places:
+    post:
+      operationId: createFavoriteJourneyFromPlaces
+      description: >-
+        Atomically creates two owner-bound saved places and the favorite journey that
+        references them. First creation requires current PRECISE_LOCATION consent.
+        Repeating the same owner, Idempotency-Key, and canonical request body within
+        24 hours returns the original immutable 201 receipt without creating location
+        data, consuming the write quota, or requiring current PRECISE_LOCATION consent
+        again. After expiry the request is a new creation and the current consent gate
+        applies. Reusing an unexpired key with another body returns
+        IDEMPOTENCY_CONFLICT. Invalid coordinates use INVALID_COORDINATE;
+        invalid labels or conditions use CONSTRAINT_OUT_OF_RANGE; a missing or expired
+        USER session uses AUTH_REQUIRED or SESSION_EXPIRED; missing current location
+        consent uses CONSENT_REQUIRED; quota rejection uses RATE_LIMITED. CSRF
+        protection is required. The response is owner-only and Cache-Control no-store.
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FavoriteJourneyFromPlacesInput'}
+      responses:
+        '201':
+          description: Immutable creation receipt; clients refresh owner-scoped lists for current representations
+          headers:
+            Cache-Control:
+              description: Sensitive owner data must not be stored by shared or browser caches.
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FavoriteJourneyFromPlacesResult'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
   /api/v1/me/favorite-journeys/{favoriteJourneyId}:
     patch:
       operationId: updateFavoriteJourney
@@ -403,8 +478,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/FavoriteJourney'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
         '403': {$ref: '#/components/responses/Problem'}
         '404': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
     delete:
       operationId: deleteFavoriteJourney
       security: [{sessionCookie: []}]
@@ -412,8 +490,10 @@ paths:
         - {$ref: '#/components/parameters/FavoriteJourneyId'}
       responses:
         '204': {description: Favorite journey deleted}
+        '401': {$ref: '#/components/responses/Problem'}
         '403': {$ref: '#/components/responses/Problem'}
         '404': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
   /api/v1/me/consents:
     get:
       operationId: listConsents
@@ -667,23 +747,7 @@ components:
             time: {type: string, format: date-time}
         arrivalDeadline: {type: [string, 'null'], format: date-time}
         taxiBudget: {$ref: './common/components.v1.yaml#/components/schemas/TaxiBudget'}
-        preferences:
-          type: object
-          additionalProperties: false
-          required: [maxWalkSeconds, maxTransfers, maxTaxiLegs, optimization]
-          properties:
-            maxWalkSeconds: {type: integer, minimum: 0, maximum: 7200}
-            maxTransfers: {type: integer, minimum: 0, maximum: 8}
-            maxTaxiLegs: {type: integer, minimum: 0, maximum: 3}
-            allowTaxiBridge: {type: boolean}
-            avoidHighBusSeatRisk: {type: boolean}
-            allowedModes:
-              description: Passed to Routing without Service-side ranking or cost interpretation. Omission uses all canonical modes.
-              type: array
-              uniqueItems: true
-              items: {type: string, enum: [WALK, WAIT, TRANSFER, TAXI, BUS, SUBWAY, GTX, TRAIN]}
-            optimization: {type: string, enum: [FASTEST, STABLE, EFFICIENT, BALANCED]}
-            accessibility: {$ref: './common/components.v1.yaml#/components/schemas/Accessibility'}
+        preferences: {$ref: '#/components/schemas/PublicRouteSearchPreferences'}
         requestedRecommendations:
           type: array
           uniqueItems: true
@@ -731,6 +795,42 @@ components:
         warnings: {type: array, items: {type: string}}
         support: {$ref: '#/components/schemas/PublicCapabilities'}
         history: {$ref: '#/components/schemas/HistoryMetadata'}
+        requestSummary:
+          description: >-
+            Optional owner-visible, coordinate-free input summary for history display.
+            It is not sufficient to recreate a route search and must not be used as a
+            quick-search request.
+          oneOf:
+            - {$ref: '#/components/schemas/RouteSearchRequestSummary'}
+            - {type: 'null'}
+    PublicRouteSearchPreferences:
+      type: object
+      additionalProperties: false
+      required: [maxWalkSeconds, maxTransfers, maxTaxiLegs, optimization]
+      properties:
+        maxWalkSeconds: {type: integer, minimum: 0, maximum: 7200}
+        maxTransfers: {type: integer, minimum: 0, maximum: 8}
+        maxTaxiLegs: {type: integer, minimum: 0, maximum: 3}
+        allowTaxiBridge: {type: boolean}
+        avoidHighBusSeatRisk: {type: boolean}
+        allowedModes:
+          description: Passed to Routing without Service-side ranking or cost interpretation. Omission uses all canonical modes.
+          type: array
+          uniqueItems: true
+          items: {type: string, enum: [WALK, WAIT, TRANSFER, TAXI, BUS, SUBWAY, GTX, TRAIN]}
+        optimization: {type: string, enum: [FASTEST, STABLE, EFFICIENT, BALANCED]}
+        accessibility: {$ref: './common/components.v1.yaml#/components/schemas/Accessibility'}
+    RouteSearchRequestSummary:
+      type: object
+      additionalProperties: false
+      required: [originDisplayName, destinationDisplayName, departureTime, taxiBudget, preferences]
+      properties:
+        originDisplayName: {type: string, minLength: 1, maxLength: 200}
+        destinationDisplayName: {type: string, minLength: 1, maxLength: 200}
+        departureTime: {type: string, format: date-time}
+        arrivalDeadline: {type: [string, 'null'], format: date-time}
+        taxiBudget: {$ref: './common/components.v1.yaml#/components/schemas/TaxiBudget'}
+        preferences: {$ref: '#/components/schemas/PublicRouteSearchPreferences'}
     HistoryMetadata:
       type: object
       additionalProperties: false
@@ -859,7 +959,12 @@ components:
         nickname: {type: string, maxLength: 100}
         originSavedPlaceId: {type: string, format: uuid}
         destinationSavedPlaceId: {type: string, format: uuid}
-        defaultConstraints: {type: object}
+        defaultConstraints:
+          type: object
+          additionalProperties: true
+          deprecated: true
+          description: Opaque Public 1.x compatibility payload. New consumers must not interpret it.
+        searchConditions: {$ref: '#/components/schemas/FavoriteJourneySearchConditionsV1'}
     FavoriteJourney:
       type: object
       additionalProperties: false
@@ -869,7 +974,15 @@ components:
         nickname: {type: string, maxLength: 100}
         originSavedPlaceId: {type: string, format: uuid}
         destinationSavedPlaceId: {type: string, format: uuid}
-        defaultConstraints: {type: object}
+        defaultConstraints:
+          type: object
+          additionalProperties: true
+          deprecated: true
+          description: Opaque Public 1.x compatibility payload. New consumers must not interpret it.
+        searchConditions:
+          oneOf:
+            - {$ref: '#/components/schemas/FavoriteJourneySearchConditionsV1'}
+            - {type: 'null'}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
     FavoriteJourneyUpdate:
@@ -880,7 +993,57 @@ components:
         nickname: {type: string, maxLength: 100}
         originSavedPlaceId: {type: string, format: uuid}
         destinationSavedPlaceId: {type: string, format: uuid}
-        defaultConstraints: {type: object}
+        defaultConstraints:
+          type: object
+          additionalProperties: true
+          deprecated: true
+          description: Opaque Public 1.x compatibility payload. New consumers must not interpret it.
+        searchConditions: {$ref: '#/components/schemas/FavoriteJourneySearchConditionsV1'}
+    FavoriteJourneySearchConditionsV1:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, departurePolicy, taxiBudget, preferences, requestedRecommendations]
+      properties:
+        schemaVersion: {type: integer, const: 1}
+        departurePolicy: {type: string, const: DEPART_AT_CLICK}
+        taxiBudget: {$ref: './common/components.v1.yaml#/components/schemas/TaxiBudget'}
+        preferences: {$ref: '#/components/schemas/PublicRouteSearchPreferences'}
+        requestedRecommendations:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {type: string, enum: [FASTEST, STABLE, EFFICIENT, PUBLIC_TRANSIT_ONLY]}
+    FavoriteJourneyFromPlacesInput:
+      type: object
+      additionalProperties: false
+      required: [nickname, originPlace, destinationPlace, searchConditions]
+      properties:
+        nickname: {type: string, minLength: 1, maxLength: 100}
+        originPlace: {$ref: '#/components/schemas/SavedPlaceInput'}
+        destinationPlace: {$ref: '#/components/schemas/SavedPlaceInput'}
+        searchConditions: {$ref: '#/components/schemas/FavoriteJourneySearchConditionsV1'}
+    FavoriteJourneyFromPlacesResult:
+      type: object
+      additionalProperties: false
+      description: >-
+        Immutable receipt returned for both first creation and same-body replay during
+        the 24-hour idempotency window. It intentionally contains no coordinates,
+        labels, request body, or mutable resource representation.
+      required:
+        - favoriteJourneyId
+        - originSavedPlaceId
+        - destinationSavedPlaceId
+        - createdAt
+        - idempotencyExpiresAt
+      properties:
+        favoriteJourneyId: {type: string, format: uuid}
+        originSavedPlaceId: {type: string, format: uuid}
+        destinationSavedPlaceId: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        idempotencyExpiresAt:
+          type: string
+          format: date-time
+          description: Exclusive end of the 24-hour durable replay window.
     ConsentType:
       type: string
       enum: [SERVICE_PRIVACY, SEARCH_HISTORY, PRECISE_LOCATION, PRODUCT_ANALYTICS, ROUTING_FEEDBACK]

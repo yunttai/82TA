@@ -71,15 +71,21 @@
 - SP-065 favorite journey CRUD
 - SP-066 consent records
 - SP-067 auth security tests
+- SP-068 typed favorite conditions and legacy fail-closed migration UX
+- SP-069 atomic favorite creation from arbitrary places with PRECISE_LOCATION consent and owner-scoped idempotency
 
 ## SP-E07 History & Feedback
 
 - SP-070 history list/detail
-- SP-071 save opt-in and retention
+- SP-071 current SEARCH_HISTORY consent-driven automatic save and exactly-once idempotent retention
+- SP-076 coordinate/provider-free history request-summary cards; display-only and no replay
+- SP-077 explicit one-tap favorite fresh search with click-time DEPART_AT and duplicate-submit protection
 - SP-072 route feedback
 - SP-073 anonymized feedback event projection
 - SP-074 deletion/export
 - SP-075 backup/analytics deletion policy
+
+**Acceptance:** guest·SEARCH_HISTORY 거절 사용자는 검색 가능하되 durable history가 없고, 동의한 USER의 accepted search는 한 건만 저장된다. 임의 장소 favorite 생성은 세 resource가 모두 성공하거나 모두 rollback되며, `바로 길찾기` 한 번은 mount·back·reload가 아닌 사용자 클릭에서만 새 route-search POST 한 번을 만든다. 삭제 장소·legacy favorite은 quick search를 fail closed한다.
 
 ## SP-E08 Support & Operations
 

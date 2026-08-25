@@ -1,5 +1,38 @@
 # Contract Changelog
 
+## 1.6.0 — 2026-08-25
+
+- Added versioned `FavoriteJourneySearchConditionsV1` while retaining the required,
+  deprecated opaque `defaultConstraints` field for Public 1.x compatibility, on top
+  of the accepted Public 1.5 Seoul Bike endpoint.
+- Added idempotent `POST /api/v1/me/favorite-journeys/from-places` so two saved places,
+  their favorite and a digest-only receipt are committed or rolled back together.
+  The DB-authoritative immutable ID receipt replays for 24 hours across restart/Redis
+  failure; current `PRECISE_LOCATION` and write quota apply to first creation only.
+- Added optional coordinate/provider-free `RouteSearchRequestSummary` for owner-only
+  history display. It cannot reconstruct a route request.
+- Defined favorite departure as a fresh timezone-aware `DEPART_AT` value created at
+  click time. Absolute timestamps, history consent state, result IDs and ranks are not
+  stored in favorite conditions.
+- Reused the existing favorite JSONB without backfill and added the Service-owned
+  `favorite_creation_idempotency` ledger table. Private Routing contracts, generated
+  Python client, events, codes, ranking and budget semantics are unchanged.
+- Clarified that SavedPlace creation and coordinate-changing PATCH require current
+  `PRECISE_LOCATION` consent, while label/sensitivity updates and deletion remain
+  available after consent withdrawal; documented their canonical Problem responses.
+- Preserved nonempty arbitrary legacy `defaultConstraints` properties in generated
+  clients as `Record<string, unknown>` while keeping typed `searchConditions` closed.
+- Documented canonical `429 RATE_LIMITED` responses for SavedPlace/FavoriteJourney
+  POST, PATCH and DELETE under the shared write quota; GET behavior is unchanged.
+- Synchronized legacy FavoriteJourney CRUD with producer Problem responses: POST now
+  declares 400/401/403/404, PATCH 400/401, and DELETE 401. Success and atomic-create
+  semantics are unchanged.
+- Advanced the Service database contract to `1.3.0` for the additive idempotency
+  ledger. Private Routing contracts, generated Python client, events, codes, ranking,
+  route generation, and budget semantics remain unchanged.
+- Added the two favorite-creation examples to the canonical GCE-only context and
+  recorded the atomic favorite quick-search decision as ADR-0013.
+
 ## Context 1.5.1 — 2026-08-25
 
 - Accepted GCE as the only supported cloud compute deployment platform and
@@ -30,6 +63,22 @@
   explicitly reports that live bicycle/empty-rack availability is not provided.
 - No Private Routing API, DBML, migration, event, code registry, ranking or route-ID
   change.
+
+## Context 1.4.1 — 2026-08-25
+
+- Accepted GCE as the only supported cloud compute deployment platform and
+  removed the alternate-cloud Terraform, runbooks and CI/CD templates.
+- Made the implemented single-GCE-VM Docker Compose workflow the honest current
+  baseline without relabeling its development flags, SQLite or internal HTTP as
+  production-ready.
+- Replaced cloud model/data artifact identities with canonical `gs://` URIs while
+  preserving bucket allowlists, path canonicalization, safe formats and SHA-256
+  verification.
+- Added GCE Terraform for the VM/network/static IP/firewall/runtime identity and a
+  private versioned GCS artifact bucket. Exact Google managed-service topology is
+  intentionally not frozen by the harness.
+- Contract version remains `1.4.0`; OpenAPI, DBML, events, code registry, generated
+  clients, ranking and public/private API wire semantics are unchanged.
 
 ## 1.4.0 — 2026-08-24
 

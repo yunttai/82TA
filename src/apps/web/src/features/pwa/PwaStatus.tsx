@@ -17,20 +17,30 @@ export function PwaStatus() {
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [registrationFailed, setRegistrationFailed] = useState(false);
   const updateRequested = useRef(false);
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const iosInstallAvailable = /iphone|ipad|ipod/i.test(navigator.userAgent) && !isStandalone();
+
+  function watchInstallingWorker(worker: ServiceWorker | null) {
+    if (worker === null) return;
+    const showUpdateWhenInstalled = () => {
+      if (worker.state === "installed" && navigator.serviceWorker.controller !== null) setUpdateWorker(worker);
+    };
+    showUpdateWhenInstalled();
+    worker.addEventListener("statechange", showUpdateWhenInstalled);
+  }
 
   async function registerServiceWorker() {
     if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
     setRegistrationFailed(false);
     try {
       const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      registrationRef.current = registration;
       if (registration.waiting !== null) setUpdateWorker(registration.waiting);
+      watchInstallingWorker(registration.installing);
       registration.addEventListener("updatefound", () => {
-        const worker = registration.installing;
-        worker?.addEventListener("statechange", () => {
-          if (worker.state === "installed" && navigator.serviceWorker.controller !== null) setUpdateWorker(worker);
-        });
+        watchInstallingWorker(registration.installing);
       });
+      void registration.update().catch(() => setRegistrationFailed(true));
     } catch {
       setRegistrationFailed(true);
     }
@@ -54,6 +64,15 @@ export function PwaStatus() {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
+  }, []);
+
+  useEffect(() => {
+    function checkForUpdate() {
+      if (document.visibilityState !== "visible") return;
+      void registrationRef.current?.update().catch(() => setRegistrationFailed(true));
+    }
+    document.addEventListener("visibilitychange", checkForUpdate);
+    return () => document.removeEventListener("visibilitychange", checkForUpdate);
   }, []);
 
   useEffect(() => {

@@ -36,7 +36,6 @@ export interface SearchDraft {
   avoidHighBusSeatRisk: boolean;
   avoidStairs: boolean;
   wheelchair: boolean;
-  saveToHistory: boolean;
   allowedModes: AllowedMode[];
   optimization: Optimization;
 }
@@ -82,7 +81,6 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
     avoidHighBusSeatRisk: false,
     avoidStairs: false,
     wheelchair: false,
-    saveToHistory: false,
     allowedModes: [...canonicalModes],
     optimization: "BALANCED",
   });
@@ -247,14 +245,6 @@ export function SearchForm({ busy, offline = false, errors, capabilities, initia
               onChange={(event) => setDraft({ ...draft, allowTaxiBridge: event.currentTarget.checked })}
             />
             <span>대중교통 사이 짧은 택시 이동 허용</span>
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={draft.saveToHistory}
-              onChange={(event) => setDraft({ ...draft, saveToHistory: event.currentTarget.checked })}
-            />
-            <span>검색 기록에 저장</span>
           </label>
         </div>
       </fieldset>

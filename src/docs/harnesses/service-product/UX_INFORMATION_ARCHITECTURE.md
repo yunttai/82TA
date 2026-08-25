@@ -2,7 +2,7 @@
 
 ## 1. 목적과 경계
 
-이 문서는 React 모바일 웹앱/PWA가 Public Service API `1.3.0`을 오인 없이 표시하기 위한 정보 구조, 상태, 문구, 접근성 acceptance를 정의한다. 화면은 Routing이 반환한 시간·비용·순위·확률을 재계산하지 않는다. Provider 호출, Kakao↔GBIS 매핑, Bus ETA·Seat Risk 추론, 후보 생성, strict-budget 판정, Pareto/ranking은 이 작업흐름의 구현 대상이 아니다.
+이 문서는 React 모바일 웹앱/PWA가 Public Service API `1.6.0`을 오인 없이 표시하기 위한 정보 구조, 상태, 문구, 접근성 acceptance를 정의한다. 화면은 Routing이 반환한 시간·비용·순위·확률을 재계산하지 않는다. Provider 호출, Kakao↔GBIS 매핑, Bus ETA·Seat Risk 추론, 후보 생성, strict-budget 판정, Pareto/ranking은 이 작업흐름의 구현 대상이 아니다.
 
 적용 원칙:
 
@@ -25,7 +25,7 @@
 | 항목 | URL | 화면 | guest 동작 |
 |---|---|---|---|
 | 길찾기 | `/` | Search Home·결과 진입 | 사용 가능 |
-| 기록 | `/history` | History | 로그인 안내 또는 guest-owned 단건만 표시 |
+| 기록 | `/history` | History | 로그인 안내; guest 검색은 durable history로 표시하지 않음 |
 | 즐겨찾기 | `/favorites` | Favorite Journeys·Saved Places | 로그인 안내 |
 | 내 정보 | `/me` | Preferences·Support·Privacy | 공개 support와 로컬 설정은 접근 가능 |
 
@@ -451,16 +451,22 @@ unknown reason은 추천 근거 영역에서 `추가 추천 근거가 있어요`
 
 | 상태 | 표현/action |
 |---|---|
-| logged out | 로그인 시 기록을 관리할 수 있다는 안내; 자동 저장 동의 금지 |
-| opt-out | `검색 기록 저장 안 함`을 명확히 표시 |
-| loading | skeleton + status |
+| logged out | `로그인하면 검색 기록을 확인할 수 있어요`; guest 검색은 계속 허용하고 durable history 저장을 약속하지 않음 |
+| consent off | `검색 기록 저장이 꺼져 있어요`; 개인정보 화면에서 선택 동의를 변경하는 action 제공 |
+| loading | 목록 skeleton과 `검색 기록을 불러오는 중이에요` status; 기존 목록이 있으면 유지 |
 | empty | `저장된 검색 기록이 없어요` |
-| loaded | 출발/도착 displayName, 검색 시각, 상태, `history.saved`, `retainedUntil`; exact 좌표 숨김 |
-| expired item | `다시 검색 필요`; 과거 route를 현재 결과처럼 열지 않음 |
-| delete pending | 대상과 범위를 확인; undo 가능 여부를 서버 의미대로 표시 |
-| error | 목록 유지 가능한 경우 유지 + 재시도 |
+| loaded | 좌표 없는 `requestSummary`의 출발지→목적지, 검색 시각, 사용자 친화적 상태, 조건 요약 표시 |
+| summary unavailable | legacy/누락 summary를 추정하지 않고 `검색 조건을 표시할 수 없어요`; 과거 결과 열기만 허용 |
+| expired item | `이 결과는 다시 확인이 필요해요`; 과거 route를 현재 추천처럼 표시하거나 자동 재검색하지 않음 |
+| error | 기존 목록 유지 + `기록을 불러오지 못했어요` + 명시적 `다시 시도` |
 
-`saveToHistory`는 명시적 opt-in이며 USER session과 현재 `SEARCH_HISTORY` 동의가 모두 있어야 한다. GUEST 검색은 `history.saved=false`, `ownerKind=GUEST`로 짧은 조회 TTL만 표시한다. 민감 장소 label을 analytics event에 넣지 않는다.
+- USER session과 현재 버전의 `SEARCH_HISTORY` 동의가 있으면 Web은 사용자가 제출한 모든 유효한 검색에 `saveToHistory=true`를 자동 적용한다. 검색 폼에 검색별 저장 checkbox를 두지 않는다.
+- guest, 동의 거절/철회 상태에서도 경로 검색은 가능하지만 `saveToHistory=false`이며 기록 목록에 지속 저장하지 않는다. validation 실패나 서버가 수락하지 않은 검색도 기록으로 만들지 않는다.
+- 네트워크 재시도는 최초 요청과 같은 idempotency key를 사용하고, 같은 accepted search가 기록에 정확히 한 건만 생겨야 한다.
+- 기록 카드는 표시 전용 `requestSummary`만 사용한다. 좌표·주소·Provider ID를 노출하거나 summary로 새 검색 요청을 재구성하지 않는다.
+- 기록 선택은 저장된 과거 결과 상세를 연다. page mount, browser back/forward, reload 또는 카드 선택만으로 새 route-search POST를 만들지 않는다.
+- 개별 기록 삭제 endpoint는 계약에 없으므로 item delete action을 제공하지 않는다. 계정 데이터 삭제와 export는 별도 data-rights 흐름을 따른다.
+- 장소 표시명은 집·직장 등 민감 정보를 포함할 수 있으므로 analytics, URL, persistent browser storage, notification preview에 넣지 않는다.
 
 ### 13.3 Saved Places
 
@@ -468,16 +474,22 @@ unknown reason은 추천 근거 영역에서 `추가 추천 근거가 있어요`
 - 화면/notification preview에서 민감 label을 기본 숨길 수 있는 privacy 설정을 제공한다.
 - create는 목록에 server `201` response가 도착한 뒤 반영하고, edit는 item `PATCH`의 server response로 교체한다.
 - delete는 대상 label을 확인한 뒤 item `DELETE` 204에서 목록에서 제거한다. 다른 owner는 404로 resource 존재를 숨기고, 동일 owner의 scope/consent 부족 403은 일반 접근 불가로 처리한다.
-- 삭제 확인은 연결된 favorite 영향이 계약으로 제공될 때만 구체적으로 말한다.
+- saved place 삭제는 연결된 favorite을 함께 무효화한다. 삭제 확인에 영향을 알리고, 무효화된 favorite에서 quick search를 fail closed한다.
 - 저장 장소 label과 providerPlaceId는 Routing request에 전달하지 않는다.
 
 ### 13.4 Favorite Journeys
 
-- nickname, 저장된 출발/도착, default constraints 요약을 표시한다.
-- favorite 선택은 Search Home을 prefill하며 자동 POST하지 않는다.
-- create/update/delete는 collection POST와 item PATCH/DELETE 응답을 기준으로 완료 처리한다. 다른 owner의 item 404에서 resource 존재를 추정하지 않는다.
-- 저장된 조건이 현재 capability와 맞지 않으면 disabled 이유를 표시하고 사용자가 수정하게 한다.
-- favorite은 경로 결과 snapshot이 아니라 검색 조건임을 명확히 한다.
+- 화면 설명은 `자주 가는 경로와 조건을 저장하고 한 번에 길찾기할 수 있어요.`로 한다. 각 카드는 nickname, 저장된 출발지→목적지, `searchConditions`의 요금 상한·택시 연결 허용·추천 조건을 사용자 용어로 요약한다.
+- `자주 가는 경로 추가`는 두 개의 기존 saved place 선택을 선행 조건으로 요구하지 않는다. 사용자가 임의의 출발지와 목적지를 선택하고 조건을 확인한 뒤 `POST /api/v1/me/favorite-journeys/from-places` 한 번으로 두 saved place와 favorite을 원자적으로 생성한다.
+- from-places 생성은 USER session과 현재 버전의 `PRECISE_LOCATION` 동의를 요구한다. 동의가 없으면 검색은 막지 않고 `정확한 위치 저장 동의가 필요해요`와 개인정보 화면 action을 제공한다. 세 resource 중 일부만 성공한 것처럼 목록을 갱신하지 않는다.
+- 생성 재시도는 같은 canonical body와 owner-scoped idempotency key를 유지한다. `IDEMPOTENCY_CONFLICT`는 새 key로 조용히 우회하지 않고 입력 확인을 요청한다.
+- `searchConditions.taxiBudget`은 canonical strict taxi budget 그대로 저장한다. Web의 `예상 요금 상한` 표시는 기존 fare-cap 변환기를 통해서만 표시·입력 변환하며, favorite 화면에서 비용이나 ranking을 새로 계산하지 않는다.
+- favorite은 과거 경로 결과가 아니라 새 검색 입력이다. 절대 출발시각, 도착 마감, `saveToHistory`, 과거 search/route/rank ID를 저장하거나 표시하지 않는다.
+- 사용자가 `바로 길찾기`를 명시적으로 한 번 누를 때만 두 active saved place와 typed conditions로 timezone-aware 클릭 시점 `DEPART_AT` 요청을 만들고, 새 idempotency key로 기존 `POST /api/v1/route-searches`를 정확히 한 번 호출한다. 성공하면 새 `searchId` 결과로 이동한다.
+- page mount, browser back/forward, reload, 목록 refresh, 카드 focus/선택은 route-search POST를 발생시키지 않는다. 요청 중에는 해당 카드의 action만 disabled하고 중복 tap을 무시한다.
+- quick-search 실패 시 favorite 목록과 입력을 유지하고 `길찾기를 시작하지 못했어요`와 명시적 `다시 시도`를 제공한다. 재시도는 응답 여부가 불명확한 요청에만 같은 idempotency key를 사용한다.
+- `searchConditions=null`인 legacy favorite, 삭제된/다른 owner의 saved place, 지원하지 않는 schema/capability는 값을 추측하지 않고 `이 즐겨찾기는 조건을 다시 저장해야 해요`로 `바로 길찾기`를 비활성화한다.
+- create/update/delete는 server 응답을 기준으로 완료 처리하며 다른 owner의 404에서 resource 존재를 추정하지 않는다.
 
 ### 13.5 Preferences
 
@@ -514,8 +526,8 @@ Support 화면은 PublicCapabilities만 사용한다.
 
 | consentType | 사용자 label | 거절 시 영향 |
 |---|---|---|
-| SEARCH_HISTORY | 검색 기록 저장 | `saveToHistory=true` 사용 불가; guest/짧은 TTL 검색은 유지 |
-| PRECISE_LOCATION | 정확한 위치 저장 | saved place 등 지속 저장 제한; 일회성 현재 위치 검색은 별도 설명 |
+| SEARCH_HISTORY | 검색 기록 저장 | USER 검색의 자동 기록 저장 중단; guest/동의 없는 검색은 계속 가능 |
+| PRECISE_LOCATION | 정확한 위치 저장 | saved place와 임의 장소 favorite 생성 제한; 일회성 위치 검색은 계속 가능 |
 | PRODUCT_ANALYTICS | 제품 개선 분석 | 분석 event 비활성; route search 유지 |
 | ROUTING_FEEDBACK | 이동 결과 feedback 활용 | feedback 수집 비활성; route search 유지 |
 
@@ -565,9 +577,10 @@ export는 exact location이 포함될 수 있는 민감 파일로 취급한다.
 | RouteMap | geometry | ready/partial/none/error | timeline equivalent, reduced motion |
 | BusPanel | `BusLegIntelligence|null` | all coverage/confidence/stale states | proxy disclosure always adjacent, null≠0 tests |
 | WarningList | registry codes | known/unknown | severity not color-only, generic fallback |
-| HistoryList | Public responses | auth/loading/empty/data/error | no exact coordinate exposure, expired action |
+| HistoryList | Public responses + optional `requestSummary` | auth/consent-off/loading/empty/data/summary-unavailable/error | coordinate-free display, no summary replay, no unsupported item delete |
 | SavedPlaceList | SavedPlace | auth/loading/empty/data/error | sensitive label privacy, ownership errors |
-| FavoriteList | FavoriteJourney | auth/loading/empty/data/error | prefill only, no auto-search |
+| FavoriteList | FavoriteJourney + active SavedPlaces | auth/loading/empty/data/legacy-invalid/searching/error | explicit one-tap fresh search only, 44px target, duplicate tap suppression |
+| FavoriteCreate | FavoriteJourneyFromPlacesInput | auth/consent-required/editing/submitting/conflict/success/error | atomic create, focus/error summary, keyboard-safe iPhone layout |
 | PreferencesForm | UserPreferences | loading/dirty/saving/saved/conflict/error | section status, server confirmation |
 | FeedbackForm | RouteFeedbackInput | pristine/invalid/submitting/success/error | optional fields identified, no HTML rendering |
 | CapabilityPanel | PublicCapabilities | supported/degraded/unknown/error | false≠unknown, private details absent |
@@ -620,22 +633,26 @@ fixture coverage:
 - duplicate recommendation routeId, null recommendation slot
 - offline before submit, lost connection after submit, update waiting during search
 - guest credential create/expire/revoke, USER/GUEST session inspection
-- `history.saved` true/false, USER/GUEST owner, retainedUntil null/value
-- saved place and favorite create/update/delete, owner-hidden 404
+- current USER+SEARCH_HISTORY automatic save, guest/declined no durable save, accepted idempotent retry exactly one history row
+- history requestSummary present/null/legacy, coordinate/provider-free rendering, no replay from summary
+- saved place and favorite create/update/delete, owner-hidden 404, linked place deletion invalidation
+- atomic favorite from arbitrary places success/rollback/idempotent retry/conflict/PRECISE_LOCATION required
+- typed favorite quick search at click time, duplicate tap, reload/back/mount no POST, legacy conditions fail closed
 - preference ETag update and `PREFERENCE_VERSION_CONFLICT`
 - each consent type accepted/declined and stale document version failure
 - export/deletion PENDING/RUNNING/COMPLETE/FAILED, conflict, owner-hidden not-found, expired download URL
 
-## 20. Public 1.3.0 지원 범위와 남은 계약 gap
+## 20. Public 1.6.0 지원 범위와 남은 계약 gap
 
 ### 20.1 contract-backed 구현 범위
 
-다음은 Public 1.3.0 generated client를 통해 구현한다.
+다음은 Public 1.6.0 generated client를 통해 구현한다.
 
 - guest credential create, GUEST/USER session inspection, current session revoke
-- `history.saved`, owner kind, retained-until 표시와 로그인+SEARCH_HISTORY opt-in
+- USER+현재 SEARCH_HISTORY 동의 기반 자동 history 저장과 coordinate-free `requestSummary` 표시
 - preference ETag/`If-Match` optimistic concurrency
 - saved place와 favorite journey list/create/update/delete
+- typed favorite 조건, arbitrary place의 atomic create, explicit one-tap click-time fresh search
 - consent type별 list/record
 - asynchronous export/deletion create/status와 짧은 수명 download
 - owner를 숨기는 not-found, consent 부족 403, preference/data-rights conflict 복구
@@ -649,9 +666,8 @@ fixture coverage:
 |---|---|---|
 | 계정 복구·이메일 확인 | recovery token, email delivery, verification state, 재인증 | 이메일 가입·로그인은 제공하고 복구 CTA는 제공하지 않음 |
 | guest→USER 병합 | 검색·feedback ownership 이전과 conflict policy | 자동 병합을 약속하지 않음 |
-| 개별 history 삭제·보존기간 설정 | delete endpoint, retention preference | save opt-in과 list/get/metadata만 사용 |
+| 개별 history 삭제·보존기간 설정 | delete endpoint, retention preference | 자동 저장 동의와 list/get/metadata만 사용; item delete CTA 없음 |
 | 동의 문서 배포 | 현재 document URL/version, required/optional policy, version 갱신 UX | 배포가 고정한 법적 문서 version만 전송; 임의 version 생성 금지 |
-| favorite default constraints | `defaultConstraints`의 typed public schema | opaque object 내부를 추정·부분 수정하지 않음 |
 | privacy preference | `UserPreferences.privacy`의 typed public schema | typed consent API만 사용; 임의 toggle 저장 금지 |
 | feedback bus outcome | `busOutcome`의 typed public schema와 동의/validation | rating·comment 등 typed 필드만 사용; object 추정 금지 |
 | transit display fields | `RouteLeg.transit`의 안정된 public shape | mode/from/to 외 필드 추정 금지 |
@@ -670,7 +686,7 @@ Service UX 구현 완료는 다음을 모두 만족할 때만 주장한다.
 - 카드·timeline·지도는 동일 routeId/legId/sequence를 사용한다.
 - PWA install/update/offline이 iOS·Android에서 검증되고 민감 API 데이터가 cache되지 않는다.
 - guest route search가 계정 기능 없이도 끝까지 동작한다.
-- 이메일 가입·로그인·session revoke, guest session, history consent, CRUD, preference conflict, consent, export/deletion job의 Public 1.3.0 상태가 end-to-end로 검증된다.
+- 이메일 가입·로그인·session revoke, guest session, 자동 history 저장, typed favorite atomic 생성·quick search, preference conflict, consent, export/deletion job의 Public 1.6.0 상태가 end-to-end로 검증된다.
 - exact coordinate·token·민감 label이 URL, persistent browser storage, telemetry, Service Worker cache에 없다.
 - WCAG 2.2 AA 기본 자동 검사와 VoiceOver/TalkBack smoke가 통과한다.
 - contract gap 기능은 구현 완료로 세지 않고 `BLOCKED` 또는 `UNVERIFIED`로 보고한다.

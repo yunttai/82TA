@@ -6,7 +6,7 @@ import canonicalBikeOptions from "../../../../contracts/openapi/examples/public-
 import canonicalResponse from "../../../../contracts/openapi/examples/public-route-search-response.json";
 import { ResultPanel } from "../features/route-results/ResultPanel";
 import type { PublicProblem, PublicRouteSearchRequest, PublicRouteSearchResponse, RouteCandidate } from "../shared/api/publicService";
-import { clearSessionMemory, currentGuestToken, rememberGuestSession } from "../shared/session/sessionMemory";
+import { clearSessionMemory, currentGuestToken, rememberGuestSession, rememberUserSession } from "../shared/session/sessionMemory";
 import { App } from "./App";
 
 const guestCredential = {
@@ -156,6 +156,7 @@ afterEach(() => {
   clearSessionMemory();
   window.history.replaceState(null, "", "/");
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -216,8 +217,8 @@ describe("route search vertical slice", () => {
     expect(screen.getByRole("button", { name: "무관" })).toBeInTheDocument();
     expect(screen.queryByText("세부 조건")).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "대중교통 사이 짧은 택시 이동 허용" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "검색 기록에 저장" })).toBeInTheDocument();
-    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+    expect(screen.queryByRole("checkbox", { name: "검색 기록에 저장" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(1);
     expect(screen.queryByRole("textbox", { name: "출발 경도" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "출발 위도" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "도착 경도" })).not.toBeInTheDocument();
@@ -290,6 +291,43 @@ describe("route search vertical slice", () => {
       destinationLon: "127.111159",
       destinationLat: "37.394761",
     });
+  });
+
+  it.each([
+    ["현재 동의", "privacy-current", true],
+    ["지난 문서 동의", "privacy-stale", false],
+  ])("automatically applies search-history policy for %s without a form checkbox", async (_label, consentVersion, expectedSaved) => {
+    const currentDocumentVersion = "privacy-current";
+    vi.stubEnv("VITE_PRIVACY_DOCUMENT_VERSION", currentDocumentVersion);
+    document.cookie = "csrftoken=csrf-test-token; Path=/; SameSite=Lax";
+    const userSession = { subjectType: "USER", authenticated: true, expiresAt: "2099-08-24T07:40:00+09:00", email: "user@example.com" } as const;
+    rememberUserSession(userSession);
+    const fallbackFetch = successfulFetch();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      const path = new URL(request.url).pathname;
+      if (path === "/api/v1/session") return new Response(JSON.stringify(userSession), { status: 200, headers: { "content-type": "application/json" } });
+      if (path === "/api/v1/me/consents") return new Response(JSON.stringify({ items: [{ consentType: "SEARCH_HISTORY", documentVersion: consentVersion, accepted: true, recordedAt: "2026-08-25T00:00:00+09:00" }] }), { status: 200, headers: { "content-type": "application/json" } });
+      if (path === "/api/v1/me/preferences") return new Response(JSON.stringify({ defaultTaxiBudget: 7000, maxWalkSeconds: 7200, maxTransfers: 8, maxTaxiLegs: 3, optimizationProfile: "BALANCED" }), { status: 200, headers: { "content-type": "application/json" } });
+      return fallbackFetch(input);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<App />);
+    await selectDefaultPlaces(user);
+    await user.click(screen.getByRole("button", { name: "내 예산으로 경로 찾기" }));
+    expect(await screen.findAllByText("일부 정보 제한")).toHaveLength(1);
+
+    const routeCall = fetchMock.mock.calls.find(([input]) => {
+      const request = input instanceof Request ? input : new Request(input);
+      return new URL(request.url).pathname === "/api/v1/route-searches" && request.method === "POST";
+    });
+    if (routeCall === undefined) throw new Error("Expected route request");
+    const request = routeCall[0] instanceof Request ? routeCall[0].clone() : new Request(routeCall[0]);
+    const body = await request.json() as PublicRouteSearchRequest;
+    expect(body.saveToHistory).toBe(expectedSaved);
+    expect(screen.queryByRole("checkbox", { name: "검색 기록에 저장" })).not.toBeInTheDocument();
   });
 
   it("preserves place swap, scheduled departure, budget, and hidden preference defaults", async () => {

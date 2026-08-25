@@ -187,8 +187,12 @@ EXPIRED
 - guest first
 - optional login
 - secure cookie·CSRF
-- history save opt-in
-- saved places·favorites
+- 현재 `SEARCH_HISTORY` 동의가 있는 USER의 accepted search 자동 기록; guest·거절 사용자는 검색 가능하되 durable history 없음
+- 기록 목록은 좌표·주소·Provider ID가 없는 표시 전용 `requestSummary`를 사용하며 이를 재검색 입력으로 사용하지 않음
+- saved places·favorites CRUD
+- 현재 `PRECISE_LOCATION` 동의 아래 arbitrary origin/destination 두 곳과 typed favorite 조건을 한 transaction으로 생성
+- favorite의 `바로 길찾기`는 명시적 한 번의 클릭에서만 클릭 시점 `DEPART_AT` 새 검색을 한 번 제출하고 mount·back·reload에서는 제출하지 않음
+- legacy/무효 favorite은 조건과 장소를 추측하지 않고 quick search를 fail closed
 - preferences version
 - account deletion·data export
 
@@ -204,6 +208,7 @@ EXPIRED
 Service DB 원본은 `src/contracts/database/service-db.dbml`이다.
 
 - exact coordinate·saved place는 encrypted at rest와 최소 접근
+- favorite은 canonical taxi budget과 typed 검색 조건만 저장하며 절대 출발시각·검색 결과 ID·`saveToHistory`를 저장하지 않음
 - `public_result`는 versioned snapshot
 - user/guest ownership constraint
 - delete/retention job
@@ -226,6 +231,8 @@ Service DB 원본은 `src/contracts/database/service-db.dbml`이다.
 - rate limit·guest abuse
 - exact coordinate·email·token redaction
 - owner authorization for search/history/favorite
+- from-places favorite의 USER·현재 PRECISE_LOCATION 동의·CSRF·owner-scoped idempotency 검증
+- linked saved place 삭제 시 favorite 무효화 및 legacy favorite quick-search fail closed
 
 ## 10. 성능
 
@@ -243,7 +250,10 @@ Service DB 원본은 `src/contracts/database/service-db.dbml`이다.
 - public API↔React type 교차 검증
 - COMPLETE/PARTIAL/error/expired UI
 - guest·user ownership
-- search history privacy
+- USER+현재 SEARCH_HISTORY 동의의 accepted search는 정확히 한 번 기록되고 guest·거절·validation 실패는 durable history가 없음
+- history summary는 coordinate/provider-free이며 재검색 입력으로 사용되지 않음
+- arbitrary place favorite은 부분 성공 없이 원자적으로 생성되고 legacy/삭제 장소 favorite은 실행되지 않음
+- `바로 길찾기` 한 번은 클릭 시점 새 route-search POST 한 번만 만들며 iPhone duplicate tap·reload·back은 추가 POST를 만들지 않음
 - exact location log 없음
 - accessibility 기본 검사
 - P95 end-to-end gate에서 Service가 병목 아님

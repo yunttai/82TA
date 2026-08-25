@@ -137,7 +137,7 @@ class ServiceFullBoundaryTests(SimpleTestCase):
         ):
             self.assertNotIn(forbidden, encoded)
 
-    def test_service_dbml_tables_match_orm_and_initial_migration(self) -> None:
+    def test_service_dbml_tables_match_orm_and_migrations(self) -> None:
         dbml_tables = set(
             re.findall(r"^Table\s+([a-z0-9_]+)\s*\{", SERVICE_DBML.read_text(encoding="utf-8"), re.MULTILINE)
         )
@@ -145,10 +145,10 @@ class ServiceFullBoundaryTests(SimpleTestCase):
             model._meta.db_table
             for model in apps.get_app_config("journeys").get_models()
         }
-        migration_source = (
-            SERVICE_ROOT / "journeys/migrations/0001_initial.py"
-        ).read_text(encoding="utf-8")
-        migration_tables = set(re.findall(r'"db_table":\s*"([a-z0-9_]+)"', migration_source))
+        migration_tables: set[str] = set()
+        for migration_path in sorted((SERVICE_ROOT / "journeys/migrations").glob("[0-9]*.py")):
+            migration_source = migration_path.read_text(encoding="utf-8")
+            migration_tables.update(re.findall(r'"db_table":\s*"([a-z0-9_]+)"', migration_source))
         self.assertEqual(orm_tables, dbml_tables)
         self.assertEqual(migration_tables, dbml_tables)
 

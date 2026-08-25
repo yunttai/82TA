@@ -24,6 +24,11 @@ urlpatterns = [
     ),
     path("api/v1/me/favorite-journeys", account_views.favorite_journeys, name="favorite-journeys"),
     path(
+        "api/v1/me/favorite-journeys/from-places",
+        account_views.favorite_journey_from_places,
+        name="favorite-journey-from-places",
+    ),
+    path(
         "api/v1/me/favorite-journeys/<str:favorite_journey_id>",
         account_views.favorite_journey_detail,
         name="favorite-journey-detail",

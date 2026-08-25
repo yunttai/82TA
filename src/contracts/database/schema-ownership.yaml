@@ -1,4 +1,4 @@
-version: 1.1.0
+version: 1.2.0
 schemas:
   service:
     owner: service-product
@@ -11,6 +11,7 @@ schemas:
       - user_preference
       - saved_place
       - favorite_journey
+      - favorite_creation_idempotency
       - anonymous_session
       - authenticated_session
       - route_search
