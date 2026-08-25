@@ -5,25 +5,9 @@ description: "공통 PRD를 Provider, entity mapping, route optimization, Bus In
 
 # Routing Work Planning
 
-## 공통 사전 조건
+Use this skill only when the user asks for planning, backlog decomposition, assignment, or a multi-component rerun. Do not insert a planning phase into a focused implementation request.
 
-작업을 시작하기 전에 반드시 다음을 수행한다.
-
-1. `python src/scripts/validate_repository.py`를 실행한다.
-2. `python src/scripts/verify_contract_lock.py`를 실행한다.
-3. `src/contracts/CONTEXT_MANIFEST.json`과 `src/contracts/CONTRACT_LOCK.json`을 읽는다.
-4. `src/docs/shared/PROJECT_CONTEXT.md`, `PRD.md`, 관련 canonical 계약을 읽는다.
-5. 이전 `_workspace/` 산출물이 있으면 미완료·피드백·차단 사항을 확인한다.
-
-검증 실패 시 구현을 진행하지 않는다. 공통 원본을 임의로 맞춰 쓰지 말고 drift 또는 change request로 처리한다.
-
-## 저장 위치 규칙
-
-- 분석·토론·중간 결과: `_workspace/{workstream}/`
-- 검토가 끝난 제품 코드·문서·테스트·인프라: 반드시 `src/` 아래
-- 루트에는 `.codex/`, `.agents/`, `_workspace/`, `src/`, `AGENTS.md`, `README.md`, `.gitignore`만 둔다.
-- 공통 PRD·OpenAPI·ERD·enum 복사본을 workstream 폴더에 만들지 않는다.
-
+Start from current code and requested outcome. Split only work that can be independently accepted; do not manufacture tasks for every possible Routing layer.
 
 ## 분해 축
 
@@ -37,7 +21,7 @@ description: "공통 PRD를 Provider, entity mapping, route optimization, Bus In
 8. collector·data quality·model registry
 9. replay·property·performance·security
 
-각 task에는 input snapshot, output type, owned path, latency budget, failure behavior, test ID, model/data version을 기록한다.
+각 task에는 최소한 outcome, affected path, dependency, acceptance check를 기록한다. Latency budget, failure behavior, fixture/test ID, contract, model/data version은 그 task에 실제로 관련될 때만 추가한다. `_workspace/WORKPLAN.md` 기록은 장기·위임 조율에 유용하거나 사용자가 요청했을 때만 한다.
 
 ## 금지
 
@@ -46,3 +30,4 @@ description: "공통 PRD를 Provider, entity mapping, route optimization, Bus In
 - raw Provider schema를 domain contract로 사용
 - online request 중 training·heavy preprocessing
 - 무제한 candidate/API call
+- 구현 요청을 계획·audit·release verdict만으로 끝내기

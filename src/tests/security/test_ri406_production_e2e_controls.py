@@ -63,24 +63,15 @@ ROUTING_API_PACKAGE = SRC_ROOT / "services" / "routing-api" / "routing_api"
 DATABASE_BOOTSTRAP_SCRIPT = (
     SRC_ROOT / "infra" / "docker" / "routing-api" / "database_bootstrap.py"
 )
-ROUTING_TERRAFORM = (
-    SRC_ROOT / "infra" / "terraform" / "modules" / "routing-platform" / "main.tf"
+GCE_TERRAFORM = (
+    SRC_ROOT / "infra" / "terraform" / "modules" / "gce-platform" / "main.tf"
 )
-DATABASE_BOOTSTRAP_WORKFLOW = (
-    SRC_ROOT / "infra" / "ci" / "github-actions" / "bootstrap-routing-staging.yml"
-)
+GCE_WORKFLOW = SRC_ROOT.parent / ".github" / "workflows" / "cd-gce.yml"
 NOW = datetime(2026, 8, 24, 0, 0, tzinfo=timezone.utc)
 PROVIDER = "KAKAO_PUBLIC_TRANSIT"
 OPERATION = "search_current"
 SECRET = "ri406-provider-secret-must-not-render"
 PROBE_SCRIPT = SRC_ROOT / "scripts" / "probe_routing_providers.py"
-
-
-def _terraform_resource(source: str, kind: str, name: str) -> str:
-    marker = f'resource "{kind}" "{name}" {{'
-    start = source.index(marker)
-    end = source.find('\nresource "', start + len(marker))
-    return source[start:] if end < 0 else source[start:end]
 
 
 class RecordingUnavailableTransport:
@@ -414,74 +405,32 @@ def test_database_bootstrap_binds_role_passwords_instead_of_composing_sql() -> N
     assert "(role_password,)" in source
 
 
-def test_master_secret_and_deploy_authority_are_confined_to_database_bootstrap() -> None:
-    source = ROUTING_TERRAFORM.read_text(encoding="utf-8")
-    runtime_policy = _terraform_resource(
-        source, "aws_iam_role_policy", "execution_secrets"
-    )
-    migration_policy = _terraform_resource(
-        source, "aws_iam_role_policy", "migration_execution_secrets"
-    )
-    bootstrap_policy = _terraform_resource(
-        source, "aws_iam_role_policy", "database_bootstrap_execution_secrets"
-    )
-    online_task = _terraform_resource(source, "aws_ecs_task_definition", "routing")
-    bootstrap_task = _terraform_resource(
-        source, "aws_ecs_task_definition", "database_bootstrap"
-    )
-    migration_task = _terraform_resource(
-        source, "aws_ecs_task_definition", "migration"
-    )
-    deploy_policy = _terraform_resource(
-        source, "aws_iam_role_policy", "github_deploy"
-    )
-    database_deploy_policy = _terraform_resource(
-        source, "aws_iam_role_policy", "github_database_bootstrap"
-    )
-
-    master_secret = "aws_db_instance.routing.master_user_secret[0].secret_arn"
-    assert master_secret not in runtime_policy
-    assert master_secret not in migration_policy
-    assert master_secret in bootstrap_policy
-    assert master_secret not in online_task
-    assert master_secret not in migration_task
-    assert master_secret in bootstrap_task
-
-    assert "aws_iam_role.execution.arn" in online_task
-    assert "aws_iam_role.database_bootstrap_execution.arn" in bootstrap_task
-    assert "aws_iam_role.migration_execution.arn" in migration_task
-    assert "aws_secretsmanager_secret.migration_django.arn" in migration_task
-    assert "aws_secretsmanager_secret.migration_jwt.arn" in migration_task
-    assert "var.shared_jwt_secret_arn" not in migration_task
-
-    assert "ecs:RegisterTaskDefinition" not in deploy_policy
-    assert "ecs:RunTask" not in deploy_policy
-    assert "iam:PassRole" not in deploy_policy
-    assert 'Action   = ["ecs:UpdateService"]' in deploy_policy
-    assert "local.routing_service_arn" in deploy_policy
-    assert "local.ecs_cluster_arn" in deploy_policy
-    assert "local.routing_task_definition_arn" in deploy_policy
-    assert '"ecs:auto-assign-public-ip"  = "DISABLED"' in deploy_policy
-    assert '"ecs:enable-execute-command" = "false"' in deploy_policy
-    assert 'Null = { "ecs:subnet" = "false" }' in deploy_policy
-
-    assert "ecs:RegisterTaskDefinition" not in database_deploy_policy
-    assert 'Action = ["ecs:RunTask"]' in database_deploy_policy
-    assert "local.bootstrap_task_definition_arn" in database_deploy_policy
-    assert "local.migration_task_definition_arn" in database_deploy_policy
-    assert "local.ecs_cluster_arn" in database_deploy_policy
-    assert '"ecs:auto-assign-public-ip"  = "DISABLED"' in database_deploy_policy
-    assert '"ecs:enable-execute-command" = "false"' in database_deploy_policy
-    assert 'Null = { "ecs:subnet" = "false" }' in database_deploy_policy
-    assert "aws_iam_role.database_bootstrap_execution.arn" in database_deploy_policy
-    assert "aws_iam_role.migration_execution.arn" in database_deploy_policy
-    assert "aws_iam_role.execution.arn" not in database_deploy_policy
+def test_gce_runtime_identity_has_no_key_or_secret_material_in_terraform() -> None:
+    source = GCE_TERRAFORM.read_text(encoding="utf-8")
+    assert 'resource "google_compute_instance" "platform"' in source
+    assert 'resource "google_service_account" "runtime"' in source
+    assert 'role   = "roles/storage.objectViewer"' in source
+    assert 'enable-oslogin         = "TRUE"' in source
+    assert "google_service_account_key" not in source
+    for secret_name in (
+        "KAKAO_REST_API_KEY",
+        "GBIS_SERVICE_KEY",
+        "ROUTING_DJANGO_SECRET_KEY",
+        "ROUTING_SERVICE_JWT_SECRET",
+        "SSH_KEY",
+    ):
+        assert secret_name not in source
 
 
-def test_database_bootstrap_workflow_is_protected_and_uses_immutable_tasks() -> None:
-    source = DATABASE_BOOTSTRAP_WORKFLOW.read_text(encoding="utf-8")
-    assert "environment: staging-routing-database" in source
-    assert "BOOTSTRAP-ROUTING-STAGING" in source
-    assert "@sha256:[0-9a-f]{64}$" in source
-    assert "assignPublicIp=DISABLED" in source
-    assert "aws ecs register-task-definition" not in source
+def test_gce_workflow_pins_host_and_preserves_private_routing_start_order() -> None:
+    source = GCE_WORKFLOW.read_text(encoding="utf-8")
+    assert "environment:" in source and "name: gce" in source
+    assert "StrictHostKeyChecking=yes" in source
+    assert "StrictHostKeyChecking=no" not in source
+    assert "ssh-keyscan" not in source
+    assert "routing-api" in source
+    assert source.index("Probe Providers and create runtime evidence") < source.index(
+        "Start HTTP stack in dependency order"
+    )
+    ordered_start = source.split("Start HTTP stack in dependency order", 1)[1]
+    assert ordered_start.index("routing-api") < ordered_start.index("service-api")

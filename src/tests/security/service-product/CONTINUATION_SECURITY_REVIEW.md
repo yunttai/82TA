@@ -4,7 +4,7 @@
 - 계약: `1.1.0`
 - 계약 lock: `80ade2452c103c534ac88deb5b832d21c27d0bd8eee8d5c5f270bb5491ffdb1a`
 - 범위: React Web/PWA session·retry·result, Django Redis coordination/HMAC,
-  Routing/Kakao response trust, PostGIS, data retention, AWS IaC, generated client tracking
+  Routing/Kakao response trust, PostGIS, data retention, GCE IaC, generated client tracking
 - 변경 권한: 이 보안 evidence/test 디렉터리만 수정; 제품 코드는 읽기 전용 검토
 
 ## 판정
@@ -13,7 +13,7 @@
 Canonical Stub/Replay를 사용하는 local/CI vertical slice는 보안 관점에서 `GO`다.
 
 Internet staging/closed beta/GA는 `NO-GO`다. 이 판정은 알려진 Critical/High
-코드 취약점이 아니라 실제 CloudFront/ALB client-IP chain, RDS/PostGIS/Redis,
+코드 취약점이 아니라 실제 GCE Nginx client-IP chain, PostGIS/Redis,
 Kakao 운영 키, Private Routing, data-rights 전달·삭제 및 실제 모바일 기기
 evidence가 아직 없기 때문이다.
 
@@ -23,7 +23,7 @@ evidence가 아직 없기 때문이다.
 Browser module memory
   guest bearer + exact retry body + cryptographic idempotency key
     └─ same-origin HTTPS / CSRF / no-store
-       CloudFront WAF + HTTPS-only ALB origin
+       GCE Nginx + Let's Encrypt HTTPS
          └─ Django Service
             ├─ Redis TLS: atomic quota + owner-scoped single-flight/replay (10분)
             ├─ PostgreSQL/PostGIS geography(Point,4326): exact Service location
@@ -38,7 +38,7 @@ Browser module memory
   재사용한다. 만료 결과는 새 검색으로 분리한다.
 - Redis key는 keyed HMAC이고 raw IP, user/guest ID, public idempotency key를
   포함하지 않는다. completed public response는 600초 TTL이며 TLS 및 encrypted
-  ElastiCache 경계 안에 있다. Redis TLS는 certificate와 hostname 검증을 요구한다.
+  GCE runtime 경계 안에 있다. managed Redis를 도입할 경우 TLS는 certificate와 hostname 검증을 요구한다.
 - Routing에는 좌표와 canonical constraints만 전달한다. Service owner와 public
   retry key는 HMAC으로 가리고 display name, provider place ID, history, email,
   guest token은 전달하지 않는다.
@@ -48,9 +48,9 @@ Browser module memory
 - exact coordinate는 PostGIS `geography(Point,4326)`로 저장하며 finite/WGS84/SRID
   검증을 거친다. transient 결과는 Routing expiry와 무관하게 짧은 Service TTL로
   제한되고 history는 current consent가 있어야 저장한다.
-- export는 Fernet 암호화된 private EFS artifact이며 path escape를 거부한다.
+- export는 Fernet 암호화된 private filesystem artifact이며 path escape를 거부한다.
   TTL purge는 artifact를 물리 삭제하고, artifact 삭제 실패 시 reference 및 계정
-  hard-delete가 fail-closed한다. EFS automatic backup은 TTL 연장을 막기 위해 꺼져 있다.
+  hard-delete가 fail-closed한다. GCE volume backup도 canonical TTL을 무단 연장하지 않아야 한다.
 
 ## 실행 evidence
 
@@ -83,16 +83,15 @@ Security suite가 추가로 고정하는 continuation assertion:
 
 ## 해소된 finding과 남은 release gate
 
-### SEC-M-CONT-01 — 해소: CloudFront→ALB viewer quota identity
+### SEC-M-CONT-01 — 해소: GCE trusted-proxy viewer quota identity
 
 - 심각도: Medium (availability/Denial of Wallet defense)
-- flow: viewer → CloudFront `X-Forwarded-For` → ALB append → Django nearest-untrusted hop
-- IaC가 ALB public-subnet CIDR와 AWS-managed CloudFront origin-facing prefix의 live
-  CIDR만 trusted proxy로 주입한다. reverse walk는 ALB/CloudFront hop을 건너뛰고
-  CF가 append한 viewer IP를 선택하며, viewer가 만든 왼쪽 XFF 값은 무시한다.
-- ALB ingress도 같은 managed CloudFront prefix의 443만 허용한다. arbitrary range나
-  dedicated spoofable identity header는 사용하지 않는다.
-- static chain test와 55-CIDR production settings test는 통과했다. 실제 AWS header
+- flow: viewer → GCE Nginx `X-Forwarded-For` append/sanitize → Django nearest-untrusted hop
+- GCE Compose가 exact private proxy CIDR만 trusted proxy로 주입한다. reverse walk는
+  trusted Nginx hop을 건너뛰고 viewer IP를 선택하며, viewer가 만든 왼쪽 XFF 값은 무시한다.
+- Routing은 host port를 공개하지 않으며 arbitrary range나 dedicated spoofable identity
+  header는 사용하지 않는다.
+- static chain test와 many-CIDR settings test는 통과했다. 실제 GCE ingress header
   capture/multi-user quota smoke는 internet staging 운영 gate로 유지한다.
 
 ### SEC-L-CONT-02 — 해소: caller correlation의 내부 log privacy
@@ -114,8 +113,8 @@ Security suite가 추가로 고정하는 continuation assertion:
 ### 계약·운영 gate
 
 - USER 가입·로그인·복구·guest merge canonical 계약과 구현
-- authenticated one-time export download 계약/endpoint 및 live EFS worker·TTL 삭제 drill
-- 실제 CloudFront TLS/CSP/WAF, RDS/PostGIS migration/restore, Redis failover/rotation evidence
+- authenticated one-time export download 계약/endpoint 및 live GCE volume worker·TTL 삭제 drill
+- 실제 GCE TLS/CSP/edge control, PostGIS migration/restore, Redis failover/rotation evidence
 - 실제 Kakao JavaScript/REST key domain·app restriction과 위치정보 고지/법률 검토
 - 실제 Private Routing compatibility, response-size/load/cost/rollback drill
 - WebKit 실행 의존성 및 실제 iPhone Safari·Android Chrome/PWA 설치·업데이트 검증

@@ -1,5 +1,7 @@
 # Claude 전용 하네스 → Codex 하네스 변환
 
+> **Historical archive:** 초기 2026-08-22 변환 기록이다. 현재 운영 방식은 `CODEX_RUNBOOK.md`와 루트 `AGENTS.md`를 따른다. 아래 durable ledger, legacy cloud 보존, prompt-library 설명은 현재 gate가 아니다.
+
 ## 목표
 
 제품 코드와 비즈니스 계약을 건드리지 않고, 실행 제어층만 Codex-native로 바꾼다.
@@ -21,7 +23,7 @@
 
 ## 보존된 항목
 
-- React/Django/AWS 제품 결정
+- React/Django/GCE 제품 결정
 - Service/Routing 책임 경계
 - Public/Private OpenAPI
 - Service/Routing DBML·ERD

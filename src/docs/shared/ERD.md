@@ -5,7 +5,7 @@
 - Service DB: 사용자 계정·설정·장소·검색 기록·즐겨찾기·동의·피드백
 - Routing DB: Provider·canonical 교통 entity·observation·candidate·model·수집·품질
 - cross-service FK, cross-schema ORM join, 상대 DB 직접 조회 금지
-- 같은 RDS cluster를 사용하더라도 database/schema/role/migration을 분리
+- 같은 GCE 환경이나 managed PostgreSQL instance를 사용하더라도 database/schema/role/migration을 분리
 
 ## 2. Service DB
 

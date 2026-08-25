@@ -1,53 +1,33 @@
 # Branch / Worktree / Integration 운영
 
-## 권장 브랜치
+Branch와 worktree 구조는 팀 상황에 맞게 선택한다. 특정 branch 이름이나 세 개 worktree를 하네스가 강제하지 않는다.
 
-```text
-main
-workstream/service-product
-workstream/routing-intelligence
-integration/current
-contract/<change-name>
-```
+## 독립 작업
 
-## 권장 worktree
+- 같은 경계의 파일을 여러 branch/agent가 동시에 수정하지 않도록 실제 write scope를 나눈다.
+- 작은 vertical slice를 자주 통합한다.
+- 충돌 해결은 선언된 agent ownership이 아니라 current implementation, 사용자 의도, DB/context boundary, producer-consumer compatibility를 기준으로 한다.
+
+## Shared contract
+
+1. 변경된 의미와 실제 producer·consumer를 식별한다.
+2. 영향을 받는 OpenAPI/client/test, DBML/migration, event/code만 고친다.
+3. breaking/ownership/production platform 결정이면 CCR 또는 ADR과 migration/rollback을 추가한다.
+4. affected tests 후 intentional canonical diff에 대해 lock을 갱신한다.
+5. 통합 대상 양쪽의 live lock을 비교한다.
 
 ```bash
-git worktree add ../budget-route-service -b workstream/service-product
-git worktree add ../budget-route-routing -b workstream/routing-intelligence
-git worktree add ../budget-route-integration -b integration/current
+python src/scripts/compare_context_snapshots.py \
+  --service-root <service-worktree> \
+  --routing-root <routing-worktree>
 ```
 
-## 공통 계약
+기존 스크립트 이름은 호환성을 위해 남아 있지만 snapshot 파일을 읽지 않는다.
 
-한 작업흐름이 공통 계약을 직접 확정하지 않는다.
+## Integration depth
 
-1. `13_CONTRACT_CHANGE_PROPOSAL.md`
-2. 사용자/두 담당자 승인
-3. contract branch에서 `14_APPLY_APPROVED_CONTRACT_CHANGE.md`
-4. 양쪽 브랜치에 contract commit을 먼저 반영
-5. 생성 client와 consumer/provider tests
-6. lock/snapshot parity
-7. 기능 구현 재개
+- source merge: 변경된 경계의 targeted contract/integration checks
+- environment deploy: live lock, generated client, representative replay/E2E, security/rollback
+- release claim: 그 단계가 의존하는 provider/model/SLO/quota/DR evidence
 
-## 최초 통합
-
-- 양쪽 HANDOFF
-- context sync
-- integration branch에서 Service consumer와 Routing producer 연결
-- mock↔real parity
-- R1~R4
-- security/performance
-- merge readiness
-
-## 반복 통합
-
-작은 vertical slice마다 통합한다. 마지막에 대규모 병합하지 않는다.
-
-## 충돌
-
-- 제품 의미 충돌: PRD/ADR/contract governance
-- 파일 충돌: ownership 기준
-- DB 충돌: context별 migration 소유권
-- generated client 충돌: 계약 원본에서 재생성
-- 결과 차이: deterministic replay와 ranking version 비교
+disabled/unsupported/PARTIAL capability의 `UNVERIFIED`는 무관한 source merge를 막지 않는다.

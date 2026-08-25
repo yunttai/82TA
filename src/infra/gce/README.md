@@ -1,4 +1,9 @@
-# Blank GCE server deployment
+# Required GCE deployment
+
+GCE is the only supported cloud compute target. The current implementation is a
+single blank GCE VM bootstrapped into a Docker Compose host; no alternate-cloud
+runbook or parity requirement exists. Terraform provisioning is documented in
+`../terraform/README.md`.
 
 `.github/workflows/cd-gce.yml` deploys the application to a new Debian/Ubuntu
 VM at the fixed path `/opt/82ta`. No application files, Docker installation, or
@@ -50,6 +55,11 @@ resources and GitHub secret values cannot be inferred by the repository.
 The workflow runs automatically for `main` and tags matching `v*.*.*`; it can
 also be started manually.
 
+The current SSH path requires the deploy runner or bastion CIDR to be explicitly
+allowed by the GCE firewall and the reviewed host key to match `HOST_KEY`. GCE OS
+Login should own the remote user's key. Do not create a JSON service-account key
+for this workflow.
+
 ## Database and Redis
 
 Service keeps the locally used SQLite/no-Redis setup, so `DATABASE_URL`,
@@ -60,3 +70,15 @@ Routing does use PostGIS and Redis locally, so this Compose file starts both and
 the bootstrap generates `ROUTING_DB_PASSWORD`. The separate Routing migration
 role variables remain commented because the locally tested Docker path runs
 migrations with the same Routing database user before Gunicorn starts.
+
+## Readiness and rollback
+
+The filename `docker-compose.prod.yml` is retained for deployment compatibility;
+its Service development mode, SQLite, internal HTTP and Routing development
+provenance are not a production claim. Before staging/production promotion, record
+the database/TLS/backup/restore/alert/cost evidence listed in
+`../../docs/shared/GCE_DEPLOYMENT.md`.
+
+Rollback on GCE means redeploying the previous reviewed image tag/digest and
+Compose revision on the same VM. Back up state before schema changes and prove a
+restore into an isolated GCE environment; switching clouds is not a rollback path.

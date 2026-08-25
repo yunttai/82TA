@@ -21,7 +21,7 @@
 | 사용자 앱 | React 기반 모바일 우선 웹앱·PWA |
 | Public Backend | Django Service Backend |
 | Core Backend | Django Routing & Intelligence Server + Django 독립 Python domain |
-| 배포 | AWS |
+| 배포 | GCE 필수. 현재 단일 VM + Docker Compose + Nginx |
 | 응답 목표 | 정상 검색 P95 7초 이내 |
 | 실시간 재추천 | V2 |
 | 기존 자산 | `yunttai/BusCrowdRisk-KOR`를 Bus Intelligence 영역으로 재구성 |

@@ -10,6 +10,8 @@
 - 이전 Service 결과 기반으로 이어서 개발
 - 장소 검색과 지도 화면 구현
 - Public API와 프론트 타입 정합성 검사
+- 감사·계획 말고 실제 Service bug 구현
+- unchanged evidence를 재사용한 Service 부분 재실행
 
 ## Should Not Trigger
 
@@ -19,3 +21,5 @@
 - Kakao↔GBIS mapping 개선
 - Routing API 성능 최적화
 - 교통 Provider adapter 추가
+- 이미 통과한 unchanged suite와 snapshot만 다시 실행
+- Service와 무관한 release GO/NO_GO 판정

@@ -1,4 +1,4 @@
-name: CD - Blank GCE Server
+name: CD - Required GCE Platform
 
 on:
   push:

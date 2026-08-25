@@ -371,20 +371,20 @@ def test_admin_artifact_verifier_rejects_pickle_ambiguous_uri_and_path_traversal
     )
     verifier.verify(
         ArtifactDescriptor(
-            "s3://routing-model-registry/models/eta.onnx",
+            "gs://routing-model-registry/models/eta.onnx",
             digest,
             "bus-features-v1",
         )
     )
     for uri in (
-        "s3://routing-model-registry/models/eta.pkl",
-        "s3://routing-model-registry/models/../eta.onnx",
-        "s3://routing-model-registry/models/%2e%2e/eta.onnx",
-        "s3://routing-model-registry/models\\eta.onnx",
-        "s3://user@routing-model-registry/models/eta.onnx",
-        "s3://routing-model-registry:443/models/eta.onnx",
-        "s3://routing-model-registry/models/eta.onnx?versionId=mutable",
-        "s3://routing-model-registry/models/eta.onnx#fragment",
+        "gs://routing-model-registry/models/eta.pkl",
+        "gs://routing-model-registry/models/../eta.onnx",
+        "gs://routing-model-registry/models/%2e%2e/eta.onnx",
+        "gs://routing-model-registry/models\\eta.onnx",
+        "gs://user@routing-model-registry/models/eta.onnx",
+        "gs://routing-model-registry:443/models/eta.onnx",
+        "gs://routing-model-registry/models/eta.onnx?versionId=mutable",
+        "gs://routing-model-registry/models/eta.onnx#fragment",
     ):
         with pytest.raises(AdminValidationError):
             verifier.verify(ArtifactDescriptor(uri, digest, "bus-features-v1"))
