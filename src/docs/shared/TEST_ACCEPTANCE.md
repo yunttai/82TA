@@ -28,6 +28,8 @@
 - missing future label은 negative가 아님
 - Pareto frontier에 완전 지배 후보 없음
 - 동일 snapshot replay는 동일 결과
+- 따릉이 예상시간은 `ceil(직선거리 m × 3600 / 15000)` 정수 초이고 실시간 수량으로 표시하지 않음
+- 따릉이 예상은 첫 pickup과 그 ID가 아닌 가장 가까운 return을 참조하며, 그런 return이 없으면 `null`
 
 ## 경계면 QA
 
@@ -54,6 +56,7 @@ QA는 양쪽을 동시에 읽는다.
 8. Provider timeout → cache/fallback/partial
 9. model artifact 손상 → fallback과 alert
 10. 사용자 기록·saved place 삭제
+11. 서울 내 두 좌표 → 인근 따릉이 위치·시속 15km 단순 예상과 실시간 수량 미제공 안내
 
 ## GA 수용
 

@@ -51,7 +51,10 @@ class NamedProviderSuiteTests(unittest.TestCase):
         self.assertEqual(lookup[("KAKAO_WALK", "route")], "https://dapi.kakao.com/v2/routing/walk")
         self.assertEqual(lookup[("KAKAO_DIRECTIONS", "route_current")], "https://apis-navi.kakaomobility.com/v1/directions")
         self.assertIsNone(lookup[("GITS", "traffic_context")])
-        self.assertIsNone(lookup[("GBIS_V2", "locations")])
+        self.assertEqual(
+            lookup[("GBIS_V2", "locations")],
+            "https://apis.data.go.kr/6410000/buslocationservice/v2/getBusLocationListv2",
+        )
         self.assertIsNone(lookup[("GBIS_V2", "stations")])
         verified = {
             (spec.provider, spec.operation): spec.response_schema_version
@@ -73,6 +76,14 @@ class NamedProviderSuiteTests(unittest.TestCase):
                     "KAKAO_WALK",
                     "route",
                 ): "kakao.walk.rest.v2.2026-08-24",
+                (
+                    "GBIS_V2",
+                    "arrivals",
+                ): "gbis.bus-arrival.rest.v2.2026-08-25",
+                (
+                    "GBIS_V2",
+                    "locations",
+                ): "gbis.bus-location.rest.v2.2026-08-25",
             },
         )
 

@@ -94,6 +94,22 @@ major URL 또는 compatibility adapter가 필요하다.
 - DBML, migration, event, code registry와 optimize request wire family `1.0`은
   변경하지 않는다.
 
+## 1.5.0 compatibility decision
+
+- 분류: backward-compatible Public API minor.
+- `GET /api/v1/bike-options`와 전용 응답 schema는 additive endpoint다. 기존
+  Public consumer, route-search 요청·응답, 추천 순위와 Private Routing 계약은
+  바뀌지 않는다.
+- 자전거 시간은 서버가 대여소 사이 WGS84 직선거리를 시속 15km로 나누어
+  정수 초로 제공한다. 도로·자전거길 경로시간이나 실시간 자전거 수량으로
+  표현하지 않는다.
+- 대여소 자료의 기준 월·공개일·출처·라이선스와 `NOT_PROVIDED` availability 상태를
+  응답에 포함한다. 설치 거치대 수는 실시간 대여 가능 자전거 수가 아니다.
+- 대여소는 요청 좌표와 5km 이내에서 거리·station ID 순으로 결정한다. 지원
+  범위 밖은 오류로 위장하지 않고 빈 목록과 `null` 예상시간을 반환한다.
+- DBML, migration, event, code registry, Private Routing API, ranking 및 route ID는
+  변경하지 않는다.
+
 ## `rank-0.2.0` / `strategy-2.0.0` policy decision
 
 - 분류: wire-compatible executable-policy revision. Existing request/response keys,

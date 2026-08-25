@@ -1,5 +1,17 @@
 # Contract Changelog
 
+## 1.5.0 — 2026-08-25
+
+- Added the optional `GET /api/v1/bike-options` Public endpoint for nearby Seoul
+  Bike pickup and return stations using the official June 2026 station snapshot.
+- Added a server-owned station-to-station cycling estimate based on WGS84
+  straight-line distance and an explicitly disclosed ordinary bicycle speed of
+  15 km/h.
+- Kept the option outside route generation, Pareto ranking and RouteLeg modes, and
+  explicitly reports that live bicycle/empty-rack availability is not provided.
+- No Private Routing API, DBML, migration, event, code registry, ranking or route-ID
+  change.
+
 ## 1.4.0 — 2026-08-24
 
 - Added optional `RouteLeg.waitDuration` and `RouteLeg.travelDuration` to preserve

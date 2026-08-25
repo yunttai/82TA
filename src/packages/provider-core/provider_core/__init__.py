@@ -43,6 +43,12 @@ from .context_queries import (
 )
 from .envelope import Freshness, ProviderEnvelope, ProviderStatus, QualityFlag, classify_freshness
 from .http import BoundedHttpTransport, HttpRequest, HttpResponse, SensitiveValue
+from .gbis_raw import (
+    GBIS_ARRIVALS_SCHEMA_VERSION,
+    GBIS_LOCATIONS_SCHEMA_VERSION,
+    parse_gbis_arrivals,
+    parse_gbis_locations,
+)
 from .named import (
     ENDPOINT_SPECS,
     GbisAdapter,
@@ -64,12 +70,17 @@ from .named import (
 from .requests import TransitSearchRequest
 from .production import (
     EVIDENCE_ENV,
+    GBIS_LIVE_OPERATIONS,
     KAKAO_BASELINE_KEY_ENV,
     KAKAO_BASELINE_OPERATIONS,
     KAKAO_BASELINE_SCHEMA_VERSIONS,
+    KAKAO_GBIS_KEY_ENV,
+    KAKAO_GBIS_OPERATIONS,
+    KAKAO_GBIS_SCHEMA_VERSIONS,
     PROVIDER_OPERATION_KEY_ENV,
     PROVIDER_HTTPS_PROXY_ENV,
     build_kakao_baseline_config,
+    build_kakao_gbis_config,
     build_strict_https_transport,
 )
 from .probe import ProbeState, ProviderProbeResult, probe_kakao_operation, probe_scope_names
@@ -112,6 +123,9 @@ __all__ = [
     "ENDPOINT_SPECS",
     "Freshness",
     "GbisAdapter",
+    "GBIS_ARRIVALS_SCHEMA_VERSION",
+    "GBIS_LIVE_OPERATIONS",
+    "GBIS_LOCATIONS_SCHEMA_VERSION",
     "GITS_TRAFFIC_QUERY_VERSION",
     "GitsTrafficCorridorQuery",
     "GitsTrafficAdapter",
@@ -122,6 +136,9 @@ __all__ = [
     "KAKAO_BASELINE_KEY_ENV",
     "KAKAO_BASELINE_OPERATIONS",
     "KAKAO_BASELINE_SCHEMA_VERSIONS",
+    "KAKAO_GBIS_KEY_ENV",
+    "KAKAO_GBIS_OPERATIONS",
+    "KAKAO_GBIS_SCHEMA_VERSIONS",
     "KakaoTransitAdapter",
     "KakaoWalkAdapter",
     "KMA_GRID_CONVERSION_VERSION",
@@ -176,10 +193,13 @@ __all__ = [
     "TransportTimeoutError",
     "WeatherContext",
     "build_kakao_baseline_config",
+    "build_kakao_gbis_config",
     "build_strict_https_transport",
     "PinnedHttpsConnectionFactory",
     "classify_freshness",
     "foundation_capability_registry",
     "probe_kakao_operation",
     "probe_scope_names",
+    "parse_gbis_arrivals",
+    "parse_gbis_locations",
 ]
