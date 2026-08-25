@@ -520,34 +520,36 @@ class ServiceBoundarySecurityTests(SimpleTestCase):
     def test_location_bearing_requests_are_excluded_from_access_logs(self) -> None:
         dockerfile = (REPOSITORY_ROOT / "src/infra/docker/service-api/Dockerfile").read_text(encoding="utf-8")
         nginx = (REPOSITORY_ROOT / "src/infra/docker/web/default.conf.template").read_text(encoding="utf-8")
-        terraform = (
-            REPOSITORY_ROOT / "src/infra/terraform/modules/service-platform/main.tf"
+        gce_nginx = (
+            REPOSITORY_ROOT / "src/infra/gce/nginx/default.https.conf.template"
         ).read_text(encoding="utf-8")
 
         self.assertIn('"--access-logfile", "/dev/null"', dockerfile)
         api_location = nginx.split("location /api/", 1)[1].split("}", 1)[0]
         self.assertIn("access_log off", api_location)
-        self.assertNotIn("access_logs {", terraform)
-        self.assertIn("query_string {}", terraform)
-        self.assertNotIn("sampled_requests_enabled   = true", terraform)
+        self.assertIn("access_log off", gce_nginx)
 
     def test_edge_and_task_defense_in_depth_controls_are_declared(self) -> None:
+        compose = (
+            REPOSITORY_ROOT / "src/infra/gce/docker-compose.prod.yml"
+        ).read_text(encoding="utf-8")
         terraform = (
-            REPOSITORY_ROOT / "src/infra/terraform/modules/service-platform/main.tf"
+            REPOSITORY_ROOT / "src/infra/terraform/modules/gce-platform/main.tf"
         ).read_text(encoding="utf-8")
 
         for expected in (
-            '"place-ip-rate-limit"',
-            '"guest-session-ip-rate-limit"',
-            '"route-search-ip-rate-limit"',
-            'name = "SERVICE_ROUTING_API_ALLOWED_HOSTS"',
-            'name = "SERVICE_TRUST_PROXY_HEADERS"',
-            'name = "SERVICE_TRUSTED_PROXY_IPS"',
-            "aws_lb.service.dns_name",
-            "storage_encrypted",
-            "readonlyRootFilesystem = true",
-            'origin_protocol_policy = "https-only"',
-            "var.alb_origin_domain_name",
-            "var.alb_certificate_arn",
+            "SERVICE_ROUTING_API_ALLOWED_HOSTS",
+            "SERVICE_TRUST_PROXY_HEADERS",
+            "SERVICE_TRUSTED_PROXY_IPS",
+            "cap_drop: [ALL]",
+            "security_opt: [no-new-privileges:true]",
+            "read_only: true",
+        ):
+            self.assertIn(expected, compose)
+        for expected in (
+            'resource "google_compute_instance" "platform"',
+            "shielded_instance_config",
+            'enable-oslogin         = "TRUE"',
+            'ports    = ["80", "443"]',
         ):
             self.assertIn(expected, terraform)

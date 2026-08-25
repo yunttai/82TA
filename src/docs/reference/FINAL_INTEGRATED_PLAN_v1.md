@@ -25,7 +25,7 @@
 - public API·private Routing API 명세
 - canonical data model·error·warning·reason code
 - Service DB·Routing DB ERD
-- AWS 배포·CI/CD·관측성·복구·비용통제
+- GCE 배포·CI/CD·관측성·복구·비용통제
 - 보안·개인정보·외부 API 약관 검토
 - 테스트·현장검증·상용 GA 기준·V2 확장
 
@@ -42,7 +42,7 @@
 | Routing | 하이브리드형 time-dependent multimodal routing |
 | Frontend | React 기반 웹앱·PWA |
 | Backend | Django |
-| 배포 | AWS |
+| 배포 | GCE 필수 |
 | 코드 구성 | 하나의 monorepo, 두 개의 독립 배포 단위 |
 | 분업 1 | Frontend + Service Backend |
 | 분업 2 | Routing + Bus Intelligence + 외부 교통 API |
@@ -57,7 +57,7 @@
 
 1. **사용자 확정사항**: 위 표와 최신 요청에서 확정된 제품·기술·분업 결정
 2. **현재 저장소 기반 판단**: `BusCrowdRisk-KOR` README·API·모델·수집·schema 코드에서 확인한 구조
-3. **외부 공식 문서 기반 판단**: Kakao·Kakao Mobility·공공데이터·AWS 등의 공식 문서
+3. **외부 공식 문서 기반 판단**: Kakao·Kakao Mobility·공공데이터·Google Cloud 등의 공식 문서
 
 아직 실제 키 또는 데이터 통계로 확인되지 않은 항목은 별도 `미시험`, `검증 대기`, `release gate`로 명시한다. 특히 다음은 추후 결과를 반영해야 한다.
 
@@ -70,7 +70,7 @@
 ## 문서 구조
 
 - **1~37장**: 제품·기능·외부 API·데이터·모델 구상
-- **38~63장**: 최종 구현·분업·계약·ERD·AWS·보안·검증 계획
+- **38~63장**: 최종 구현·분업·계약·ERD·GCE·보안·검증 계획
 - **부록**: 용어, 판단 흐름, 계약 코드, 완료 체크리스트
 
 ---
@@ -2477,7 +2477,7 @@ Expected Delay
 | 사용자 응답 목표 | 정상 요청 P95 7초 이내를 목표로 함 |
 | 프론트엔드 | React 기반 모바일 우선 웹앱 및 PWA |
 | 백엔드 | Django 기반 |
-| 배포 | AWS |
+| 배포 | GCE 필수 |
 | 버스 데이터 | GBIS v2 및 재구성한 `Bus Intelligence` |
 | 예측 모델 | 좌석 부족 예측과 별도로 ETA 모델을 초기 제품부터 포함 |
 | 코드 구성 | 새 monorepo 내부에 기존 `BusCrowdRisk-KOR`를 재구성 |
@@ -2696,7 +2696,7 @@ flowchart LR
 
 | 경계 | 접근 주체 | 정책 |
 |---|---|---|
-| Web Frontend | 일반 사용자 브라우저 | CloudFront·WAF를 통해 제공 |
+| Web Frontend | 일반 사용자 브라우저 | GCE Nginx HTTPS를 통해 제공 |
 | Service Backend Public API | Web Frontend 및 승인된 클라이언트 | 사용자 인증·rate limit 적용 |
 | Routing API | Service Backend만 | private network, service authentication |
 | Collector·Model Jobs | 내부 scheduler·queue만 | 외부 ingress 없음 |
@@ -2819,7 +2819,7 @@ flowchart TB
 | Ingestion & Quality | 수집 checkpoint, 결측·지연·schema drift | Routing DB/Object Store | 2번 |
 | Model Ops | 학습, 평가, 등록, 활성 버전, rollback | Routing DB/Object Store | 2번 |
 | Contracts | API 스키마·enum·샘플·mock | Git | 공동 |
-| Observability | trace convention, dashboard, alert | AWS/Telemetry | 공동 |
+| Observability | trace convention, dashboard, alert | GCE/Telemetry | 공동 |
 
 ## 42.3 금지되는 책임 누출
 
@@ -3017,7 +3017,7 @@ budget-route-platform/
 - OpenAPI 계약
 - error·warning·reason code
 - 통합 테스트 fixture
-- AWS infrastructure와 보안 경계
+- GCE infrastructure와 보안 경계
 - 배포·rollback·장애 runbook
 - 개인정보·외부 API 약관 검토
 - 대표 경로 현장 검증
@@ -3248,7 +3248,7 @@ infrastructure/
     PostgreSQL/PostGIS repositories
     Redis cache
     model runtime
-    S3 artifact store
+    GCS artifact store
     telemetry
 ```
 
@@ -4110,7 +4110,7 @@ Provider 전용 field는 adapter 밖으로 노출하지 않는다.
   "status": "OK",
   "schemaVersion": "gbis-location-v2.1",
   "freshnessSeconds": 3,
-  "payloadRef": "s3://restricted/raw/...",
+  "payloadRef": "gs://restricted/raw/...",
   "normalizedCount": 18,
   "qualityFlags": []
 }
@@ -5467,7 +5467,7 @@ routing:model-runtime:*
 ## 53.3 Object Storage layout
 
 ```text
-s3://transport-platform-data/
+gs://transport-platform-data/
 ├─ raw/                     # 약관 허용 데이터만, 제한 접근
 │  ├─ gbis/date=.../
 │  ├─ kma/date=.../
@@ -5490,7 +5490,7 @@ s3://transport-platform-data/
 ## 53.4 Artifact immutability
 
 - model version 경로는 overwrite 금지
-- S3 versioning 활성화
+- Cloud Storage object versioning 활성화
 - hash와 signature 검증
 - active pointer는 DB registry에서 관리
 - rollback은 이전 artifact를 다시 활성화하는 방식
@@ -5498,248 +5498,130 @@ s3://transport-platform-data/
 
 ---
 
-# 54. AWS 배포 아키텍처
+# 54. GCE 배포 아키텍처
 
 ## 54.1 기본 선택
 
-두 명이 유지보수하면서 상용 확장성을 확보하기 위해 Kubernetes보다 **Amazon ECS on Fargate**를 우선한다.
+GCE를 유일한 cloud compute 배포 플랫폼으로 사용한다. 현재 구현은 한 대의 GCE
+VM에서 Docker Compose를 실행한다. GCE 사용은 필수지만, VM 수와 Google managed
+service 조합은 실제 운영 요구가 생길 때 진화시킨다.
 
-이유:
-
-- 별도 cluster node 운영이 필요하지 않다.
-- Service API, Routing API, Collector, Model Job을 각 task definition으로 분리할 수 있다.
-- 서비스별 autoscaling과 네트워크 경계를 구성하기 쉽다.
-- 향후 workload가 충분히 커질 때 EKS나 전용 compute로 이전할 수 있다.
-
-## 54.2 배포 구성도
+## 54.2 현재 배포 구성도
 
 ```mermaid
 flowchart TB
-    USER[User Browser]
-    DNS[Route 53]
-    CF[CloudFront]
-    WAF[AWS WAF]
-    S3WEB[S3 Web Assets]
-    ALB[Public ALB]
+    USER[User Browser] --> IP[GCE Static External IP]
+    IP --> NGINX[Nginx + Let's Encrypt]
 
-    subgraph VPC[VPC - 2+ Availability Zones]
-        subgraph Public[Public Subnets]
-            ALB
-            NAT[NAT Gateways]
-        end
-
-        subgraph PrivateApp[Private Application Subnets]
-            SERVICE[ECS Fargate\nService Backend]
-            IALB[Private Internal ALB]
-            ROUTING[ECS Fargate\nRouting API]
-            COLLECTOR[ECS Fargate Tasks\nCollectors]
-            MODEL[ECS/Batch Tasks\nModel Jobs]
-        end
-
-        subgraph PrivateData[Private Data Subnets]
-            SDB[(RDS PostgreSQL\nService DB)]
-            RDB[(RDS PostgreSQL + PostGIS\nRouting DB)]
-            REDIS[(ElastiCache Redis)]
-        end
+    subgraph VM[GCE VM]
+        NGINX --> WEB[React / Nginx Container]
+        NGINX --> SERVICE[Service API Container]
+        SERVICE -->|Private Docker Network| ROUTING[Routing API Container]
+        SERVICE --> SDB[(Service SQLite Volume)]
+        ROUTING --> RDB[(Routing PostGIS Container)]
+        ROUTING --> REDIS[(Routing Redis Container)]
+        ROUTING --> EGRESS[Provider Egress Proxy]
     end
 
-    ECR[ECR]
-    SM[Secrets Manager + KMS]
-    OBJ[S3 Data / Model Artifacts]
-    EB[EventBridge Scheduler]
-    SQS[SQS]
-    CW[CloudWatch / OpenTelemetry]
-
-    USER --> DNS --> CF
-    CF --> S3WEB
-    CF --> WAF --> ALB --> SERVICE
-    SERVICE --> SDB
-    SERVICE --> REDIS
-    SERVICE --> IALB --> ROUTING
-    ROUTING --> RDB
-    ROUTING --> REDIS
-    ROUTING --> OBJ
-    EB --> SQS --> COLLECTOR
-    EB --> MODEL
-    COLLECTOR --> RDB
-    COLLECTOR --> OBJ
-    MODEL --> RDB
-    MODEL --> OBJ
-    ECR --> SERVICE
-    ECR --> ROUTING
-    ECR --> COLLECTOR
-    ECR --> MODEL
-    SM --> SERVICE
-    SM --> ROUTING
-    SERVICE --> CW
-    ROUTING --> CW
-    COLLECTOR --> CW
-    MODEL --> CW
+    ROUTING --> GCS[Cloud Storage Data / Model Artifacts]
+    COLLECTOR[Collectors / Model Jobs] --> RDB
+    COLLECTOR --> GCS
 ```
 
-## 54.3 Frontend 배포
+현재 Compose의 development provenance와 Service SQLite는 production-ready라는
+뜻이 아니다. 환경 승격은 TLS, database, backup/restore, alert, cost와 rollback
+evidence를 별도로 요구한다.
 
-- React build asset을 S3에 업로드
-- CloudFront로 HTTPS 제공
-- immutable hashed asset은 장기 cache
-- `index.html`은 짧은 cache와 atomic deployment
-- Kakao JavaScript SDK 허용 도메인은 실제 production·staging domain으로 제한
-- CSP에 필요한 Kakao map origin을 최소 허용
-- WAF는 API origin에 적용하고 정적 asset은 CloudFront 보호
+## 54.3 Frontend와 Service 배포
 
-## 54.4 Service Backend 배포
+- 현재 Web container가 immutable React asset을 제공한다.
+- Nginx가 same-origin HTTPS와 Service API proxy를 제공한다.
+- Kakao JavaScript SDK 허용 도메인은 실제 GCE domain으로 제한한다.
+- Service는 browser가 접근하는 유일한 public backend다.
+- health check, graceful shutdown, secret 비노출과 access-log redaction을 유지한다.
+- background job을 web process에서 실행하지 않는다.
 
-- ECS Fargate service
-- public ALB 뒤 private subnet task
-- 최소 2개 task를 서로 다른 AZ에 배치
-- stateless application, session은 secure cookie 또는 shared store 정책
-- static/media를 container local disk에 의존하지 않음
-- health check와 graceful shutdown
-- background job을 web process에서 실행하지 않음
+## 54.4 Routing 배포
 
-## 54.5 Routing Server 배포
+- Routing container는 host port를 공개하지 않는다.
+- Service container만 private Docker network로 Routing을 호출한다.
+- Provider outbound는 exact-host egress proxy와 evidence gate를 사용한다.
+- model artifact는 `gs://` identity, hash와 local read-only materialization을 검증한다.
+- inference batch와 provider concurrency를 제한한다.
 
-- private internal ALB 또는 service discovery 뒤 ECS Fargate service
-- 인터넷에서 직접 접근 불가
-- Service Backend security group만 ingress 허용
-- 모델 artifact는 task 시작 시 검증 후 local read-only cache
-- CPU·memory와 provider latency를 기준으로 autoscaling
-- inference batch와 provider concurrency 제한
-- scale-out 시 동일 Redis cache와 DB를 사용하되 single-flight 적용
+## 54.5 Collector와 Model Job
 
-## 54.6 Collector와 Model Job
+- 현재 구현된 worker는 별도 process/container로 실행한다.
+- checkpoint 기반 idempotent 수집과 provider quota/backoff를 유지한다.
+- training dataset snapshot ID를 고정한다.
+- artifact와 metrics를 Cloud Storage와 Routing registry에 등록한다.
+- 자동 ACTIVE 전환을 금지한다.
+- 큰 학습이 필요하면 별도 GCE machine type 또는 Google Cloud batch compute를 검토한다.
 
-### Collector
+## 54.6 데이터베이스와 Redis
 
-- EventBridge Scheduler가 SQS 또는 ECS task를 실행
-- route group별 shard
-- 실패 message는 DLQ
-- checkpoint 기반 idempotent 수집
-- provider quota와 backoff를 중앙 관리
+- 현재 Service는 persistent host volume의 SQLite를 사용한다.
+- 현재 Routing은 VM 내부 PostGIS와 Redis containers를 사용한다.
+- 두 bounded context의 database/role/migration 소유권은 계속 분리한다.
+- production 승격 시 Cloud SQL 또는 GCE-hosted PostgreSQL의 HA, encryption,
+  backup/PITR와 restore drill을 증명한다.
+- multi-node가 필요하면 Memorystore 또는 검증된 Redis HA 구성을 선택한다.
+- schema migration은 배포 pipeline의 별도 단계로 관리한다.
 
-### Model Job
+## 54.7 Network와 secret
 
-- 정기 또는 운영자 승인으로 실행
-- training dataset snapshot ID를 고정
-- artifact와 metrics를 S3·registry에 등록
-- 자동 ACTIVE 전환 금지
-- 큰 학습이 필요해지면 AWS Batch 또는 전용 compute로 이동 가능
+- GCE VPC/subnet과 static external IP를 Terraform으로 관리한다.
+- public ingress는 80/443, SSH는 명시한 deploy runner/bastion CIDR만 허용한다.
+- OS Login과 pinned host key를 사용한다.
+- Provider key와 application secret은 GitHub protected environment 및 host-side
+  restricted files에서 관리하며 browser, Terraform state와 로그에 넣지 않는다.
+- managed secret이 필요해질 때 Google Secret Manager와 workload identity를 사용하고
+  JSON service-account key는 만들지 않는다.
 
-## 54.7 데이터베이스 배포
-
-상용 기본:
-
-- PostgreSQL RDS Multi-AZ
-- Service DB와 Routing DB는 별도 database와 계정
-- 초기에는 동일 RDS cluster에 논리 분리할 수 있으나 cross-query는 금지
-- 부하·보안 요구가 커지면 별도 RDS instance로 물리 분리
-- automated backup과 point-in-time recovery
-- schema migration은 배포 pipeline에서 별도 단계
-- backward-compatible expand/contract migration
-
-## 54.8 Redis 배포
-
-- ElastiCache replication group
-- encryption in transit·at rest
-- Service와 Routing ACL·prefix 분리
-- automatic failover
-- cache 장애 시 DB·provider로 제한적 fallback
-- Redis 장애가 데이터 영구 손실로 이어지지 않도록 설계
-
-## 54.9 Network
-
-- 최소 2개 AZ
-- ECS task와 RDS는 private subnet
-- provider outbound는 NAT 또는 egress proxy
-- S3·ECR·CloudWatch·Secrets Manager 등에 VPC endpoint 검토
-- security group은 서비스 호출 방향별 최소 허용
-- DB public access 비활성
-- 운영자 접근은 SSM Session Manager 등 감사 가능한 경로
-
-## 54.10 Secret 관리
-
-- AWS Secrets Manager에 provider key·DB credential 저장
-- task role이 필요한 secret만 읽음
-- GitHub Actions에는 장기 AWS access key를 넣지 않고 OIDC 사용
-- key rotation 절차와 owner 기록
-- staging과 production key 분리
-- browser에 REST·Mobility·GBIS key 노출 금지
-
-## 54.11 Infrastructure as Code
+## 54.8 Infrastructure as Code
 
 Terraform을 infrastructure source of truth로 사용한다.
 
-- reusable module: VPC, ECS service, RDS, Redis, S3, IAM, monitoring
-- `dev`, `staging`, `prod` state 분리
+- reusable module: GCE VM, VPC/subnet, static IP, firewall, service account, GCS
+- environment별 GCS state prefix와 versioning
 - production apply는 review와 승인 필요
 - manual console 변경은 drift detection 대상
-- secret 값 자체는 Terraform state에 평문으로 넣지 않음
+- secret 값 자체는 Terraform state에 넣지 않음
 
-## 54.12 환경 분리
+## 54.9 CI/CD
 
-권장:
+- `.github/workflows/cd-gce.yml`이 유일한 cloud deploy workflow다.
+- main과 release tag에서 image build, blank-host bootstrap, ordered Compose deploy,
+  Provider evidence, HTTP→HTTPS 전환과 health verification을 수행한다.
+- 실패 시 같은 GCE 환경의 이전 image tag/digest와 Compose revision으로 rollback한다.
+- 다른 cloud 경로는 배포 또는 rollback 대안이 아니다.
 
-```text
-dev       개발자 통합·mock/제한 실제 provider
-staging   production과 동일 구조, 테스트 key·비식별 fixture
-prod      사용자 트래픽
-```
+## 54.10 확장 경로
 
-상용 단계에서는 가능하면 AWS account를 환경별로 분리한다.
+실제 부하와 운영 evidence가 필요성을 보이면 같은 Google Cloud 안에서 다음을
+선택할 수 있다. 현재 구현되지 않았다는 이유로 하네스가 완료를 강제하지 않는다.
 
-## 54.13 CI/CD
+- 여러 GCE VM과 managed instance group
+- Cloud Load Balancing과 Cloud Armor
+- Cloud SQL, Memorystore, Artifact Registry, Secret Manager
+- Cloud Logging/Monitoring과 scheduler/batch services
 
-### Pull Request
+## 54.11 Database migration와 Disaster Recovery
 
-- lint·format
-- unit test
-- contract compatibility
-- migration check
-- SAST·dependency scan
-- container build
-- SBOM 생성
-- provider fixture replay
-- Frontend build·accessibility 기본 검사
+- destructive migration을 한 번에 배포하지 않는다.
+- expand/contract, backfill, 이전 version 호환 기간을 유지한다.
+- GCE persistent state와 database backup/restore를 정기 검증한다.
+- Cloud Storage versioning/lifecycle과 Terraform GCS state versioning을 사용한다.
+- model registry와 artifact generation/hash를 cross-check한다.
+- RTO·RPO를 GA 전에 확정하고 분기별 restore drill을 수행한다.
 
-### Main
-
-- image를 ECR에 push
-- dev 자동 배포
-- integration·smoke test
-- staging 승격
-- production 수동 승인 또는 release tag
-- rolling 또는 blue/green deploy
-- 실패 시 이전 task definition과 model version rollback
-
-## 54.14 Database migration 안전성
-
-- destructive migration을 한 번에 배포하지 않음
-- 먼저 새 column/table 추가
-- 양쪽 version이 읽을 수 있는 기간 유지
-- backfill job 분리
-- code 전환 후 오래된 field 제거
-- large table index는 online 방식과 lock 영향을 검토
-
-## 54.15 Disaster Recovery
-
-- RDS PITR와 정기 snapshot 복구 연습
-- S3 versioning과 lifecycle
-- Terraform state backup·locking
-- model registry와 artifact cross-check
-- 외부 provider credential 재발급 runbook
-- RTO·RPO를 GA 전에 확정
-- 분기별 restore drill
-
-## 54.16 비용 통제
-
-비용 상한이 없더라도 비용은 품질 지표다.
+## 54.12 비용 통제
 
 - provider별 호출 수·성공률·cache hit·건당 비용
 - 검색 한 건의 평균 외부 API 비용
 - 사용자·IP·계정별 비정상 호출
-- 일일·월간 budget alarm
+- Google Cloud budget/alert와 label 기반 비용 분류
 - 다중 목적지 fallback 시 호출 폭발 감지
-- AWS Cost Anomaly Detection과 tag 기반 비용 분류
 - 기능별 cost-to-value 분석
 
 ---
@@ -5772,8 +5654,8 @@ Trusted internal
 
 | 위협 | 영향 | 통제 |
 |---|---|---|
-| API key 유출 | 비용·서비스 악용 | Secrets Manager, 권한 최소화, rotation, client 비노출 |
-| Denial of Wallet | 외부 API·AWS 비용 폭증 | WAF, rate limit, cache, 후보 상한, cost alarm |
+| API key 유출 | 비용·서비스 악용 | server-side secret store, 권한 최소화, rotation, client 비노출 |
+| Denial of Wallet | 외부 API·GCE 비용 폭증 | edge/application rate limit, cache, 후보 상한, cost alarm |
 | SSRF | 내부망 접근 | provider URL allowlist, 사용자 URL 입력 금지, egress 통제 |
 | 위치 이력 노출 | 생활패턴 침해 | 최소 저장, 암호화, 접근통제, 삭제 기능 |
 | 계정 탈취 | 저장 장소·기록 노출 | secure session, MFA 운영자, login rate limit, audit |
@@ -5788,7 +5670,7 @@ Trusted internal
 
 ## 55.3 Public API 보호
 
-- AWS WAF managed rule과 rate-based rule
+- GCE edge/application rate-based protection
 - 사용자·계정·IP·anonymous session 복합 rate limit
 - 비정상 좌표 sweep와 automation 탐지
 - 검색당 `max provider calls` 예산
@@ -5802,7 +5684,7 @@ Trusted internal
 최소 기준:
 
 - Routing API는 private subnet과 internal load balancer에만 노출
-- Service Backend task role만 network 접근
+- Service Backend workload identity만 network 접근
 - 짧은 수명의 signed service JWT 또는 workload identity
 - `iss`, `aud`, `exp`, `jti` 검증
 - key rotation
@@ -5934,7 +5816,7 @@ Trusted internal
 | high-confidence mapping precision | 검증 dataset에서 99.5% 이상 권고 |
 | stale data 오표시 | 0건 목표 |
 | 모델 artifact rollback | 15분 이내 |
-| RDS 복구 검증 | 정기 restore drill 통과 |
+| GCE DB 복구 검증 | 정기 restore drill 통과 |
 
 수치는 초기 제안 게이트다. 실제 부하·provider SLA·현장 검증 결과로 확정한다.
 
@@ -6063,7 +5945,7 @@ OpenTelemetry convention을 두 서비스와 worker에 공통 적용한다.
 4. GBIS/KMA/GITS 수집 상태
 5. Mapping coverage
 6. Model online·offline 성능
-7. AWS resource·DB·Redis
+7. GCE resource·DB·Redis
 8. Security·rate limit
 
 ## 56.8 Graceful Degradation Matrix
@@ -6292,7 +6174,7 @@ GA 전 필수:
 - model rollback
 - 사용자 기록 삭제
 - staging에서 production-like deployment·rollback
-- RDS restore drill
+- GCE database restore drill
 
 ---
 # 58. 협업·유지보수·향후 통합 전략
@@ -6638,7 +6520,7 @@ Exit:
 
 ## 59.12 단계 11: 상용 Hardening
 
-- AWS production architecture
+- GCE production architecture
 - WAF·rate limit·secret·audit
 - observability·SLO·runbook
 - backup·restore·rollback
@@ -6793,7 +6675,7 @@ reason_for_deviation
 | provider quota·과금 | 변동 | 장애·비용 | cache·alarm·paid plan·fallback | 상용 승인 전 |
 | GITS 접근·mapping | 미확정 | ETA feature | optional, ablation 후 유지 | ETA 고도화 |
 | 일정 무제한에 따른 범위 팽창 | 높음 | 완성 지연 | 단계별 exit criteria·GA scope 고정 | 상시 |
-| 두 명의 운영부담 | 높음 | 장애 대응 | managed AWS, 자동화, runbook | Beta 전 |
+| 두 명의 운영부담 | 높음 | 장애 대응 | managed GCE, 자동화, runbook | Beta 전 |
 | 위치정보 규제 | 검토 필요 | 출시 제한 | 법률·개인정보 검토 | GA 필수 |
 | 모델 drift | 필연적 | 품질 하락 | monitoring·retrain·rollback | GA 필수 |
 | 공급자 약관 변경 | 지속 | 기능 중단 | capability registry·provider adapter | 상시 |
@@ -6965,12 +6847,12 @@ No-Go:
 - PostgreSQL: <https://www.postgresql.org/docs/>
 - PostGIS: <https://postgis.net/documentation/>
 - OpenTelemetry: <https://opentelemetry.io/docs/>
-- Terraform AWS Provider: <https://registry.terraform.io/providers/hashicorp/aws/latest/docs>
-- Amazon ECS: <https://docs.aws.amazon.com/ecs/>
-- AWS Fargate: <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html>
-- Amazon RDS for PostgreSQL: <https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html>
-- Amazon ElastiCache: <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/>
-- AWS Secrets Manager: <https://docs.aws.amazon.com/secretsmanager/>
+- Terraform Google Provider: <https://registry.terraform.io/providers/hashicorp/google/latest/docs>
+- Compute Engine: <https://cloud.google.com/compute/docs>
+- Cloud Storage: <https://cloud.google.com/storage/docs>
+- Cloud SQL for PostgreSQL: <https://cloud.google.com/sql/docs/postgres>
+- Memorystore: <https://cloud.google.com/memorystore/docs>
+- Secret Manager: <https://cloud.google.com/secret-manager/docs>
 
 ## 63.2 API 검증 기준일
 
@@ -7178,4 +7060,3 @@ IDEMPOTENCY_CONFLICT
 | 검색당 provider 호출 수 | 추후 입력 | bounded | 비용 추적 |
 | 검색당 외부 API 비용 | 추후 입력 | 운영 예산 내 |  |
 | 실제 strict budget 위반 | 추후 입력 | 0건 목표 | 현장 검증 |
-

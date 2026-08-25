@@ -1,6 +1,6 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.5.0",
+  "contextVersion": "1.5.1",
   "contractVersion": "1.5.0",
   "publicApiMajor": 1,
   "routingApiMajor": 1,
@@ -10,5 +10,5 @@
   "strategyPolicyVersion": "strategy-2.0.0",
   "mappingPolicyVersion": "0.1.0-planned",
   "featureSchemaVersion": "0.1.0-planned",
-  "status": "TYPED_FAVORITE_QUICK_SEARCH_1_5"
+  "status": "TYPED_FAVORITE_QUICK_SEARCH_1_5_GCE_ONLY"
 }

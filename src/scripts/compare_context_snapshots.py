@@ -1,45 +1,91 @@
 #!/usr/bin/env python3
-"""Compare the latest Service and Routing context snapshots before integration."""
+"""Verify and compare live Service and Routing contract locks."""
 
 from __future__ import annotations
 
 import argparse
-import json
+import subprocess
+import sys
 from pathlib import Path
 
-from _contract_utils import project_root
+from _contract_utils import load_json, project_root
 
 
-def load(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+def verify(root: Path, label: str) -> bool:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "src/scripts/verify_contract_lock.py"),
+            "--root",
+            str(root),
+        ],
+        cwd=root,
+        check=False,
+    )
+    if result.returncode:
+        print(f"ERROR: {label} live contract lock verification failed: {root}")
+        return False
+    return True
+
+
+def context(root: Path) -> dict:
+    manifest = load_json(root / "src/contracts/CONTEXT_MANIFEST.json")
+    lock = load_json(root / "src/contracts/CONTRACT_LOCK.json")
+    return {
+        "project": manifest.get("project"),
+        "contextVersion": lock.get("contextVersion"),
+        "contractVersion": lock.get("contractVersion"),
+        "aggregateSha256": lock.get("aggregateSha256"),
+        "canonicalFiles": lock.get("files"),
+    }
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=Path, default=None)
+    parser = argparse.ArgumentParser(
+        description="Compare verified live contract locks; historical snapshots are ignored."
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=None,
+        help="backward-compatible shorthand that sets both roots",
+    )
+    parser.add_argument("--service-root", type=Path, default=None)
+    parser.add_argument("--routing-root", type=Path, default=None)
     args = parser.parse_args()
-    root = args.root.resolve() if args.root else project_root()
-    paths = {
-        "service-product": root / "_workspace/service-product/00_context_snapshot_latest.json",
-        "routing-intelligence": root / "_workspace/routing-intelligence/00_context_snapshot_latest.json",
-    }
-    for name, path in paths.items():
-        if not path.is_file():
-            print(f"ERROR: {name} snapshot is missing: {path.relative_to(root)}")
-            return 2
-    left = load(paths["service-product"])
-    right = load(paths["routing-intelligence"])
-    keys = ("project", "contextVersion", "contractVersion", "aggregateSha256")
+
+    default_root = args.root.resolve() if args.root else project_root()
+    service_root = (
+        args.service_root.resolve() if args.service_root else default_root
+    )
+    routing_root = (
+        args.routing_root.resolve() if args.routing_root else default_root
+    )
+
+    roots = [("service-product", service_root)]
+    if routing_root != service_root:
+        roots.append(("routing-intelligence", routing_root))
+    if not all(verify(root, label) for label, root in roots):
+        return 2
+
+    left = context(service_root)
+    right = context(routing_root)
+    keys = (
+        "project",
+        "contextVersion",
+        "contractVersion",
+        "aggregateSha256",
+        "canonicalFiles",
+    )
     differences = [key for key in keys if left.get(key) != right.get(key)]
-    if left.get("canonicalFiles") != right.get("canonicalFiles"):
-        differences.append("canonicalFiles")
     if differences:
         print("CONTEXT PARITY FAILED")
         for key in differences:
             print(f"- {key}: service={left.get(key)!r}, routing={right.get(key)!r}")
         return 1
+
     print(
-        "CONTEXT PARITY OK: "
+        "LIVE CONTEXT PARITY OK: "
         f"context={left['contextVersion']} contract={left['contractVersion']} "
         f"aggregate={left['aggregateSha256']}"
     )

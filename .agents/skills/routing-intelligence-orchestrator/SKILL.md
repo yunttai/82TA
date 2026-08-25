@@ -5,135 +5,37 @@ description: "Run the Routing & Intelligence workstream. Use for transport provi
 
 # Routing & Intelligence Orchestrator
 
-## Global gates
+## Default mode: focused implementation
 
-```bash
-python src/scripts/validate_repository.py
-python src/scripts/verify_contract_lock.py
-```
+Treat an implementation, bug fix, or continuation request as implementation work. An audit, plan, ADR/CCR proposal, workspace update, or release verdict is not an alternative deliverable.
 
-Read the applicable `AGENTS.md` chain, `src/contracts/CONTEXT_MANIFEST.json`, `src/contracts/CONTRACT_LOCK.json`, shared PRD, relevant contract, workstream documents, and latest `_workspace` state. Final product artifacts belong under `src/`; durable coordination belongs in `_workspace/`.
+1. Read applicable `AGENTS.md`, the current production call path, nearby tests, and directly consumed contracts.
+2. If relationships are unclear and `.codegraph/` exists, make one bounded query for the affected symbol/call path. Reuse that result until the relevant source changes.
+3. Identify the smallest real implementation gap, edit it, and add a focused regression or property test.
+4. Run targeted checks while iterating and one affected Routing aggregate suite after the diff stabilizes.
+5. Report the implementation and its evidence. Do not issue `GO`/`NO_GO` unless the user requested integration or release readiness.
 
-If shared semantics or contracts must change, stop and use `$shared-contract-governance`.
+On a continuation, reuse unchanged code findings, verified contract hashes, and green test results. Do not repeat repository audits, snapshots, `WORKPLAN`/`STATUS`/`HANDOFF` updates, or unchanged suites merely because the task resumed.
 
-## Owned paths
+## Scope routing
 
-- `src/services/routing-api/**`
-- `src/packages/routing-domain/**`
-- `src/packages/provider-core/**`
-- `src/packages/bus-intelligence-core/**`
-- `src/workers/**`
-- `src/docs/harnesses/routing-intelligence/**`
+- Local provider, mapping, Bus Intelligence, optimizer, worker, or private API change: work only in the affected component and its tests.
+- Shared API or semantic change: add `$shared-contract-governance` for the affected producer/consumer surface only.
+- Cross-workstream integration: add `$integration-coherence-qa` for the changed boundary only.
+- Deployment/release readiness: add security, performance, capability, rollback, and environment evidence only when explicitly requested.
 
-Never access Service DB or implement account/history/favorites.
+Do not invoke architecture, contract, integration, security, or release roles merely because they exist. Delegate only when the user requested delegation or the task contains genuinely independent work; keep a focused task to at most one implementation specialist and one independent reviewer with non-overlapping write scopes.
 
-## Primary-thread workflow
+## Dependency guidance, not a mandatory pipeline
 
-The primary thread owns orchestration and final consolidation.
+Provider → canonical mapping → optional Bus Intelligence → candidate/time/cost/ranking → private API is a dependency map. Run only the segment touched by the task. An unavailable provider key, live approval, model, or mapping corpus does not block pure-domain or fixture-backed offline algorithm work; keep the unavailable live capability disabled or unverified.
 
-1. Run `python src/scripts/snapshot_context.py routing-intelligence`.
-2. Create/update `_workspace/routing-intelligence/WORKPLAN.md`.
-3. Build dependency graph and latency budget.
-4. Delegate independent provider, mapping, model/data, optimizer, security/performance and QA tasks.
-5. Keep canonical interfaces fixed during parallel work.
-6. Wait for all results and fan-in in dependency order.
-7. Run replay/contract/semantic checks incrementally.
-8. Write `STATUS.md` and `HANDOFF.md`.
+Use the runtime that owns each check. Routing package/private API tests run in the Routing environment. Service consumer tests run in the Service environment. Do not collect both trees with one incomplete environment.
 
-## Recommended custom subagents
+## Failure semantics
 
-- `routing-technical-lead`
-- `provider-integration-engineer`
-- `transport-mapping-engineer`
-- `route-optimization-engineer`
-- `bus-intelligence-engineer`
-- `routing-data-ml-engineer`
-- `routing-security-performance-engineer`
-- `routing-qa-engineer`
-- `contract-steward`: shared contract impact and compatibility
-- `architecture-auditor`: bounded-context and integration architecture review
-- `integration-qa`: cross-workstream verification
-
-Do not spawn every role for a narrow task. Keep concurrency within `.codex/config.toml`.
-
-## Dependency order
-
-```text
-capability/fixture
-→ adapter/canonical object
-→ catalog/mapping
-→ ETA/seat/boardability/expected wait
-→ candidate/time propagation
-→ transfer/cost/budget/Pareto/ranking
-→ private API
-→ replay/performance/security
-```
-
-## Phases
-
-### Phase 0 — Audit
-
-- repository/lock/context snapshot
-- capability states: DOCUMENTED / KEY_VERIFIED / PRODUCTION_APPROVED
-- data/model/mapping status
-- private API contract/deadline
-
-### Phase 1 — Plan
-
-Each task includes paths, canonical input/output, fixture, dependency, latency allocation and fallback.
-
-### Phase 2 — Provider and mapping
-
-Use `$provider-adapter-delivery` and `$transport-mapping-delivery`:
-
-- envelope/schema/timeout/quota/cache
-- canonical route/stop/direction
-- mapping evidence/confidence/review
-- malformed/stale/429/timeout fixtures
-
-Run QA before downstream use.
-
-### Phase 3 — Bus Intelligence and optimizer
-
-Use `$bus-intelligence-delivery`, `$routing-data-mlops`, `$route-optimizer-delivery`:
-
-- trip identity and observed labels
-- ETA P50/P90/source arbitration
-- target-stop seat risk/calibration
-- boardability proxy and multi-vehicle expected/P90 wait
-- bounded candidate patterns
-- sequential time-dependent evaluation
-- transfer feasibility
-- strict taxi upper-budget
-- Pareto and representative selection
-
-Bus Intelligence is incomplete unless it changes bus-leg expected time and ranking in validated cases.
-
-### Phase 4 — API, performance, security
-
-- `POST /v1/routes/optimize`
-- capability/health/version/admin restriction
-- deadline/cancellation
-- provider/model/mapping/ranking provenance
-- 6.5-second internal budget
-- partial/fallback
-- private service auth
-- deterministic replay/load/fault tests
-
-### Phase 5 — Service integration
-
-Proceed only after context parity. Compare real output with canonical fixture and generated client; ensure no user identity or cross-database access.
-
-### Phase 6 — Completion
-
-Run component, contract, replay, performance and repository checks. Report capability and data/model gaps honestly.
-
-## Failure rules
-
-- Unverified provider: fixture + capability false; never claim production readiness.
-- Optional enrichment timeout: cancel and return PARTIAL when valid.
-- LOW mapping: no Bus Intelligence.
-- Missing model: approved fallback with warning; no fabricated probability.
-- Missing future label: unobserved/NULL, not negative.
-- Latency over budget: reduce optional candidates/enrichment, not correctness invariants.
-- Shared contract drift: stop and invoke governance.
+- Fail closed for service authentication, untrusted schemas/artifacts, and values required to certify strict budget or feasibility.
+- Optional exactification/enrichment timeout drops the affected candidate or uses the current fallback/`PARTIAL`/no-feasible-route semantics; it is not automatically a hard 504.
+- LOW mapping disables Bus Intelligence; missing models use the approved explicit fallback; missing future labels stay NULL/unobserved.
+- Preserve bounded candidate/provider calls, time propagation, provenance, and deterministic behavior.
+- Stop only the shared boundary affected by real contract drift; report unrelated baseline drift separately.

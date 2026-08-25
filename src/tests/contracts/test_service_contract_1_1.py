@@ -177,9 +177,9 @@ class ServiceContract11Tests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["contextVersion"], "1.5.0")
+        self.assertEqual(manifest["contextVersion"], "1.5.1")
         self.assertEqual(manifest["contractVersion"], "1.5.0")
-        self.assertEqual(versions["contextVersion"], "1.5.0")
+        self.assertEqual(versions["contextVersion"], "1.5.1")
         self.assertEqual(versions["contractVersion"], "1.5.0")
         self.assertEqual(versions["databaseContractVersion"], "1.3.0")
         self.assertEqual(versions["codeRegistryVersion"], "1.3.0")

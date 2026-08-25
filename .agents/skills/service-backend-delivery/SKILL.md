@@ -5,24 +5,18 @@ description: "Django Service Backend의 Public API, 인증·guest ownership, Kak
 
 # Service Backend Delivery
 
-## 공통 사전 조건
+## 작업 범위 확인
 
-작업을 시작하기 전에 반드시 다음을 수행한다.
+1. 적용되는 `AGENTS.md`, 현재 구현, 직접 영향받는 테스트를 읽는다.
+2. 공유 API·데이터 의미를 소비하거나 바꿀 때만 manifest, lock, 관련 canonical 계약과 실제 producer·consumer를 읽는다.
+3. 작업 전후 가장 작은 관련 검증을 실행한다. 전체 repository/lock 검증은 공유 경계·통합·릴리스 또는 drift 조사에 사용한다.
+4. 기존의 무관한 실패는 baseline으로 분리해 보고하고, 현재 작업을 무효화할 때만 중단한다.
 
-1. `python src/scripts/validate_repository.py`를 실행한다.
-2. `python src/scripts/verify_contract_lock.py`를 실행한다.
-3. `src/contracts/CONTEXT_MANIFEST.json`과 `src/contracts/CONTRACT_LOCK.json`을 읽는다.
-4. `src/docs/shared/PROJECT_CONTEXT.md`, `PRD.md`, 관련 canonical 계약을 읽는다.
-5. 이전 `_workspace/` 산출물이 있으면 미완료·피드백·차단 사항을 확인한다.
+요청이 rate limit·idempotency의 process 간 coordination이면 그 소비자, backend wiring, 직접 테스트까지만 기본 범위로 삼는다. Kakao Local 또는 Routing Provider 응답 캐싱, TTL·약관·위치 key 정책, 배포 환경 확대는 명시적으로 요청되거나 실제 diff가 그 경계를 바꿀 때만 포함한다. 인접 기능의 미결정은 현재 slice의 차단 사유가 아니다.
 
-검증 실패 시 구현을 진행하지 않는다. 공통 원본을 임의로 맞춰 쓰지 말고 drift 또는 change request로 처리한다.
+공유 infra나 CI 파일도 실제로 겹치는 writer/diff가 있을 때만 조율한다. 경로가 shared라는 이유만으로 승인 대기하지 않는다. 사용자가 working PR CI를 요청했다면 repository-local 검증 활성화는 구현 범위이며, secret·permission·배포·외부 상태 변경이 동반될 때만 별도 권한을 확인한다.
 
-## 저장 위치 규칙
-
-- 분석·토론·중간 결과: `_workspace/{workstream}/`
-- 검토가 끝난 제품 코드·문서·테스트·인프라: 반드시 `src/` 아래
-- 루트에는 `.codex/`, `.agents/`, `_workspace/`, `src/`, `AGENTS.md`, `README.md`, `.gitignore`만 둔다.
-- 공통 PRD·OpenAPI·ERD·enum 복사본을 workstream 폴더에 만들지 않는다.
+제품 산출물은 `src/`에 두고 CI/CD는 `.github/`에 둘 수 있다. `_workspace/`는 선택적·gitignored 메모이며 최신 상태의 근거가 아니다. 공통 PRD·OpenAPI·ERD·enum 복사본은 만들지 않는다.
 
 
 ## 경계
@@ -30,6 +24,8 @@ description: "Django Service Backend의 Public API, 인증·guest ownership, Kak
 Service는 사용자와 Public API를 소유한다. Provider 조율, Kakao↔GBIS 매핑, 모델, 후보·Pareto·ranking을 구현하지 않는다.
 
 ## 워크플로우
+
+아래 항목은 변경에 해당하는 단계만 선택한다. 모든 Service Backend 작업의 일괄 완료 목록이 아니다.
 
 1. Public OpenAPI operation과 requirement를 선택한다.
 2. domain/application/infrastructure/API 경계를 정의한다.

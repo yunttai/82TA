@@ -1,7 +1,7 @@
 """Local Service gateway -> Routing WSGI HTTP load evidence.
 
 This deliberately uses sanitized fixture work and a loopback process boundary. It
-does not claim deployed Public API, Provider, database, model, AWS, or production
+does not claim deployed Public API, Provider, database, model, GCE, or production
 capacity evidence.
 """
 

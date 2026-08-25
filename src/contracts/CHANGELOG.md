@@ -1,5 +1,16 @@
 # Contract Changelog
 
+## Context 1.5.1 — 2026-08-25
+
+- Integrated the Public/Service 1.5.0 favorite and history contract with the
+  independently accepted GCE-only deployment context.
+- Added `GCE_DEPLOYMENT.md` to the canonical context alongside the two Public 1.5
+  favorite-creation examples. Contract version remains `1.5.0`; no additional API,
+  DB, event, code-registry, ranking, or private Routing wire change is introduced by
+  this integration revision.
+- Renumbered the atomic favorite quick-search decision to ADR-0013 so the accepted
+  GCE-only platform decision remains the unique ADR-0012.
+
 ## 1.5.0 — 2026-08-25
 
 - Added versioned `FavoriteJourneySearchConditionsV1` while retaining the required,
@@ -27,6 +38,21 @@
   declares 400/401/403/404, PATCH 400/401, and DELETE 401. Success and atomic-create
   semantics are unchanged.
 
+## Context 1.4.1 — 2026-08-25
+
+- Accepted GCE as the only supported cloud compute deployment platform and
+  removed the alternate-cloud Terraform, runbooks and CI/CD templates.
+- Made the implemented single-GCE-VM Docker Compose workflow the honest current
+  baseline without relabeling its development flags, SQLite or internal HTTP as
+  production-ready.
+- Replaced cloud model/data artifact identities with canonical `gs://` URIs while
+  preserving bucket allowlists, path canonicalization, safe formats and SHA-256
+  verification.
+- Added GCE Terraform for the VM/network/static IP/firewall/runtime identity and a
+  private versioned GCS artifact bucket. Exact Google managed-service topology is
+  intentionally not frozen by the harness.
+- Contract version remains `1.4.0`; OpenAPI, DBML, events, code registry, generated
+  clients, ranking and public/private API wire semantics are unchanged.
 ## 1.4.0 — 2026-08-24
 
 - Added optional `RouteLeg.waitDuration` and `RouteLeg.travelDuration` to preserve

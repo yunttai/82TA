@@ -467,31 +467,31 @@ def test_artifact_verifier_rejects_paths_buckets_schema_and_digest_mismatch() ->
     )
     verifier.verify(
         ArtifactDescriptor(
-            "s3://routing-model-registry/models/eta.onnx",
+            "gs://routing-model-registry/models/eta.onnx",
             digest,
             "bus-features-v1",
         )
     )
     verifier.verify(
         ArtifactDescriptor(
-            "s3://routing-model-registry/models/seat-risk.txt",
+            "gs://routing-model-registry/models/seat-risk.txt",
             digest,
             "bus-features-v1",
         )
     )
     for descriptor in (
         ArtifactDescriptor("file:///tmp/model.pkl", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://other/model.onnx", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry/model.onnx", digest, "unknown"),
-        ArtifactDescriptor("s3://routing-model-registry/model.onnx", "0" * 64, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry/model.pkl", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry/models/../model.onnx", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry/model.onnx?versionId=caller", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry/model.onnx#fragment", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://user@routing-model-registry/model.onnx", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry:443/model.onnx", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry/models//model.onnx", digest, "bus-features-v1"),
-        ArtifactDescriptor("s3://routing-model-registry/models/%2e%2e/model.onnx", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://other/model.onnx", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry/model.onnx", digest, "unknown"),
+        ArtifactDescriptor("gs://routing-model-registry/model.onnx", "0" * 64, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry/model.pkl", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry/models/../model.onnx", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry/model.onnx?versionId=caller", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry/model.onnx#fragment", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://user@routing-model-registry/model.onnx", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry:443/model.onnx", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry/models//model.onnx", digest, "bus-features-v1"),
+        ArtifactDescriptor("gs://routing-model-registry/models/%2e%2e/model.onnx", digest, "bus-features-v1"),
     ):
         with pytest.raises(AdminValidationError):
             verifier.verify(descriptor)
@@ -553,7 +553,7 @@ def test_model_activation_enforces_artifact_and_validated_shadow_canary_active_l
         "BUS_ETA",
         "eta-1.2.3",
         "VALIDATED",
-        "s3://routing-model-registry/eta-1.2.3.onnx",
+        "gs://routing-model-registry/eta-1.2.3.onnx",
         hashlib.sha256(payload).hexdigest(),
         "bus-features-v1",
     )

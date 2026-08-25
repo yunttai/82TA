@@ -1,30 +1,20 @@
 ---
 name: platform-release-gate
-description: "Budget Route Platform의 integration, staging, beta, GA 릴리스 가능 여부를 공통 PRD·계약·보안·성능·데이터·모델·복구 evidence로 판정한다. 배포 승인, 버전 출시, 두 하네스 합류, GA 준비 요청 시 반드시 사용한다."
+description: "Budget Route Platform의 명시적인 integration 환경 배포, staging, beta, GA 릴리스 가능 여부를 환경별 계약·보안·성능·데이터·모델·복구 evidence로 판정한다. 일반 소스 병합이나 로컬 수정에는 사용하지 않는다."
 ---
 
 # Platform Release Gate
 
-기능이 보인다는 이유만으로 출시하지 않고 `src/docs/shared/RELEASE_GATES.md`의 evidence를 검증한다.
+명시적으로 요청된 배포 단계에 대해 현재 구현과 `src/docs/shared/RELEASE_GATES.md`의 해당 evidence를 검증한다. 목표 아키텍처 문구만으로 현재 GCE 배포를 AWS로 바꾸거나 환경을 production-ready라고 승격하지 않는다.
 
-## 공통 사전 조건
+## 작업 범위 확인
 
-작업을 시작하기 전에 반드시 다음을 수행한다.
+1. 적용되는 `AGENTS.md`, 현재 구현, 직접 영향받는 테스트를 읽는다.
+2. 공유 API·데이터 의미를 소비하거나 바꿀 때만 manifest, lock, 관련 canonical 계약과 실제 producer·consumer를 읽는다.
+3. 작업 전후 가장 작은 관련 검증을 실행한다. 전체 repository/lock 검증은 공유 경계·통합·릴리스 또는 drift 조사에 사용한다.
+4. 기존의 무관한 실패는 baseline으로 분리해 보고하고, 현재 작업을 무효화할 때만 중단한다.
 
-1. `python src/scripts/validate_repository.py`를 실행한다.
-2. `python src/scripts/verify_contract_lock.py`를 실행한다.
-3. `src/contracts/CONTEXT_MANIFEST.json`과 `src/contracts/CONTRACT_LOCK.json`을 읽는다.
-4. `src/docs/shared/PROJECT_CONTEXT.md`, `PRD.md`, 관련 canonical 계약을 읽는다.
-5. 이전 `_workspace/` 산출물이 있으면 미완료·피드백·차단 사항을 확인한다.
-
-검증 실패 시 구현을 진행하지 않는다. 공통 원본을 임의로 맞춰 쓰지 말고 drift 또는 change request로 처리한다.
-
-## 저장 위치 규칙
-
-- 분석·토론·중간 결과: `_workspace/{workstream}/`
-- 검토가 끝난 제품 코드·문서·테스트·인프라: 반드시 `src/` 아래
-- 루트에는 `.codex/`, `.agents/`, `_workspace/`, `src/`, `AGENTS.md`, `README.md`, `.gitignore`만 둔다.
-- 공통 PRD·OpenAPI·ERD·enum 복사본을 workstream 폴더에 만들지 않는다.
+제품 산출물은 `src/`에 두고 CI/CD는 `.github/`에 둘 수 있다. `_workspace/`는 선택적·gitignored 메모이며 최신 상태의 근거가 아니다. 공통 PRD·OpenAPI·ERD·enum 복사본은 만들지 않는다.
 
 
 ## 입력
@@ -36,7 +26,7 @@ description: "Budget Route Platform의 integration, staging, beta, GA 릴리스 
 
 ## 워크플로우
 
-1. 두 context snapshot hash 비교
+1. 두 live verified contract lock 비교
 2. contract and migration compatibility
 3. requirements traceability completeness
 4. Service·Routing·integration test
@@ -55,4 +45,4 @@ description: "Budget Route Platform의 integration, staging, beta, GA 릴리스 
 - disabled capability 목록
 - 다음 재평가 조건
 
-최종 report는 `src/tests/integration/reports/` 또는 `src/docs/releases/` 아래에 둔다.
+최종 report는 요청된 릴리스에서 필요할 때 `src/tests/integration/reports/` 또는 `src/docs/releases/` 아래에 둔다. 이 판정은 일반 source merge gate가 아니다.

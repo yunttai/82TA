@@ -1,11 +1,15 @@
 ---
 name: source-layout-guard
-description: "Enforce the src-only product artifact policy and Codex control-file allowlist. Use after harness changes, new files, repository audits, integration, and release."
+description: "Keep product implementation under src while allowing conventional repository controls and CI/CD. Use after harness changes, new files, repository audits, integration, and release."
 ---
 # Source Layout Guard
 
-Run `python src/scripts/validate_repository.py --layout-only`.
+Run:
 
-Allow root only: `.codex`, `.agents`, ignored local `.codegraph`, `_workspace`, `src`, `AGENTS.md`, `README.md`, `.gitignore`, optional `.git`.
+```bash
+python src/scripts/validate_repository.py --layout-only
+```
 
-Executable implementation belongs under `src/`. `.codex` and `.agents` may contain only TOML/Markdown/reference data, not Python/shell implementation. Reject `.claude` and active `CLAUDE.md`. Reject duplicated YAML/JSON/DBML machine contracts in workstream docs.
+Product code, product contracts, migrations, tests, IaC, and executable product scripts belong under `src/`. Conventional repository controls are allowed at the root, including `.codex/`, `.agents/`, ignored `.codegraph/`, optional `_workspace/`, `.github/`, Git/editor configuration, license, security, and contribution files.
+
+`.codex/` and `.agents/` may contain declarative TOML/Markdown/reference data, not product implementation. Reject active `.claude/` or `CLAUDE.md` controls and duplicated canonical YAML/JSON/DBML contracts in workstream documentation.

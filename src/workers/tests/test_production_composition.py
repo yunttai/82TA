@@ -279,7 +279,7 @@ class ProductionCompositionTest(unittest.TestCase):
         base = {
             "family": "ETA",
             "version": "eta-v1",
-            "artifactUri": "s3://models/eta-v1.pkl",
+            "artifactUri": "gs://models/eta-v1.pkl",
             "artifactSha256": "a" * 64,
             "featureSchemaVersion": "seat-risk-feature-v1",
             "trainingScope": {

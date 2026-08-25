@@ -267,10 +267,10 @@ class ModelRegistration:
             raise DurableRepositoryError("artifact hash must be SHA-256")
         artifact = urlsplit(self.artifact_uri)
         if (
-            artifact.scheme != "s3" or not artifact.hostname or artifact.username
+            artifact.scheme != "gs" or not artifact.hostname or artifact.username
             or artifact.password or artifact.query or artifact.fragment or ".." in artifact.path.split("/")
         ):
-            raise DurableRepositoryError("artifact URI must be a credential-free fixed s3 URI")
+            raise DurableRepositoryError("artifact URI must be a credential-free fixed gs URI")
         if PurePosixPath(artifact.path).suffix.casefold() not in {".json", ".txt"}:
             raise DurableRepositoryError(
                 "model artifact must use an allowlisted non-pickle format"

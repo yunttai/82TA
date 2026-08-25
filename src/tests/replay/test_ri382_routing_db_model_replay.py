@@ -760,7 +760,7 @@ def test_active_lifecycle_rejects_train_serve_policy_or_digest_drift(
     eta_row = _active_row(
         purpose="BUS_ETA",
         model_version="eta-active-ri382-lifecycle-v1",
-        artifact_uri="s3://approved-models/ri382/lifecycle/eta/model.txt",
+        artifact_uri="gs://approved-models/ri382/lifecycle/eta/model.txt",
         evidence=eta_evidence,
         model_id="00000000-0000-0000-0000-000000000211",
         deployment_id="00000000-0000-0000-0000-000000000212",
@@ -771,7 +771,7 @@ def test_active_lifecycle_rejects_train_serve_policy_or_digest_drift(
     seat_row = _active_row(
         purpose="SEAT_RISK",
         model_version="seat-active-ri382-lifecycle-v1",
-        artifact_uri="s3://approved-models/ri382/lifecycle/seat/model.txt",
+        artifact_uri="gs://approved-models/ri382/lifecycle/seat/model.txt",
         evidence=seat_evidence,
         model_id="00000000-0000-0000-0000-000000000213",
         deployment_id="00000000-0000-0000-0000-000000000214",
@@ -804,7 +804,7 @@ def _lifecycle_replay_rows(tmp_path: Path) -> tuple[tuple[Any, ...], tuple[Any, 
         _active_row(
             purpose="BUS_ETA",
             model_version="eta-active-ri382-time-v1",
-            artifact_uri="s3://approved-models/ri382/time/eta/model.txt",
+            artifact_uri="gs://approved-models/ri382/time/eta/model.txt",
             evidence=eta_evidence,
             model_id="00000000-0000-0000-0000-000000000221",
             deployment_id="00000000-0000-0000-0000-000000000222",
@@ -812,7 +812,7 @@ def _lifecycle_replay_rows(tmp_path: Path) -> tuple[tuple[Any, ...], tuple[Any, 
         _active_row(
             purpose="SEAT_RISK",
             model_version="seat-active-ri382-time-v1",
-            artifact_uri="s3://approved-models/ri382/time/seat/model.txt",
+            artifact_uri="gs://approved-models/ri382/time/seat/model.txt",
             evidence=seat_evidence,
             model_id="00000000-0000-0000-0000-000000000223",
             deployment_id="00000000-0000-0000-0000-000000000224",
@@ -885,8 +885,8 @@ def _assembled_pair(
     seat_root = tmp_path / "seat"
     eta_evidence = _write_bundle(eta_root, "ETA")
     seat_evidence = _write_bundle(seat_root, "SEAT_RISK")
-    eta_uri = "s3://approved-models/ri382/eta/model.txt"
-    seat_uri = "s3://approved-models/ri382/seat/model.txt"
+    eta_uri = "gs://approved-models/ri382/eta/model.txt"
+    seat_uri = "gs://approved-models/ri382/seat/model.txt"
     lifecycle_factory = _Factory(
         [
             _active_row(

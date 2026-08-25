@@ -8,9 +8,9 @@
 
 ## Context
 
-AWS staging을 기다리지 않고 Docker에서 Web → Service → Routing → 실제 Provider →
+GCE staging 승격을 기다리지 않고 Docker에서 Web → Service → Routing → 실제 Provider →
 optimizer → public projection을 검증해야 한다. 기존 production baseline은 의도적으로
-STAGING/PRODUCTION만 허용하고, TLS DB와 내부 ALB 및 외부 firewall 증거를 요구한다.
+STAGING/PRODUCTION만 허용하고, TLS DB와 trusted internal ingress 및 외부 firewall 증거를 요구한다.
 이를 로컬에서 가짜 staging 값이나 허위 firewall attestation으로 우회하면 결과
 provenance와 보안 evidence가 거짓이 된다. 반대로 일반 DEVELOPMENT 구성은 Provider
 factory가 없고 all-false로 시작하므로 실제 E2E를 실행할 수 없다.
@@ -41,11 +41,11 @@ factory가 없고 all-false로 시작하므로 실제 E2E를 실행할 수 없�
 
 1. **DEVELOPMENT에서 직접 internet egress와 key만으로 활성화한다.** evidence gate와
    defense-in-depth를 제거하므로 거부한다.
-2. **로컬 stack을 STAGING으로 표시하고 DB TLS/ALB 값을 가짜로 넣는다.** provenance가
+2. **로컬 stack을 STAGING으로 표시하고 DB TLS/ingress 값을 가짜로 넣는다.** provenance가
    거짓이고 production setting 검증 의미를 훼손하므로 거부한다.
 3. **Service가 Provider를 직접 호출한다.** bounded context와 private Routing 경계를
    깨므로 거부한다.
-4. **AWS staging이 준비될 때까지 실제 Provider E2E를 보류한다.** 현재 선택한 Docker
+4. **GCE staging 승격이 준비될 때까지 실제 Provider E2E를 보류한다.** 현재 선택한 Docker
    우선 검증 목표를 달성하지 못하므로 거부한다.
 
 ## Consequences

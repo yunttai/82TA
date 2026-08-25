@@ -73,5 +73,5 @@ QA는 양쪽을 동시에 읽는다.
 - HIGH mapping precision 99.5% 권고 gate
 - P95 7초
 - Provider 하나 장애 시 partial
-- model rollback·RDS restore drill
+- model rollback·GCE database backup/restore drill
 - privacy 삭제·export와 보안 테스트

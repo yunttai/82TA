@@ -96,7 +96,8 @@ removes the owner-bound job with the account and leaves a de-identified
 
 Public 1.5.0 currently has no authenticated artifact-download operation, so
 `downloadUrl` intentionally remains `null`. Infrastructure wires the encrypted
-filesystem backend to private EFS and schedules both lifecycle commands, but a
+filesystem backend to a private durable GCE host volume and schedules both lifecycle
+commands, but a
 short-lived owner-bound delivery contract plus live worker, backup/analytics
 deletion, and recovery drills remain staging release gates. The filesystem
 backend is suitable only when the mounted volume itself is private and durable.
@@ -118,21 +119,19 @@ client-address rate limits. Configure them with
 `SERVICE_PLACE_RATE_LIMIT_PER_MINUTE`,
 `SERVICE_FAVORITE_WRITE_RATE_LIMIT_PER_MINUTE`, and
 `SERVICE_RATE_LIMIT_PER_MINUTE`.
-Forwarding headers are ignored by default. Behind the ALB, set
+Forwarding headers are ignored by default. Behind the GCE Nginx ingress, set
 `SERVICE_TRUST_PROXY_HEADERS=true` and provide comma-separated exact IPs or
 CIDRs in `SERVICE_TRUSTED_PROXY_IPS`. Only a request whose immediate peer is in
 those networks may supply forwarding headers; the resolver removes trusted
-hops from the right of the append-only `X-Forwarded-For` chain. The ALB must be
-configured to append/sanitize XFF, its security group must restrict direct
-ingress, and WAF remains the authoritative distributed abuse control. For the
-CloudFront → ALB topology, include both the ALB subnet CIDRs and AWS-managed
-CloudFront origin-facing CIDRs. The resolver then skips the trusted ALB and
-CloudFront hops and selects the viewer address; a forged browser-supplied
-leftmost XFF value cannot replace that nearer untrusted hop. Do not add general
-public address ranges to this allowlist.
+hops from the right of the append-only `X-Forwarded-For` chain. Every trusted GCE
+proxy must append/sanitize XFF and direct application ingress must remain closed.
+Include only the exact Nginx/load-balancer proxy CIDRs. The resolver skips those
+trusted hops and selects the nearest untrusted viewer address; a forged
+browser-supplied leftmost XFF value cannot replace that nearer hop. Do not add
+general public address ranges to this allowlist.
 
 Set `SERVICE_CSRF_TRUSTED_ORIGINS` to comma-separated, exact HTTPS origins for
-the CloudFront and custom web domains. Userinfo, paths, queries, fragments,
+the GCE-hosted web domains. Userinfo, paths, queries, fragments,
 wildcards, and non-HTTPS values are rejected; this list is distinct from
 `SERVICE_ALLOWED_HOSTS`.
 

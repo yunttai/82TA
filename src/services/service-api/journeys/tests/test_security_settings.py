@@ -427,7 +427,7 @@ class TrustedProxyPolicyTests(SimpleTestCase):
         TRUST_PROXY_HEADERS=True,
         TRUSTED_PROXY_IPS=("10.0.0.0/24", "203.0.113.0/24"),
     )
-    def test_alb_cloudfront_chain_ignores_forged_leftmost_value(self) -> None:
+    def test_gce_proxy_chain_ignores_forged_leftmost_value(self) -> None:
         request = self.factory.get(
             "/",
             REMOTE_ADDR="10.0.0.5",
@@ -435,7 +435,7 @@ class TrustedProxyPolicyTests(SimpleTestCase):
         )
         self.assertEqual(client_ip(request), "198.51.100.31")
 
-    def test_proxy_resolver_accepts_managed_cloudfront_cidr_set(self) -> None:
+    def test_proxy_resolver_accepts_many_reviewed_gce_proxy_cidrs(self) -> None:
         managed_ranges = tuple(f"100.64.{index}.0/24" for index in range(55))
         with override_settings(
             TRUST_PROXY_HEADERS=True,

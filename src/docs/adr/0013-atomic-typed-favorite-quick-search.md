@@ -1,4 +1,4 @@
-# ADR-0012: Atomic typed favorite quick search
+# ADR-0013: Atomic typed favorite quick search
 
 - 상태: Accepted
 - 날짜: 2026-08-25

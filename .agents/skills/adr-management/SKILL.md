@@ -1,30 +1,22 @@
 ---
 name: adr-management
-description: "Budget Route Platform의 아키텍처·서비스 경계·계약·DB 소유권·모델·Provider·보안 결정과 변경 사유를 ADR로 기록한다. 공통 의미 변경, 경계 변경, 새 Provider·DB·배포 전략, 기존 결정 철회 요청 시 반드시 사용한다."
+description: "Budget Route Platform의 되돌리기 어려운 아키텍처·서비스 경계·DB 소유권·모델·Provider·보안·production 배포 전략 결정을 ADR로 기록한다. 일반 구현 수정이나 문서와 구현의 단순 불일치에는 사용하지 않는다."
 ---
 
 # ADR Management
 
 되돌리기 어려운 결정의 맥락·대안·영향·마이그레이션을 `src/docs/adr/`에 기록한다.
 
-## 공통 사전 조건
+Local implementation bugs, cache/layout cleanup, test expectation drift, current code-versus-old-document mismatch, and work that follows an accepted decision are not ADR work. Do not divert an implementation request into a proposed ADR when the code can proceed under the current boundary and semantics.
 
-작업을 시작하기 전에 반드시 다음을 수행한다.
+## 작업 범위 확인
 
-1. `python src/scripts/validate_repository.py`를 실행한다.
-2. `python src/scripts/verify_contract_lock.py`를 실행한다.
-3. `src/contracts/CONTEXT_MANIFEST.json`과 `src/contracts/CONTRACT_LOCK.json`을 읽는다.
-4. `src/docs/shared/PROJECT_CONTEXT.md`, `PRD.md`, 관련 canonical 계약을 읽는다.
-5. 이전 `_workspace/` 산출물이 있으면 미완료·피드백·차단 사항을 확인한다.
+1. 적용되는 `AGENTS.md`, 현재 구현, 직접 영향받는 테스트를 읽는다.
+2. 공유 API·데이터 의미를 소비하거나 바꿀 때만 manifest, lock, 관련 canonical 계약과 실제 producer·consumer를 읽는다.
+3. 작업 전후 가장 작은 관련 검증을 실행한다. 전체 repository/lock 검증은 공유 경계·통합·릴리스 또는 drift 조사에 사용한다.
+4. 기존의 무관한 실패는 baseline으로 분리해 보고하고, 현재 작업을 무효화할 때만 중단한다.
 
-검증 실패 시 구현을 진행하지 않는다. 공통 원본을 임의로 맞춰 쓰지 말고 drift 또는 change request로 처리한다.
-
-## 저장 위치 규칙
-
-- 분석·토론·중간 결과: `_workspace/{workstream}/`
-- 검토가 끝난 제품 코드·문서·테스트·인프라: 반드시 `src/` 아래
-- 루트에는 `.codex/`, `.agents/`, `_workspace/`, `src/`, `AGENTS.md`, `README.md`, `.gitignore`만 둔다.
-- 공통 PRD·OpenAPI·ERD·enum 복사본을 workstream 폴더에 만들지 않는다.
+제품 산출물은 `src/`에 두고 CI/CD는 `.github/`에 둘 수 있다. `_workspace/`는 선택적·gitignored 메모이며 최신 상태의 근거가 아니다. 공통 PRD·OpenAPI·ERD·enum 복사본은 만들지 않는다.
 
 
 ## ADR이 필요한 경우
@@ -36,7 +28,7 @@ description: "Budget Route Platform의 아키텍처·서비스 경계·계약·D
 - 모델 target·artifact·activation 정책 변경
 - 두 Django 서비스를 합치거나 더 분리
 - 루트 `src-only` 예외
-- AWS 핵심 배포 전략 변경
+- active production 배포 플랫폼 또는 핵심 배포 전략 변경
 
 ## 형식
 
@@ -63,9 +55,9 @@ description: "Budget Route Platform의 아키텍처·서비스 경계·계약·D
 
 1. 다음 번호를 확인한다.
 2. 사용자 요구와 현재 canonical contract의 충돌을 기술한다.
-3. 최소 두 대안을 비교한다.
+3. 의사결정에 실제로 존재하는 대안을 비교한다. 의미 없는 두 번째 대안을 채우기 위해 만들지 않는다.
 4. consumer·producer·DB·운영·보안 영향을 명시한다.
-5. Proposed ADR을 만들고 승인 전 구현을 강제하지 않는다.
+5. 사용자가 ADR 기록을 요청했거나 요청한 구현을 막는 되돌리기 어려운 결정이 있을 때만 Proposed ADR을 만든다. 그 외 구현은 현행 결정 아래 계속한다.
 6. Accepted 후 계약·문서·테스트·lock 변경과 연결한다.
 7. 철회 시 파일 삭제가 아니라 상태와 superseding ADR을 기록한다.
 
@@ -76,4 +68,4 @@ description: "Budget Route Platform의 아키텍처·서비스 경계·계약·D
 
 ## 테스트 시나리오
 
-신규 third-party transit provider를 primary로 변경 → latency·ID·저장약관·fallback·migration을 포함한 ADR 생성.
+신규 third-party transit provider를 primary로 변경 → latency·ID·저장약관·fallback·migration을 포함한 ADR 생성. 기존 provider adapter의 timeout bug 수정 → ADR 없이 구현·검증.
