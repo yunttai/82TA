@@ -12,6 +12,7 @@ from provider_core import (
     ENDPOINT_SPECS,
     KAKAO_BASELINE_OPERATIONS,
     KAKAO_BASELINE_SCHEMA_VERSIONS,
+    KAKAO_GBIS_OPERATIONS,
     PROVIDER_OPERATION_KEY_ENV,
     ProviderAdapterSuite,
     ProviderFixtureScenario,
@@ -326,7 +327,7 @@ class KakaoProductionFactoryTests(unittest.TestCase):
             (spec.provider, spec.operation): spec.response_schema_version
             for spec in ENDPOINT_SPECS if spec.response_schema_verified
         }
-        self.assertEqual(set(verified_specs), set(KAKAO_BASELINE_OPERATIONS))
+        self.assertEqual(set(verified_specs), set(KAKAO_GBIS_OPERATIONS))
 
     def test_key_presence_does_not_infer_approval(self) -> None:
         with patch.dict(os.environ, self.environment(evidence_document(approved=False)), clear=True):

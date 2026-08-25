@@ -26,6 +26,8 @@
   semantic state transition
 - `ResultPanel`: 네 추천, null 추천, warning/reason, capability, leg 및
   Bus Intelligence 표시
+- `BikeOptionsPanel`: 출발·도착지 주변 따릉이 대여소와 시속 15km 기준 예상시간,
+  실시간 대여 가능 수량 미제공 상태 표시
 - `publicService`: generated runtime client의 Public API 경계
 
 Route 시간·비용·ranking·확률은 재계산하지 않는다. Kakao 지도는
@@ -36,7 +38,7 @@ malformed/oversized이면 직선으로 위장하지 않는다.
 남기지 않는다. Service Worker는 shell/정적 asset만 캐시하고 `/api/**`는 절대
 가로채거나 캐시하지 않는다.
 
-Public 1.4.0의 이메일 회원가입·로그인은 HttpOnly Django session으로 처리한다.
+Public 1.5.0의 이메일 회원가입·로그인은 HttpOnly Django session으로 처리한다.
 아직 계약에 없는 계정 복구·이메일 확인·guest merge, 개별 검색 기록 삭제,
 consent 문서 배포는 임의 endpoint 없이 미지원 상태로 남긴다.
 동의 변경과 production build를 활성화하려면 배포 환경에서

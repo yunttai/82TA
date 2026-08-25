@@ -25,13 +25,19 @@ from .canonical import (
 from .capabilities import CapabilityRegistry, foundation_capability_registry
 from .context import (
     BusArrivalObservation, BusLocationObservation, BusRouteRecord,
-    BusStationRecord, TrafficLinkContext, WeatherContext,
+    BusStationRecord, OpaqueVehicleTokenIssuer, TrafficLinkContext, WeatherContext,
 )
 from .context_queries import (
     GitsTrafficCorridorQuery, KmaGrid, KmaWeatherQuery, MAX_TRAFFIC_LINKS,
 )
 from .envelope import Freshness, ProviderEnvelope, ProviderStatus, QualityFlag, classify_freshness
 from .http import AuthInjection, BoundedHttpTransport, HttpRequest, SensitiveValue
+from .gbis_raw import (
+    GBIS_ARRIVALS_SCHEMA_VERSION,
+    GBIS_LOCATIONS_SCHEMA_VERSION,
+    parse_gbis_arrivals,
+    parse_gbis_locations,
+)
 from .kakao_mobility import (
     KAKAO_DIRECTIONS_CURRENT_SCHEMA_VERSION,
     normalize_current_directions,
@@ -103,8 +109,8 @@ ENDPOINT_SPECS: tuple[EndpointSpec, ...] = (
     EndpointSpec("KAKAO_MULTI_DESTINATION", "many_destinations", "POST", "https://apis-navi.kakaomobility.com/v1/destinations/directions", 1000, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
     EndpointSpec("KAKAO_MULTI_ORIGIN", "many_origins", "POST", "https://apis-navi.kakaomobility.com/v1/origins/directions", 1000, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
     EndpointSpec("KAKAO_FUTURE_DIRECTIONS", "route_future", "GET", "https://apis-navi.kakaomobility.com/v1/future/directions", 1000, 1_000_000, auth=AuthInjection("header", "Authorization", "KakaoAK ")),
-    EndpointSpec("GBIS_V2", "arrivals", "GET", "https://apis.data.go.kr/6410000/busarrivalservice/v2/getBusArrivalListv2", 700, 512_000, auth=AuthInjection("query", "serviceKey")),
-    EndpointSpec("GBIS_V2", "locations", "GET", None, 700, 512_000, auth=AuthInjection("query", "serviceKey")),
+    EndpointSpec("GBIS_V2", "arrivals", "GET", "https://apis.data.go.kr/6410000/busarrivalservice/v2/getBusArrivalListv2", 700, 512_000, auth=AuthInjection("query", "serviceKey"), response_schema_verified=True, response_schema_version=GBIS_ARRIVALS_SCHEMA_VERSION),
+    EndpointSpec("GBIS_V2", "locations", "GET", "https://apis.data.go.kr/6410000/buslocationservice/v2/getBusLocationListv2", 700, 512_000, auth=AuthInjection("query", "serviceKey"), response_schema_verified=True, response_schema_version=GBIS_LOCATIONS_SCHEMA_VERSION),
     EndpointSpec("GBIS_V2", "routes", "GET", "https://apis.data.go.kr/6410000/busrouteservice/getAreaBusRouteList", 700, 512_000, auth=AuthInjection("query", "serviceKey")),
     EndpointSpec("GBIS_V2", "stations", "GET", None, 700, 512_000, auth=AuthInjection("query", "serviceKey")),
     EndpointSpec("KMA", "weather_context", "GET", "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst", 700, 512_000, auth=AuthInjection("query", "serviceKey")),
@@ -208,6 +214,9 @@ class ProviderAdapterSuiteConfig:
     telemetry: TelemetrySink | None = field(default=None, repr=False, compare=False)
     clock: Callable[[], datetime] | None = field(default=None, repr=False, compare=False)
     retry_policy: RetryPolicy | None = field(default=None, repr=False, compare=False)
+    gbis_vehicle_token_issuer: OpaqueVehicleTokenIssuer | None = field(
+        default=None, repr=False, compare=False,
+    )
     _binding_map: Mapping[tuple[str, str], ProviderOperationBinding] = field(
         init=False, repr=False, compare=False,
     )
@@ -225,6 +234,15 @@ class ProviderAdapterSuiteConfig:
             self.retry_policy, RetryPolicy
         ):
             raise TypeError("suite retry_policy must be RetryPolicy")
+        if (
+            self.gbis_vehicle_token_issuer is not None
+            and not isinstance(
+                self.gbis_vehicle_token_issuer, OpaqueVehicleTokenIssuer
+            )
+        ):
+            raise TypeError(
+                "suite gbis_vehicle_token_issuer must be OpaqueVehicleTokenIssuer"
+            )
         entries: dict[tuple[str, str], ProviderOperationBinding] = {}
         for binding in self.bindings:
             if not isinstance(binding, ProviderOperationBinding):
@@ -885,11 +903,34 @@ class GbisAdapter(NamedProviderAdapter):
     provider = "GBIS_V2"
     operations = ("arrivals", "locations", "routes", "stations")
 
+    def __init__(
+        self,
+        transport: BoundedHttpTransport | None = None,
+        *,
+        vehicle_token_issuer: OpaqueVehicleTokenIssuer | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(transport, **kwargs)
+        if (
+            vehicle_token_issuer is not None
+            and not isinstance(vehicle_token_issuer, OpaqueVehicleTokenIssuer)
+        ):
+            raise TypeError("GBIS vehicle_token_issuer must be OpaqueVehicleTokenIssuer")
+        self.vehicle_token_issuer = vehicle_token_issuer
+
     def arrivals(self, station_id: str, *, deadline: Deadline) -> ProviderEnvelope[Any]:
-        return self.invoke("arrivals", self._id_call("stationId", station_id), deadline=deadline)
+        return self.invoke(
+            "arrivals",
+            self._live_list_call("stationId", station_id),
+            deadline=deadline,
+        )
 
     def locations(self, route_id: str, *, deadline: Deadline) -> ProviderEnvelope[Any]:
-        return self.invoke("locations", self._id_call("routeId", route_id), deadline=deadline)
+        return self.invoke(
+            "locations",
+            self._live_list_call("routeId", route_id),
+            deadline=deadline,
+        )
 
     def routes(self, keyword: str, *, deadline: Deadline) -> ProviderEnvelope[Any]:
         return self.invoke("routes", self._id_call("keyword", keyword), deadline=deadline)
@@ -904,6 +945,14 @@ class GbisAdapter(NamedProviderAdapter):
         if not value or len(value) > 64 or any(ord(char) < 32 for char in value):
             raise InputValidationError("provider identifier is invalid")
         return ProviderCall(_fingerprint(name, value), query=((name, value),))
+
+    def _live_list_call(self, name: str, value: str) -> ProviderCall:
+        call = self._id_call(name, value)
+        return replace(
+            call,
+            query=call.query + (("format", "json"),),
+            observed_hint=self.clock(),
+        )
 
     def _parse(self, operation: str, body: Any, observed: datetime | None) -> tuple[Any, ...]:
         if observed is None:
@@ -937,6 +986,32 @@ class GbisAdapter(NamedProviderAdapter):
         if operation == "routes":
             return tuple(BusRouteRecord(item["routeId"], item["routeName"], item.get("routeType")) for item in _exact_items(items, {"routeId", "routeName", "routeType"}, "GBIS route"))
         return tuple(BusStationRecord(item["stationId"], item["stationName"], _coordinate(item["coordinate"])) for item in _exact_items(items, {"stationId", "stationName", "coordinate"}, "GBIS station"))
+
+    def _parse_call(
+        self,
+        operation: str,
+        body: Any,
+        observed: datetime | None,
+        call: ProviderCall,
+    ) -> tuple[Any, ...]:
+        del call
+        if operation in {"arrivals", "locations"}:
+            if observed is None or self.vehicle_token_issuer is None:
+                raise SchemaValidationError(
+                    "GBIS live normalization configuration is incomplete"
+                )
+            if operation == "arrivals":
+                return parse_gbis_arrivals(
+                    body,
+                    observed_at=observed,
+                    token_issuer=self.vehicle_token_issuer,
+                )
+            return parse_gbis_locations(
+                body,
+                observed_at=observed,
+                token_issuer=self.vehicle_token_issuer,
+            )
+        return self._parse(operation, body, observed)
 
 
 class KmaContextAdapter(NamedProviderAdapter):
@@ -1242,6 +1317,7 @@ class ProviderAdapterSuite:
             telemetry=config.telemetry,
             clock=config.clock,
             retry_policy=config.retry_policy,
+            gbis_vehicle_token_issuer=config.gbis_vehicle_token_issuer,
         )
         return suite
 
@@ -1257,6 +1333,7 @@ class ProviderAdapterSuite:
         telemetry: TelemetrySink | None = None,
         clock: Callable[[], datetime] | None = None,
         retry_policy: RetryPolicy | None = None,
+        gbis_vehicle_token_issuer: OpaqueVehicleTokenIssuer | None = None,
     ) -> None:
         kwargs = {
             "capabilities": capabilities,
@@ -1269,7 +1346,11 @@ class ProviderAdapterSuite:
         self.kakao_transit = KakaoTransitAdapter(transport, **kwargs)
         self.kakao_walk = KakaoWalkAdapter(transport, **kwargs)
         self.kakao_mobility = KakaoMobilityDirectionsAdapter(transport, **kwargs)
-        self.gbis = GbisAdapter(transport, **kwargs)
+        self.gbis = GbisAdapter(
+            transport,
+            vehicle_token_issuer=gbis_vehicle_token_issuer,
+            **kwargs,
+        )
         self.kma = KmaContextAdapter(transport, **kwargs)
         self.gits = GitsTrafficAdapter(transport, **kwargs)
         self.tmap = TmapTransitAdapter(transport, **kwargs)

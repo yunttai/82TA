@@ -102,6 +102,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bike-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns the nearest Seoul Bike stations for an origin and destination plus a simple station-to-station cycling estimate. The estimate uses straight-line distance and an assumed speed of 15 km/h; live bicycle availability is not provided. Station lists are sorted by straight-line distance and then station ID. Stations farther than 5 km are omitted, so coordinates outside the service area return empty lists and a null estimate with HTTP 200. The estimate references the first pickup and nearest return station with a different station ID. Both referenced IDs must occur in their respective station lists. The estimate is null when the pickup list is empty or the return list has no station distinct from that first pickup. */
+        get: operations["getBikeOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/route-searches": {
         parameters: {
             query?: never;
@@ -382,6 +399,52 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BikeStationOption: {
+            stationId: string;
+            name: string;
+            district: string;
+            address: string | null;
+            coordinate: components["schemas"]["Coordinate"];
+            /** @description Installed rack count in the published station snapshot, not live bicycle availability. Null means unknown and zero means a confirmed zero. */
+            rackCount: number | null;
+            /** @description Straight-line distance from the requested origin or destination to this station. */
+            distanceFromPointMeters: number;
+        };
+        BikeRideEstimate: {
+            /** @description References one stationId in pickupStations. */
+            pickupStationId: string;
+            /** @description References a different stationId in returnStations. */
+            returnStationId: string;
+            distanceMeters: number;
+            durationSeconds: number;
+            /** @constant */
+            assumedSpeedKph: 15;
+            /** @constant */
+            distanceMethod: "STRAIGHT_LINE";
+        };
+        BikeDataSource: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            license: string;
+            /** Format: date */
+            publishedAt: string;
+        };
+        BikeOptionsResponse: {
+            pickupStations: components["schemas"]["BikeStationOption"][];
+            returnStations: components["schemas"]["BikeStationOption"][];
+            rideEstimate: components["schemas"]["BikeRideEstimate"] | null;
+            /** @constant */
+            searchRadiusMeters: 5000;
+            /** @description Month identified by the official station snapshot; it does not claim a day-level observation date. */
+            stationDataMonth: string;
+            /**
+             * @description Live bicycle and empty-rack counts are intentionally not claimed by this endpoint.
+             * @constant
+             */
+            availabilityStatus: "NOT_PROVIDED";
+            dataSource: components["schemas"]["BikeDataSource"];
+        };
         PublicRouteSearchRequest: {
             origin: components["schemas"]["PlaceRef"];
             destination: components["schemas"]["PlaceRef"];
@@ -1000,6 +1063,33 @@ export interface operations {
             400: components["responses"]["Problem"];
             429: components["responses"]["Problem"];
             502: components["responses"]["Problem"];
+        };
+    };
+    getBikeOptions: {
+        parameters: {
+            query: {
+                originLon: number;
+                originLat: number;
+                destinationLon: number;
+                destinationLat: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nearby Seoul Bike stations and a clearly disclosed simple cycling estimate */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BikeOptionsResponse"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     listRouteSearches: {

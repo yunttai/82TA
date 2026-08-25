@@ -86,6 +86,7 @@ def main() -> int:
     checks = [
         ("service-public.v1.yaml", "PublicRouteSearchRequest", "public-route-search-request.json"),
         ("service-public.v1.yaml", "PublicRouteSearchResponse", "public-route-search-response.json"),
+        ("service-public.v1.yaml", "BikeOptionsResponse", "public-bike-options-response.json"),
         ("routing-private.v1.yaml", "OptimizeRouteRequest", "routing-optimize-request.json"),
         ("routing-private.v1.yaml", "OptimizeRouteResponse", "routing-optimize-response.json"),
     ]

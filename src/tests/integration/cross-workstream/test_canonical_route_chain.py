@@ -191,14 +191,11 @@ class CanonicalRouteChainTests(unittest.TestCase):
             REPOSITORY_ROOT / "src/contracts/versions/platform-versions.json"
         )
         validator = CanonicalContractValidator()
-        public_metadata_versions = {
-            public_spec["info"]["version"],
-            manifest["contextVersion"],
-            manifest["contractVersion"],
-            versions["contextVersion"],
-            versions["contractVersion"],
-        }
-        self.assertEqual(public_metadata_versions, {"1.4.0"})
+        self.assertEqual(public_spec["info"]["version"], "1.5.0")
+        self.assertEqual(manifest["contextVersion"], "1.5.1")
+        self.assertEqual(manifest["contractVersion"], "1.5.0")
+        self.assertEqual(versions["contextVersion"], "1.5.1")
+        self.assertEqual(versions["contractVersion"], "1.5.0")
         private_metadata_versions = {
             private_spec["info"]["version"],
             validator.contract_version,

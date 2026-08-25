@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import canonicalBikeOptions from "../../../../contracts/openapi/examples/public-bike-options-response.json";
 import canonicalResponse from "../../../../contracts/openapi/examples/public-route-search-response.json";
 import { ResultPanel } from "../features/route-results/ResultPanel";
 import type { PublicProblem, PublicRouteSearchRequest, PublicRouteSearchResponse, RouteCandidate } from "../shared/api/publicService";
@@ -79,6 +80,12 @@ function successfulFetch(body = responseBody()) {
         busIntelligenceCoverage: "PARTIAL",
         degraded: [],
       }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (new URL(url).pathname === "/api/v1/bike-options") {
+      return new Response(JSON.stringify(canonicalBikeOptions), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
     return new Response(body, {
       status: 200,
@@ -243,6 +250,10 @@ describe("route search vertical slice", () => {
     }
     expect(document.querySelectorAll(".route-card")).toHaveLength(1);
     expect(screen.getAllByText("버스 실시간 정보를 사용할 수 없습니다.")).toHaveLength(2);
+    const bikePanel = await screen.findByRole("region", { name: "따릉이로 이동하기" });
+    expect(within(bikePanel).getByText("약 33분")).toBeVisible();
+    expect(within(bikePanel).getByText("직선거리·시속 15km 단순 예상", { exact: false })).toBeVisible();
+    expect(within(bikePanel).getByText("실시간 대여 가능 수량은 따릉이 앱에서 확인", { exact: false })).toBeVisible();
 
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (input instanceof Request ? input.url : input.toString()).endsWith("/api/v1/route-searches"))).toBe(true));
     const healthCall = fetchMock.mock.calls.find(([input]) => (input instanceof Request ? input.url : input.toString()).endsWith("/api/v1/health"));
@@ -268,6 +279,17 @@ describe("route search vertical slice", () => {
     expect(body).toContain('"maxTransfers":8');
     expect(body).toContain('"maxTaxiLegs":3');
     expect(body).toContain('"requestedRecommendations":["FASTEST","STABLE","EFFICIENT","PUBLIC_TRANSIT_ONLY"]');
+
+    const bikeCall = fetchMock.mock.calls.find(([input]) => new URL(input instanceof Request ? input.url : input.toString()).pathname === "/api/v1/bike-options");
+    if (bikeCall === undefined) throw new Error("Expected supplemental bike-options request");
+    const bikeRequest = bikeCall[0] instanceof Request ? bikeCall[0] : new Request(bikeCall[0]);
+    const bikeUrl = new URL(bikeRequest.url);
+    expect(Object.fromEntries(bikeUrl.searchParams)).toEqual({
+      originLon: "127.187456",
+      originLat: "37.222345",
+      destinationLon: "127.111159",
+      destinationLat: "37.394761",
+    });
   });
 
   it("preserves place swap, scheduled departure, budget, and hidden preference defaults", async () => {

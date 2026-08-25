@@ -26,6 +26,8 @@ export type ConsentType = components["schemas"]["ConsentType"];
 export type ConsentInput = components["schemas"]["ConsentInput"];
 export type ConsentRecord = components["schemas"]["ConsentRecord"];
 export type DataRightsJob = components["schemas"]["DataRightsJob"];
+export type BikeOptionsResponse = components["schemas"]["BikeOptionsResponse"];
+export type BikeStationOption = components["schemas"]["BikeStationOption"];
 
 const client = () => createPublicServiceClient(window.location.origin);
 
@@ -134,6 +136,23 @@ export async function reverseGeocode(coordinate: PlaceRef["coordinate"]) {
   return client().GET("/api/v1/places/reverse-geocode", {
     credentials: "same-origin",
     params: { query: coordinate },
+  });
+}
+
+export async function getBikeOptions(
+  origin: PlaceRef["coordinate"],
+  destination: PlaceRef["coordinate"],
+) {
+  return client().GET("/api/v1/bike-options", {
+    credentials: "same-origin",
+    params: {
+      query: {
+        originLon: origin.lon,
+        originLat: origin.lat,
+        destinationLon: destination.lon,
+        destinationLat: destination.lat,
+      },
+    },
   });
 }
 

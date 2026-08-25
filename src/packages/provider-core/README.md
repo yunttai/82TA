@@ -10,9 +10,10 @@ and deterministic sanitized fixtures.
 - No live endpoint, credential, key probe, or production approval is included.
 - Missing registry entries are `UNVERIFIED`, `UNAPPROVED`, fixture-only, and disabled.
 - `DOCUMENTED`, `KEY_VERIFIED`, and `PRODUCTION_APPROVED` are independent.
-- Every named operation also has an independent response-schema gate. Only Kakao
-  Mobility `KAKAO_DIRECTIONS/route_current` has a checked-in strict vendor-response
-  normalizer and schema revision. All other live response-schema gates remain false.
+- Every named operation also has an independent response-schema gate. The three
+  Kakao baseline operations and GBIS v2 arrival/location operations have checked-in
+  vendor-response normalizers and explicit schema revisions. Other live
+  response-schema gates remain false.
   A verified schema alone never bypasses capability, approval, binding, runtime
   evidence, or egress gates.
 - Live execution additionally requires immutable exact-operation key, production,
@@ -36,6 +37,7 @@ and deterministic sanitized fixtures.
 - `provider_core.cache`: bounded fresh/stale TTL cache
 - `provider_core.adapters.fixture`: sanitized fixture-only transit adapter
 - `provider_core.http`: injected bounded HTTP port and secret-safe auth values
+- `provider_core.gbis_raw`: bounded official GBIS v2 arrival/location normalization
 - `provider_core.transport`: concrete exact-allowlist HTTPS transport with system TLS,
   DNS/private-address rejection, deadline-derived connect/read bounds, no redirects,
   strict header/body framing, and an expiring external-egress attestation gate
@@ -93,6 +95,12 @@ GBIS arrival and location values expose the same provider-scoped opaque
 `vehicle_token` join key. A missing arrival token yields `vehicle_join_key=None` and
 cannot be joined. `OpaqueVehicleTokenIssuer` HMAC-tokenizes an approved raw identifier;
 raw IDs and plates do not enter canonical values or logs.
+
+`build_kakao_gbis_config()` is the explicit five-operation environment factory. It
+uses `KAKAO_REST_API_KEY` for the existing Kakao baseline and `GBIS_SERVICE_KEY` for
+GBIS arrivals/locations. `ROUTING_PROVIDER_HTTPS_PROXY_URL` remains the only optional
+Provider proxy setting. Exact capability, schema/runtime evidence, and egress
+attestation are still mandatory; credentials alone never activate an operation.
 
 KMA/GITS context remains optional and fixture-only. `KmaWeatherQuery` derives the
 documented DFS grid from WGS84 and rejects caller-supplied grid/coordinate mismatch.

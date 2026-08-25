@@ -43,7 +43,7 @@
         "sequence": 0,
         "mode": "BUS",
         "from": {
-          "name": "Sanitized R1 South Origin",
+          "name": "명지대학교 자연캠퍼스",
           "coordinate": {
             "lon": 127.187456,
             "lat": 37.222345
@@ -52,7 +52,7 @@
           "providerStopId": "sanitized-r1-stop-origin"
         },
         "to": {
-          "name": "Sanitized R1 North Destination",
+          "name": "판교역",
           "coordinate": {
             "lon": 127.111159,
             "lat": 37.394761
@@ -130,7 +130,7 @@
         "transit": {
           "routeLabel": "SAN-R1-701",
           "routeType": "SEAT_BUS",
-          "direction": "Sanitized R1 Northbound Terminal"
+          "direction": null
         },
         "busIntelligence": null,
         "provenance": [
@@ -381,7 +381,7 @@
           "sequence": 0,
           "mode": "BUS",
           "from": {
-            "name": "Sanitized R1 South Origin",
+            "name": "명지대학교 자연캠퍼스",
             "coordinate": {
               "lon": 127.187456,
               "lat": 37.222345
@@ -390,7 +390,7 @@
             "providerStopId": "sanitized-r1-stop-origin"
           },
           "to": {
-            "name": "Sanitized R1 North Destination",
+            "name": "판교역",
             "coordinate": {
               "lon": 127.111159,
               "lat": 37.394761
@@ -468,7 +468,7 @@
           "transit": {
             "routeLabel": "SAN-R1-701",
             "routeType": "SEAT_BUS",
-            "direction": "Sanitized R1 Northbound Terminal"
+            "direction": null
           },
           "busIntelligence": null,
           "provenance": [
@@ -718,7 +718,7 @@
           "sequence": 0,
           "mode": "BUS",
           "from": {
-            "name": "Sanitized R1 South Origin",
+            "name": "명지대학교 자연캠퍼스",
             "coordinate": {
               "lon": 127.187456,
               "lat": 37.222345
@@ -727,7 +727,7 @@
             "providerStopId": "sanitized-r1-stop-origin"
           },
           "to": {
-            "name": "Sanitized R1 North Destination",
+            "name": "판교역",
             "coordinate": {
               "lon": 127.111159,
               "lat": 37.394761
@@ -805,7 +805,7 @@
           "transit": {
             "routeLabel": "SAN-R1-701",
             "routeType": "SEAT_BUS",
-            "direction": "Sanitized R1 Northbound Terminal"
+            "direction": null
           },
           "busIntelligence": null,
           "provenance": [
@@ -1055,7 +1055,7 @@
           "sequence": 0,
           "mode": "BUS",
           "from": {
-            "name": "Sanitized R1 South Origin",
+            "name": "명지대학교 자연캠퍼스",
             "coordinate": {
               "lon": 127.187456,
               "lat": 37.222345
@@ -1064,7 +1064,7 @@
             "providerStopId": "sanitized-r1-stop-origin"
           },
           "to": {
-            "name": "Sanitized R1 North Destination",
+            "name": "판교역",
             "coordinate": {
               "lon": 127.111159,
               "lat": 37.394761
@@ -1142,7 +1142,7 @@
           "transit": {
             "routeLabel": "SAN-R1-701",
             "routeType": "SEAT_BUS",
-            "direction": "Sanitized R1 Northbound Terminal"
+            "direction": null
           },
           "busIntelligence": null,
           "provenance": [
@@ -1392,7 +1392,7 @@
           "sequence": 0,
           "mode": "BUS",
           "from": {
-            "name": "Sanitized R1 South Origin",
+            "name": "명지대학교 자연캠퍼스",
             "coordinate": {
               "lon": 127.187456,
               "lat": 37.222345
@@ -1401,7 +1401,7 @@
             "providerStopId": "sanitized-r1-stop-origin"
           },
           "to": {
-            "name": "Sanitized R1 North Destination",
+            "name": "판교역",
             "coordinate": {
               "lon": 127.111159,
               "lat": 37.394761
@@ -1479,7 +1479,7 @@
           "transit": {
             "routeLabel": "SAN-R1-701",
             "routeType": "SEAT_BUS",
-            "direction": "Sanitized R1 Northbound Terminal"
+            "direction": null
           },
           "busIntelligence": null,
           "provenance": [

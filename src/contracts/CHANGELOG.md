@@ -1,6 +1,6 @@
 # Contract Changelog
 
-## Context 1.4.1 — 2026-08-25
+## Context 1.5.1 — 2026-08-25
 
 - Accepted GCE as the only supported cloud compute deployment platform and
   removed the alternate-cloud Terraform, runbooks and CI/CD templates.
@@ -13,8 +13,23 @@
 - Added GCE Terraform for the VM/network/static IP/firewall/runtime identity and a
   private versioned GCS artifact bucket. Exact Google managed-service topology is
   intentionally not frozen by the harness.
-- Contract version remains `1.4.0`; OpenAPI, DBML, events, code registry, generated
+- Regenerated the canonical Public route response from the current producer and
+  Service projection so user-entered display names and public text redaction match
+  the executable integration chain.
+- Contract version remains `1.5.0`; OpenAPI, DBML, events, code registry, generated
   clients, ranking and public/private API wire semantics are unchanged.
+
+## 1.5.0 — 2026-08-25
+
+- Added the optional `GET /api/v1/bike-options` Public endpoint for nearby Seoul
+  Bike pickup and return stations using the official June 2026 station snapshot.
+- Added a server-owned station-to-station cycling estimate based on WGS84
+  straight-line distance and an explicitly disclosed ordinary bicycle speed of
+  15 km/h.
+- Kept the option outside route generation, Pareto ranking and RouteLeg modes, and
+  explicitly reports that live bicycle/empty-rack availability is not provided.
+- No Private Routing API, DBML, migration, event, code registry, ranking or route-ID
+  change.
 
 ## 1.4.0 — 2026-08-24
 

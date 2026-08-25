@@ -2,7 +2,7 @@
 
 사용자 인증, 장소 검색 proxy, 사용자 입력 검증, Routing Gateway, 검색 기록, 즐겨찾기, 설정, 개인정보 권리를 구현한다. 교통 Provider와 모델을 직접 호출하지 않는다.
 
-## Public Service API 1.4.0
+## Public Service API 1.5.0
 
 ```bash
 uv sync
@@ -10,11 +10,17 @@ uv run python manage.py test
 uv run python manage.py runserver
 ```
 
-The backend implements the Public 1.4.0 endpoint set for guest/session lifecycle,
-place suggestion/reverse geocoding, route search/history/detail/feedback,
+The backend implements the Public 1.5.0 endpoint set for guest/session lifecycle,
+place suggestion/reverse geocoding, nearby Seoul Bike options,
+route search/history/detail/feedback,
 preferences, saved places, favorite journeys, consents, data export/deletion
 jobs, capabilities, and health. Requests and Routing responses are validated
 against the locked OpenAPI sources under `src/contracts/`.
+
+`GET /api/v1/bike-options` reads the bundled official Seoul Bike station snapshot.
+It estimates station-to-station cycling time at 15 km/h and keeps live bicycle and
+empty-rack availability explicit as `NOT_PROVIDED`; it does not alter Routing-owned
+candidate generation, ranking, fare, or route duration.
 
 Development defaults to the canonical `stub` gateway so valid dynamic
 `DEPART_AT` UI requests can exercise the full browser-to-Service flow. Use
@@ -50,7 +56,7 @@ responses are schema-normalized before returning to the browser.
 Kakao responses use the same identity-encoding rule and a separate
 `SERVICE_KAKAO_LOCAL_MAX_RESPONSE_BYTES` bound (default 512 KiB).
 
-Public 1.4.0 provides CSRF-protected email registration and login backed by
+Public 1.5.0 provides CSRF-protected email registration and login backed by
 Django adaptive password hashing and an HttpOnly/SameSite session cookie.
 Authentication attempts are rate limited and login failure does not reveal
 whether an email exists. A route POST without a credential gets an ephemeral browser guest session;
@@ -94,7 +100,7 @@ that account's export artifacts are physically removed. Deletion jobs remain
 removes the owner-bound job with the account and leaves a de-identified
 `DATA_DELETION_COMPLETED` audit event.
 
-Public 1.4.0 currently has no authenticated artifact-download operation, so
+Public 1.5.0 currently has no authenticated artifact-download operation, so
 `downloadUrl` intentionally remains `null`. The current GCE path can wire the encrypted
 filesystem backend to a private durable host volume and schedule both lifecycle commands, but a
 short-lived owner-bound delivery contract plus live worker, backup/analytics

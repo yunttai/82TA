@@ -1,0 +1,47 @@
+{
+  "pickupStations": [
+    {
+      "stationId": "2407",
+      "name": "역삼서초삼성 세무서 앞 (역삼빌딩 앞",
+      "district": "강남구",
+      "address": "강남구 역삼동 804",
+      "coordinate": {
+        "lon": 127.03011322,
+        "lat": 37.49847031
+      },
+      "rackCount": 10,
+      "distanceFromPointMeters": 231
+    }
+  ],
+  "returnStations": [
+    {
+      "stationId": "379",
+      "name": "서울역9번출구",
+      "district": "중구",
+      "address": "서울특별시 중구 세종대로 지하2 서울역9번출구",
+      "coordinate": {
+        "lon": 126.97335815,
+        "lat": 37.55599976
+      },
+      "rackCount": 7,
+      "distanceFromPointMeters": 94
+    }
+  ],
+  "rideEstimate": {
+    "pickupStationId": "2407",
+    "returnStationId": "379",
+    "distanceMeters": 8122,
+    "durationSeconds": 1950,
+    "assumedSpeedKph": 15,
+    "distanceMethod": "STRAIGHT_LINE"
+  },
+  "searchRadiusMeters": 5000,
+  "stationDataMonth": "2026-06",
+  "availabilityStatus": "NOT_PROVIDED",
+  "dataSource": {
+    "name": "서울특별시 공공자전거 대여소 정보",
+    "url": "https://data.seoul.go.kr/dataList/OA-13252/F/1/datasetView.do",
+    "license": "공공누리 제1유형",
+    "publishedAt": "2026-07-15"
+  }
+}

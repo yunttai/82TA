@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { BikeOptionsPanel } from "../features/bike-options/BikeOptionsPanel";
 import { HomeMap } from "../features/home/HomeMap";
 import { PwaStatus } from "../features/pwa/PwaStatus";
 import { ResultPanel } from "../features/route-results/ResultPanel";
@@ -131,6 +132,13 @@ function SearchPage() {
             {...("request" in state && state.request.taxiBudget.strict ? { strictTaxiBudgetKrw: state.request.taxiBudget.maxAmount } : {})}
             {...(online ? { onRetry: retry } : {})}
             onRestart={reset}
+          />
+        )}
+
+        {"request" in state && state.response !== null && (
+          <BikeOptionsPanel
+            origin={state.request.origin.coordinate}
+            destination={state.request.destination.coordinate}
           />
         )}
       </main>
