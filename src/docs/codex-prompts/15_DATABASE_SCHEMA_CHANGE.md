@@ -1,5 +1,7 @@
 # 15. DB 스키마/Migration 변경
 
+> **역사 자료:** 초기 하네스 구축 당시의 복붙 레시피다. 현재 활성 지시나 완료 gate가 아니며, 현재 구현·적용되는 `AGENTS.md`·작업 관련 skill을 우선한다.
+
 **사용 시점:** Service 또는 Routing DB 변경
 
 ```text

@@ -10,6 +10,8 @@
 - 이전 Routing 결과 기반으로 계속 개발
 - Provider timeout/caching 성능 개선
 - legacy BusCrowdRisk를 새 모듈로 마이그레이션
+- 감사 말고 실제 graph/time-dependent optimizer 구현
+- unchanged evidence를 재사용한 Routing 부분 재실행
 
 ## Should Not Trigger
 
@@ -19,3 +21,5 @@
 - 즐겨찾기 DB 모델 작성
 - Kakao Local 자동완성 UI
 - 계정 탈퇴 화면 수정
+- Routing과 무관한 release readiness 판정
+- 이미 통과한 unchanged suite와 snapshot만 다시 실행

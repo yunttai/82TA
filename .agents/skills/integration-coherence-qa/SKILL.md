@@ -1,25 +1,27 @@
 ---
 name: integration-coherence-qa
-description: "Verify Service and Routing context parity, API producer-consumer compatibility, DB ownership, generated clients, code registry, replay, security, performance and merge readiness. Use before first integration, recurring integration, merge, release, or after conflict."
+description: "Verify the Service↔Routing boundaries actually touched by an integration, contract change, conflict resolution, or release. Scale evidence to source merge versus deployment readiness."
 ---
 # Integration Coherence QA
 
-Primary thread creates `_workspace/integration/WORKPLAN.md`, delegates independent checks to `integration-qa`, `architecture-auditor`, `contract-steward`, and relevant QA/security/performance agents, waits, then consolidates.
+Start from the current implementation and diff. Optional agents and `_workspace` notes may be used for large independent checks, but are not prerequisites.
 
-Mandatory gates:
+Reuse passing evidence when the affected producer, consumer, fixture, generated artifact, and configuration have not changed. Do not rerun live lock, snapshot, E2E, security, or performance checks for an unchanged boundary on every continuation.
 
-1. repository and contract lock
-2. service/routing context snapshots same aggregate SHA-256
-3. Public OpenAPI ↔ Service implementation/client/UI
-4. Private OpenAPI ↔ Routing producer ↔ Service consumer
-5. DBML ↔ ORM/migrations; no cross-DB access
-6. reason/warning/error registry across domain/API/UI
-7. no user identity in Routing
-8. deterministic replay and representative routes
-9. PARTIAL/null/unknown/unsupported semantics
-10. strict taxi upper-budget and temporal invariants
-11. security/privacy
-12. P95 7-second goal and Provider quota/fallback
-13. source layout
+## Source-merge checks
 
-Verdict: PASS, CONDITIONAL, FAIL, UNVERIFIED. No merge while mandatory gate is FAIL or UNVERIFIED unless an explicit accepted-risk record names owner, expiry and mitigation.
+For an ordinary merge, verify only affected boundaries:
+
+1. changed producer response ↔ consumer/client/UI usage
+2. changed DBML ↔ model/migration ownership
+3. changed reason/warning/error/capability semantics
+4. applicable invariants such as strict budget, time propagation, null/unknown/unsupported, privacy, and no cross-DB access
+5. targeted contract/integration/replay tests and source layout
+
+An optional external provider, model, or environment may remain `UNVERIFIED` when the implementation keeps the capability disabled, unsupported, or explicitly `PARTIAL`. That does not block an unrelated source merge.
+
+## Integration/release checks
+
+For cross-workstream integration or deployment, additionally verify live contract locks, generated clients, representative replay/E2E, security, performance, provider quota/fallback, and environment-specific rollback evidence. Use `compare_context_snapshots.py` to compare verified live locks, not old snapshot files. Run each suite in its owning Service, Routing, or prepared integration runtime.
+
+Use `PASS`, `CONDITIONAL`, `FAIL`, or `UNVERIFIED` only when the user requested integration/readiness judgment. Issue `GO`/`NO_GO` only for an explicit deployment or release gate. Ordinary implementation QA reports the affected assertions and regressions without inventing a release verdict. A `FAIL` blocks the affected boundary; `UNVERIFIED` blocks only a release or capability claim that depends on that evidence.

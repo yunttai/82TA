@@ -54,7 +54,7 @@ def _control():
         "BUS_ETA",
         "eta-1.0.0",
         "VALIDATED",
-        "s3://routing-model-registry/eta-1.0.0.onnx",
+        "gs://routing-model-registry/eta-1.0.0.onnx",
         hashlib.sha256(artifact_payload).hexdigest(),
         "bus-features-v1",
     ))

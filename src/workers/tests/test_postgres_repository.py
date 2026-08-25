@@ -359,7 +359,7 @@ class PostgresRepositoryTest(unittest.TestCase):
         )
         registration = ModelRegistration(
             FAMILY_ID, MODEL_ID, "ETA", "eta-v1", "target ETA", "routing-ml",
-            "s3://approved-models/eta-v1/model.txt", "a" * 64,
+            "gs://approved-models/eta-v1/model.txt", "a" * 64,
             "eta-feature-foundation-v1",
             {
                 "calibrationSha256": "c" * 64,
@@ -401,13 +401,13 @@ class PostgresRepositoryTest(unittest.TestCase):
             Step("INSERT INTO model_version", 0),
             Step(
                 "SELECT family_id",
-                row=(FAMILY_ID, "REGISTERED", "s3://approved-models/other/model.txt", "f" * 64, "eta-feature-foundation-v1", {}),
+                row=(FAMILY_ID, "REGISTERED", "gs://approved-models/other/model.txt", "f" * 64, "eta-feature-foundation-v1", {}),
             ),
         ))
         repository = PostgresWorkerRepository(QueueFactory(connection), source_id=SOURCE_ID)
         registration = ModelRegistration(
             FAMILY_ID, MODEL_ID, "ETA", "eta-v1", "target ETA", "routing-ml",
-            "s3://approved-models/eta-v1/model.txt", "a" * 64,
+            "gs://approved-models/eta-v1/model.txt", "a" * 64,
             "eta-feature-foundation-v1",
             {
                 "calibrationSha256": "c" * 64, "datasetSha256": "b" * 64,
@@ -431,7 +431,7 @@ class PostgresRepositoryTest(unittest.TestCase):
         repository = PostgresWorkerRepository(QueueFactory(connection), source_id=SOURCE_ID)
         registration = ModelRegistration(
             FAMILY_ID, MODEL_ID, "ETA", "eta-v1", "target ETA", "routing-ml",
-            "s3://approved-models/eta-v1/model.txt", "a" * 64,
+            "gs://approved-models/eta-v1/model.txt", "a" * 64,
             "eta-feature-foundation-v1",
             {
                 "calibrationSha256": "c" * 64, "datasetSha256": "b" * 64,
@@ -455,7 +455,7 @@ class PostgresRepositoryTest(unittest.TestCase):
             version="eta-v1",
             target_definition="target ETA",
             owner="routing-ml",
-            artifact_uri="s3://approved-models/eta-v1/model.txt",
+            artifact_uri="gs://approved-models/eta-v1/model.txt",
             artifact_sha256="a" * 64,
             feature_schema_version="eta-feature-foundation-v1",
             training_scope={
@@ -472,9 +472,9 @@ class PostgresRepositoryTest(unittest.TestCase):
                 with self.assertRaises(DurableRepositoryError):
                     ModelRegistration(family=family, **common)
         for artifact_uri in (
-            "s3://approved-models/eta-v1/model.pkl",
-            "s3://approved-models/eta-v1/model.pickle",
-            "s3://approved-models/eta-v1/model.joblib",
+            "gs://approved-models/eta-v1/model.pkl",
+            "gs://approved-models/eta-v1/model.pickle",
+            "gs://approved-models/eta-v1/model.joblib",
         ):
             with self.subTest(artifact_uri=artifact_uri):
                 with self.assertRaisesRegex(DurableRepositoryError, "non-pickle"):

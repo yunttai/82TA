@@ -1,41 +1,58 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
+  "status": "reference",
   "assertions": [
     {
-      "id": "H-STRUCT-001",
-      "text": "모든 product artifacts는 src 아래에 있다"
+      "id": "H-CURRENT-001",
+      "text": "현재 구현과 active workflow가 maintenance baseline이며 target 문서는 자동 구현 명령이 아니다"
     },
     {
-      "id": "H-STRUCT-002",
-      "text": "두 primary orchestrator가 존재한다"
+      "id": "H-STRUCT-001",
+      "text": "product implementation은 src 아래에 있고 conventional GitHub controls는 허용된다"
     },
     {
       "id": "H-CONTEXT-001",
-      "text": "두 orchestrator가 manifest, lock, context snapshot을 요구한다"
+      "text": "local 작업은 최소 context를 읽고 integration parity는 historical snapshot이 아닌 live verified lock을 비교한다"
     },
     {
       "id": "H-CONTRACT-001",
-      "text": "공통 PRD, OpenAPI, DBML, codes는 단일 원본이다"
+      "text": "공유 계약은 단일 원본이며 실제 영향받는 artifact만 함께 갱신한다"
     },
     {
-      "id": "H-OWN-001",
-      "text": "Service와 Routing write ownership이 겹치지 않는다"
+      "id": "H-SCOPE-001",
+      "text": "agent path는 expertise hint이고 delegated write scope는 task별로 비중복 배정한다"
+    },
+    {
+      "id": "H-WORKSPACE-001",
+      "text": "_workspace는 optional gitignored 메모이며 stale 또는 empty 상태를 허용한다"
     },
     {
       "id": "H-DB-001",
-      "text": "cross-service DB read와 FK가 금지된다"
+      "text": "cross-service DB read와 user identity in Routing이 금지된다"
     },
     {
       "id": "H-QA-001",
-      "text": "QA가 producer와 consumer를 동시에 읽는다"
+      "text": "source merge와 release evidence가 분리되고 QA는 변경된 producer와 consumer를 대조한다"
     },
     {
-      "id": "H-EVOLVE-001",
-      "text": "부분 재실행과 하네스 진화 절차가 있다"
+      "id": "H-IMPLEMENT-001",
+      "text": "구현 요청은 bounded discovery 뒤 실제 production code를 수정하며 audit·plan·ADR·release verdict로 대체되지 않는다"
+    },
+    {
+      "id": "H-EVIDENCE-001",
+      "text": "unchanged call-path findings와 green test evidence를 continuation에서 재사용하고 snapshot·ledger·full suite를 반복하지 않는다"
+    },
+    {
+      "id": "H-RUNTIME-001",
+      "text": "Routing·Service·integration test는 owner runtime별로 실행하며 mixed tree를 한 incomplete environment에서 수집하지 않는다"
+    },
+    {
+      "id": "H-DEGRADE-001",
+      "text": "auth·schema·artifact·strict feasibility fail-closed와 optional enrichment의 candidate-drop·PARTIAL·no-feasible 의미를 구분한다"
     },
     {
       "id": "H-TRIGGER-001",
-      "text": "모든 skill에 8개 이상의 should/should-not trigger test가 있다"
+      "text": "모든 active skill에 4개 이상의 positive/negative trigger case가 있다"
     }
   ]
 }

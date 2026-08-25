@@ -98,7 +98,7 @@ class PublicProjectionRedactionTests(SimpleTestCase):
                         "externalRouteId": "provider-internal-route",
                         "rawPayload": {
                             "authorization": "Bearer private-secret",
-                            "artifactUri": "s3://private/model",
+                            "artifactUri": "gs://private/model",
                             "userEmail": "private@example.invalid",
                         },
                     },
@@ -147,7 +147,7 @@ class PublicProjectionRedactionTests(SimpleTestCase):
         self.assertNotIn("private-secret", str(projected))
         self.assertNotIn("private-user-id", str(projected))
         self.assertNotIn("private@example.invalid", str(projected))
-        self.assertNotIn("s3://private/model", str(projected))
+        self.assertNotIn("gs://private/model", str(projected))
 
         private["routes"][0]["legs"][0]["geometry"] = {
             "encoding": "POLYLINE",

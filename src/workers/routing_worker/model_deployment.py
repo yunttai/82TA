@@ -1,7 +1,7 @@
 """Fail-closed startup assembly for one verified ETA/Seat production pair.
 
 The Routing DB is lifecycle authority, while an explicitly configured immutable
-materialization map is the only bridge from an approved S3 artifact identity to a
+materialization map is the only bridge from an approved GCS artifact identity to a
 local bundle directory.  Neither request values nor environment-only flags can
 select or promote a model.
 """
@@ -202,7 +202,7 @@ def _json_mapping(value: object, field: str) -> Mapping[str, object]:
     return value
 
 
-def _canonical_s3_uri(value: object) -> str:
+def _canonical_gcs_uri(value: object) -> str:
     uri = _text(value, "artifact_uri")
     parsed = urlparse(uri)
     try:
@@ -211,7 +211,7 @@ def _canonical_s3_uri(value: object) -> str:
         raise ModelDeploymentAssemblyError("artifact_uri is not canonical") from exc
     segments = parsed.path.removeprefix("/").split("/")
     if not (
-        parsed.scheme == "s3"
+        parsed.scheme == "gs"
         and parsed.netloc
         and parsed.username is None
         and parsed.password is None
@@ -223,7 +223,7 @@ def _canonical_s3_uri(value: object) -> str:
         and "%" not in parsed.path
         and "\\" not in parsed.path
     ):
-        raise ModelDeploymentAssemblyError("artifact_uri is not canonical S3 identity")
+        raise ModelDeploymentAssemblyError("artifact_uri is not canonical GCS identity")
     return uri
 
 
@@ -272,7 +272,7 @@ class ActiveModelDeployment:
     def __post_init__(self) -> None:
         if self.family not in {"ETA", "SEAT_RISK"}:
             raise ModelDeploymentAssemblyError("active model family is invalid")
-        _canonical_s3_uri(self.artifact_uri)
+        _canonical_gcs_uri(self.artifact_uri)
         if self.manifest.artifact.model_family != self.family:
             raise ModelDeploymentAssemblyError("active model manifest family mismatch")
         if self.lifecycle.registry_entry.artifact != self.manifest.artifact:
@@ -323,7 +323,7 @@ def _decode_active_row(
     model_version = _text(row[2], "model version", maximum_bytes=128)
     if row[3] != "ACTIVE":
         raise ModelDeploymentAssemblyError("model_version is not exactly ACTIVE")
-    artifact_uri = _canonical_s3_uri(row[4])
+    artifact_uri = _canonical_gcs_uri(row[4])
     artifact_sha256 = _digest(row[5], "artifact_sha256")
     if row[6] != schema_version:
         raise ModelDeploymentAssemblyError("feature schema version mismatch")
@@ -582,7 +582,7 @@ class ApprovedBundleMaterialization:
         if self.family not in {"ETA", "SEAT_RISK"}:
             raise ModelDeploymentAssemblyError("materialization family is invalid")
         _text(self.model_version, "materialization model version", maximum_bytes=128)
-        _canonical_s3_uri(self.artifact_uri)
+        _canonical_gcs_uri(self.artifact_uri)
         _digest(self.artifact_sha256, "materialization artifact digest")
         if not isinstance(self.bundle_directory, Path):
             raise ModelDeploymentAssemblyError(

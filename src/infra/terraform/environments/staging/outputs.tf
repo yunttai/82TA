@@ -1,27 +1,19 @@
-output "web_url" { value = module.service_product.web_url }
-output "web_bucket" { value = module.service_product.web_bucket }
-output "cloudfront_distribution_id" { value = module.service_product.cloudfront_distribution_id }
-output "service_ecr_repository" { value = module.service_product.service_ecr_repository }
-output "ecs_cluster" { value = module.service_product.ecs_cluster }
-output "ecs_service" { value = module.service_product.ecs_service }
-output "task_definition_family" { value = module.service_product.task_definition_family }
-output "service_subnet_ids" { value = module.service_product.service_subnet_ids }
-output "service_security_group_id" { value = module.service_product.service_security_group_id }
-output "application_secret_arns" { value = module.service_product.application_secret_arns }
-output "data_rights_filesystem_id" { value = module.service_product.data_rights_filesystem_id }
-output "data_rights_schedule_names" { value = module.service_product.data_rights_schedule_names }
-output "data_rights_dead_letter_queue_url" { value = module.service_product.data_rights_dead_letter_queue_url }
-output "github_deploy_role_arn" { value = module.service_product.github_deploy_role_arn }
-output "rollback_hint" { value = module.service_product.rollback_hint }
-output "postgis_migration_requirement" { value = module.service_product.postgis_migration_requirement }
-output "routing_url" { value = var.routing_enabled ? module.routing_intelligence[0].routing_url : null }
-output "routing_ecr_repository" { value = var.routing_enabled ? module.routing_intelligence[0].routing_ecr_repository : null }
-output "routing_ecs_service" { value = var.routing_enabled ? module.routing_intelligence[0].routing_ecs_service : null }
-output "routing_ecs_subnet_ids" { value = var.routing_enabled ? module.routing_intelligence[0].routing_subnet_ids : null }
-output "routing_security_group_id" { value = var.routing_enabled ? module.routing_intelligence[0].routing_security_group_id : null }
-output "routing_database_bootstrap_task_definition_arn" { value = var.routing_enabled ? module.routing_intelligence[0].routing_database_bootstrap_task_definition_arn : null }
-output "routing_migration_task_definition_arn" { value = var.routing_enabled ? module.routing_intelligence[0].routing_migration_task_definition_arn : null }
-output "routing_application_secret_arns" { value = var.routing_enabled ? module.routing_intelligence[0].routing_application_secret_arns : null }
-output "routing_rollback_hint" { value = var.routing_enabled ? module.routing_intelligence[0].rollback_hint : null }
-output "routing_github_deploy_role_arn" { value = var.routing_enabled ? module.routing_intelligence[0].github_deploy_role_arn : null }
-output "routing_github_database_bootstrap_role_arn" { value = var.routing_enabled ? module.routing_intelligence[0].github_database_bootstrap_role_arn : null }
+output "instance_name" {
+  value = module.gce_platform.instance_name
+}
+
+output "instance_zone" {
+  value = module.gce_platform.instance_zone
+}
+
+output "external_ip" {
+  value = module.gce_platform.external_ip
+}
+
+output "runtime_service_account" {
+  value = module.gce_platform.runtime_service_account
+}
+
+output "model_artifact_bucket" {
+  value = module.gce_platform.model_artifact_bucket
+}

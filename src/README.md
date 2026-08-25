@@ -22,7 +22,7 @@ src/
 │  └─ model-jobs/                  학습·평가·등록
 ├─ contracts/                      두 하네스가 공유하는 계약 원본
 ├─ docs/                           PRD·ERD·ADR·Runbook
-├─ infra/                          AWS·CI/CD·컨테이너·IaC
+├─ infra/                          GCE·CI/CD·컨테이너·IaC
 ├─ tests/                          Contract·Integration·Replay·E2E·Harness eval
 ├─ scripts/                        저장소·계약·하네스 검증 도구
 ├─ generated/                      계약에서 생성된 client·DTO

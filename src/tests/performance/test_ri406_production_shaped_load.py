@@ -243,6 +243,6 @@ def test_production_shaped_provider_routing_service_gateway_load_is_bounded(
         external_provider_calls=0,
         evidence_scope=(
             "local_loopback_sanitized_vendor_raw_and_service_gateway;"
-            "not_live_provider_not_tls_not_aws_not_deployed_slo"
+            "not_live_provider_not_tls_not_gce_not_deployed_slo"
         ),
     )

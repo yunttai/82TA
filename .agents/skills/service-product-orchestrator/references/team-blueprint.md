@@ -1,18 +1,7 @@
-# Service Product Team Blueprint
+# Service Product Delegation Blueprint
 
-## Full Vertical Slice
+Delegation is optional. A focused task stays in the primary thread. If the user requests delegation or a vertical slice has genuinely independent work, assign at most one implementation specialist and one independent reviewer with non-overlapping scopes.
 
-1. lead: requirements/tasks/dependencies
-2. UX: state and information contract
-3. backend/data: Public API, Gateway, persistence
-4. frontend: generated client, views, map
-5. security: auth/privacy/abuse
-6. QA: every boundary incrementally
+Activate only expertise required by the diff: UX/Frontend, Backend, Data, Security, QA, Contract, or Integration. Do not form a standing full team or require mandatory messages for every slice.
 
-## Mandatory message routes
-
-- UX -> Frontend: state names, labels, edge cases
-- Backend -> Frontend: fixture and operation availability
-- Data -> Backend: ownership, transaction, delete rules
-- Frontend + Backend -> QA: producer/consumer file pair
-- Any agent -> contract-steward: shared meaning change
+The primary task integrates producer/consumer changes and records durable `_workspace` handoff data only when long-running coordination needs it.

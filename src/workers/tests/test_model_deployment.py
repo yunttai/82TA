@@ -281,8 +281,8 @@ def build_fixture(tmp_path: Path) -> tuple[
     seat_root = tmp_path / "seat"
     eta_evidence = write_bundle(eta_root, "ETA")
     seat_evidence = write_bundle(seat_root, "SEAT_RISK")
-    eta_uri = "s3://approved-models/eta/model.txt"
-    seat_uri = "s3://approved-models/seat/model.txt"
+    eta_uri = "gs://approved-models/eta/model.txt"
+    seat_uri = "gs://approved-models/seat/model.txt"
     eta_sha = str(eta_evidence["artifactSha256"])
     seat_sha = str(seat_evidence["artifactSha256"])
     rows = [
@@ -606,7 +606,7 @@ def test_fixed_bundle_root_rejects_escape_and_unknown_active_identity(
         Factory(rows),
         as_of=STARTUP_AS_OF,
     ).load("staging")
-    unknown = replace(pair.eta, artifact_uri="s3://approved-models/eta/other.txt")
+    unknown = replace(pair.eta, artifact_uri="gs://approved-models/eta/other.txt")
     with pytest.raises(ModelDeploymentAssemblyError, match="no approved"):
         resolver.resolve(unknown)
 

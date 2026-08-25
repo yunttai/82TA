@@ -1,5 +1,2 @@
-bucket         = "REPLACE_WITH_TERRAFORM_STATE_BUCKET"
-key            = "82ta/service-product/staging.tfstate"
-region         = "ap-northeast-2"
-encrypt        = true
-dynamodb_table = "REPLACE_WITH_TERRAFORM_LOCK_TABLE"
+bucket = "REPLACE_WITH_VERSIONED_TERRAFORM_STATE_BUCKET"
+prefix = "82ta/staging"

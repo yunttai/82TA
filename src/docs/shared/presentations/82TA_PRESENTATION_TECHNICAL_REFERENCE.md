@@ -8,7 +8,7 @@
 |---|---|
 | 작성 기준일 | 2026-08-24 KST |
 | 프로젝트 | Budget Route Platform / 82TA |
-| Context / Contract | `1.4.0` / `1.4.0` |
+| Context / Contract | `1.4.1` / `1.4.0` |
 | Public OpenAPI | `1.4.0` |
 | Private Routing OpenAPI metadata | `1.2.0` |
 | Private request wire family | `contractVersion: "1.0"` — 1.x 호환 계열 |
@@ -1161,11 +1161,11 @@ Weather/traffic: recent valid cache -> missing context flag
 - Kakao transit/walk/current directions는 local Docker live probe와 Web→Service→Routing E2E 증거가 있다.
 - local live 결과는 HTTP 200 `PARTIAL`, `WALK → BUS → BUS → WALK`, `P50=P90=1579초`, taxi upper `0원 <= 10,000원`이었다.
 - 해당 local run에서 6개 container가 healthy였고, route/4 legs/geometry가 PostGIS에 저장되었으며 public response에 private Provider/model/computation marker가 노출되지 않았다.
-- context/contract `1.4.0`, 38-file contract lock과 repository validation이 통과한다.
+- context/contract `1.4.1` / `1.4.0`, 39-file contract lock과 repository validation이 통과한다.
 
 ### 아직 운영 완료라고 말하면 안 되는 것
 
-- local live proof는 Kakao baseline에 한정된다. AWS staging/production 배포·private ALB/TLS·실트래픽 SLO는 별도 미검증이다.
+- local live proof는 Kakao baseline에 한정된다. GCE staging/production 승격·trusted internal TLS·실트래픽 SLO는 별도 미검증이다.
 - GBIS canonical BUS mapping과 live arrivals/seat, KMA, GITS, TMAP, ODsay capability는 현재 local live 결과에 활성화되지 않았다.
 - 승인된 실제 ETA/Seat 모델 artifact가 local live 경로에 활성화되지 않았다.
 - 따라서 Bus probability나 mapping ID를 임의로 만들지 않고 결과가 `PARTIAL`인 것이 정상이다.
@@ -1192,7 +1192,7 @@ Weather/traffic: recent valid cache -> missing context flag
 | 12 | 외부 API | Kakao/GBIS/KMA/GITS/TMAP/ODsay 기능·상태 표 |
 | 13 | 성능·복원력 | 6.5초 budget, load shedding, PARTIAL/429/503/504 |
 | 14 | 실제 검증 | local Kakao live E2E 결과와 public redaction |
-| 15 | 한계와 다음 단계 | AWS·non-Kakao·mapping·model activation 미검증을 명확히 제시 |
+| 15 | 한계와 다음 단계 | GCE 승격·non-Kakao·mapping·model activation 미검증을 명확히 제시 |
 
 ---
 

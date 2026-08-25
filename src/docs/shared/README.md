@@ -21,7 +21,7 @@
 15. `INTEGRATION_PLAYBOOK.md` — 두 작업흐름 합류 절차
 16. `RELEASE_GATES.md` — Foundation·Alpha·Beta·GA·V2 gate
 17. `SOURCE_LAYOUT_POLICY.md` — 모든 제품 산출물의 `src/` 배치 규칙
-18. `AWS_DEPLOYMENT.md`, `OBSERVABILITY_RUNBOOKS.md` — 배포·관측성 기준
+18. `GCE_DEPLOYMENT.md`, `OBSERVABILITY_RUNBOOKS.md` — 배포·관측성 기준
 
 기계 판독 계약은 `src/contracts/`에 있다. 공통 파일 목록과 SHA-256은 `src/contracts/CONTEXT_MANIFEST.json`, `src/contracts/CONTRACT_LOCK.json`에서 관리한다.
 
