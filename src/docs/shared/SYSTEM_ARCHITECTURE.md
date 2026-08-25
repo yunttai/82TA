@@ -93,28 +93,34 @@ Django API / ORM / Redis / HTTP Provider
 
 온라인 요청 안에서 모델 학습·대형 전처리·전체 데이터 재적재를 수행하지 않는다.
 
-## 6. AWS 기준 배포
+## 6. GCE 필수 배포
 
 ```mermaid
 flowchart TB
-    BROWSER[Browser] --> CF[CloudFront]
-    CF --> S3WEB[S3 React Assets]
-    CF --> WAF[AWS WAF]
-    WAF --> ALB[Public ALB]
-    ALB --> SVC[ECS Fargate Service API]
-    SVC --> IALB[Internal ALB]
-    IALB --> RTE[ECS Fargate Routing API]
-    SVC --> SDB[(RDS Service DB)]
-    RTE --> RDB[(RDS Routing DB + PostGIS)]
-    SVC --> REDIS[(ElastiCache)]
-    RTE --> REDIS
-    RTE --> S3DATA[S3 Data & Models]
-    EB[EventBridge] --> WORKERS[ECS Tasks / Batch]
-    WORKERS --> RDB
-    WORKERS --> S3DATA
+    BROWSER[Browser] --> IP[GCE Static External IP]
+    IP --> NGINX[Nginx + Let's Encrypt]
+
+    subgraph VM[GCE VM]
+      NGINX --> WEB[Web Container]
+      NGINX --> SVC[Service API Container]
+      SVC -->|Private Docker Network| RTE[Routing API Container]
+      SVC --> SDB[(Service SQLite Volume)]
+      RTE --> RDB[(Routing PostGIS Container)]
+      RTE --> REDIS[(Routing Redis Container)]
+      RTE --> PROXY[Provider Egress Proxy]
+    end
+
+    RTE --> GCS[Cloud Storage Data & Models]
+    WORKERS[Collector / Model Jobs] --> RDB
+    WORKERS --> GCS
 ```
 
-초기에는 ECS Fargate를 사용하고, 실제 부하가 분리 필요성을 증명할 때만 더 세분화한다.
+GCE는 유일한 지원 cloud compute 플랫폼이다. 현재 구현은 단일 VM Docker
+Compose이지만, 이 사실이 production readiness를 의미하지 않는다. 실제 부하와
+운영 evidence가 필요하면 같은 Google Cloud 안에서 GCE VM 수, load balancing,
+managed database/cache/registry/secret/observability 구성을 진화시킬 수 있다.
+하네스는 GCE 사용은 강제하되 아직 구현되지 않은 특정 managed-service topology를
+완료 조건으로 강제하지 않는다.
 
 ## 7. 향후 두 서버 통합
 

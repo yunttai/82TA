@@ -1,15 +1,21 @@
 # Harness Tests
 
-`revfactory/harness` 방식의 agent/skill/orchestrator 구조를 Codex-native control files로 정적·드라이런 검증한다.
+Active checks are intentionally narrow:
 
-검증 대상:
+- filesystem-backed custom-agent TOML and skill frontmatter/name/path
+- positive and negative trigger-matrix coverage for every active skill
+- product-under-`src` layout with conventional `.github` controls allowed
+- Python/YAML/JSON syntax and, in full mode, existing product contract checks
+- scenario dry-runs for implementation-first scope, evidence reuse, bounded delegation, owner-specific test runtimes, and PARTIAL versus fail-closed semantics
 
-- root/nested AGENTS.md
-- `.codex/config.toml` and custom agents
-- `.agents/skills` frontmatter and trigger evals
-- two workstream ledgers
-- contract lock/context parity
-- Codex primary-thread delegation lifecycle
-- source-layout policy
+`src/contracts/harness/harness-registry.v1.yaml`, eval metadata, prompt recipes, `_workspace` ledgers, and historical snapshots are retained for compatibility/reference but are not active coverage by themselves.
 
-실제 Codex interactive environment에서는 `/agent`로 subagent 실행 상태와 handoff를 추가 확인한다.
+```bash
+python src/scripts/validate_repository.py --harness-only
+python src/scripts/validate_repository.py --layout-only
+python src/scripts/validate_repository.py
+```
+
+The trigger validator proves case coverage and schema, not actual model routing behavior. Interactive skill-selection evals may be run independently when needed.
+
+`orchestrator-dry-runs.md` is the behavioral expectation set for regressions observed in real tasks; it does not require snapshot or workspace artifacts to prove execution.

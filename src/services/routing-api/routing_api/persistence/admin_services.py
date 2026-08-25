@@ -142,7 +142,7 @@ class ArtifactVerifier(Protocol):
 
 
 class Sha256ArtifactVerifier:
-    """Validates immutable S3 artifacts; never accepts a caller-selected local path."""
+    """Validates immutable GCS artifacts; never accepts a caller-selected local path."""
 
     def __init__(
         self,
@@ -173,7 +173,7 @@ class Sha256ArtifactVerifier:
         segments = path.removeprefix("/").split("/")
         canonical_uri = (
             descriptor.uri == descriptor.uri.strip()
-            and parsed.scheme == "s3"
+            and parsed.scheme == "gs"
             and parsed.netloc in self._allowed_buckets
             and parsed.username is None
             and parsed.password is None

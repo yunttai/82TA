@@ -57,7 +57,7 @@ flowchart LR
 | Entity Mapping | Provider ID↔canonical route·stop | Routing DB | Routing |
 | Route Optimization | 후보·time-dependent cost·Pareto | Routing DB·Cache | Routing |
 | Bus Intelligence | ETA·seat·expected wait·confidence | Routing DB·Model Store | Routing |
-| Model Ops | feature·training·registry·deployment | Routing DB·S3 | Routing |
+| Model Ops | feature·training·registry·deployment | Routing DB·GCS | Routing |
 | Common Contract | API·DTO·ERD·codes·NFR | Git | 공동 |
 
 ## 3. 서비스 호출 경계
@@ -110,7 +110,7 @@ Routing Server owns Routing DB
 - 상대 ORM model import 금지
 - DB link·cross query 금지
 - 필요한 정보는 API 또는 비식별 domain event로 전달
-- 하나의 RDS cluster를 공유하더라도 database·role·schema는 논리 분리
+- 하나의 GCE 환경이나 managed PostgreSQL instance를 공유하더라도 database·role·schema는 논리 분리
 
 ## 6. 계약 변경 흐름
 

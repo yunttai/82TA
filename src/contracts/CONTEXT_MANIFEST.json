@@ -1,6 +1,6 @@
 {
   "project": "budget-route-platform",
-  "contextVersion": "1.4.0",
+  "contextVersion": "1.4.1",
   "contractVersion": "1.4.0",
   "canonicalFiles": [
     "src/docs/shared/PROJECT_CONTEXT.md",
@@ -18,6 +18,7 @@
     "src/docs/shared/INTEGRATION_PLAYBOOK.md",
     "src/docs/shared/RELEASE_GATES.md",
     "src/docs/shared/SOURCE_LAYOUT_POLICY.md",
+    "src/docs/shared/GCE_DEPLOYMENT.md",
     "src/contracts/openapi/common/components.v1.yaml",
     "src/contracts/openapi/service-public.v1.yaml",
     "src/contracts/openapi/routing-private.v1.yaml",

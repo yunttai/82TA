@@ -1,35 +1,41 @@
-# Harness Implementation Index
+# Active Harness Implementation Index
 
-전체 설명: `src/docs/DUAL_HARNESS_FINAL_SPEC.md`
-
-## 두 하네스
-
-| 하네스 | 오케스트레이터 | 소유 |
-|---|---|---|
-| Service Product | `.agents/skills/service-product-orchestrator/SKILL.md` | React/PWA, Django Service, user data |
-| Routing & Intelligence | `.agents/skills/routing-intelligence-orchestrator/SKILL.md` | Providers, mapping, routing, Bus/ML |
-
-## 공통 잠금
-
-- `src/contracts/CONTEXT_MANIFEST.json`
-- `src/contracts/CONTRACT_LOCK.json`
-- `shared-contract-governance`
-- `integration-coherence-qa`
-
-## 실행
-
-```bash
-python src/scripts/validate_repository.py
-```
-
-그 뒤 원하는 오케스트레이터를 트리거한다. 두 작업흐름의 최종 산출물은 각각 소유 `src/` 경로에 있고, 통합 시 같은 OpenAPI·DBML·code registry와 generated clients를 사용한다.
-
-## Codex 실행
+## Active controls
 
 - root/scoped instructions: `AGENTS.md`, `src/**/AGENTS.md`
-- custom agents: `.codex/agents/*.toml`
-- skills: `.agents/skills/*/SKILL.md`
-- config: `.codex/config.toml`
-- prompt index: `src/docs/codex-prompts/PROMPT_INDEX.md`
-- all prompts: `src/docs/codex-prompts/ALL_COPY_PASTE_PROMPTS.md`
-- runbook: `src/docs/codex/CODEX_RUNBOOK.md`
+- optional specialist agents: `.codex/agents/*.toml`
+- task skills: `.agents/skills/*/SKILL.md`
+- project settings: `.codex/config.toml`
+- current runbook: `src/docs/codex/CODEX_RUNBOOK.md`
+- change history: `src/docs/codex/HARNESS_CHANGELOG.md`
+
+Agent path lists are expertise hints. Actual write scope is assigned by each task.
+
+## Validation
+
+```bash
+# active harness
+python src/scripts/validate_repository.py --harness-only
+
+# repository layout
+python src/scripts/validate_repository.py --layout-only
+
+# full integration/release audit
+python src/scripts/validate_repository.py
+python src/scripts/compare_context_snapshots.py
+```
+
+The parity command compares live verified contract locks. `_workspace` and snapshots are optional diagnostics.
+
+## Shared boundary
+
+- Service and Routing responsibility boundaries remain architectural safety rules.
+- Contract changes are impact-based and use one canonical source.
+- The locked v1 harness registry is a historical compatibility artifact, not active role/path enforcement.
+- Legacy prompt documents under `src/docs/codex-prompts/` are archived recipes, not required input.
+
+Historical design records:
+
+- `src/docs/DUAL_HARNESS_FINAL_SPEC.md`
+- `src/docs/HARNESS_CONFORMANCE.md`
+- `src/docs/INITIAL_CONTEXT_ALIGNMENT.md`

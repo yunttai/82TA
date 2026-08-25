@@ -64,8 +64,8 @@
 - [ ] strict budget 현장 위반 0건 목표
 - [ ] HIGH mapping precision 99.5% 권고
 - [ ] model rollback 15분 이내
-- [ ] RDS restore drill
-- [ ] WAF·rate limit·secret rotation·audit
+- [ ] GCE database backup/restore drill
+- [ ] GCE edge/application rate limit·secret rotation·audit
 - [ ] 사용자 데이터 삭제·export
 - [ ] Provider production approval·비용 계획
 - [ ] 개인정보·위치정보·약관 검토

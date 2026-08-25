@@ -2,11 +2,11 @@
 
 ## 미션
 
-React Web App/PWA와 Django Service Backend를 구현하여 사용자가 장소·예산·시각·제약을 입력하고 Routing 결과를 안전하고 이해 가능한 형태로 사용하는 제품 경험을 완성한다.
+React Web App/PWA와 Django Service Backend의 제품 경험을 다룬다. 이 디렉터리의 backlog와 spec은 계획·참고 자료이며, 현재 구현에 없는 항목을 routine 작업에서 자동으로 강제하지 않는다.
 
 ## 공통 원본
 
-작업 시작 전 다음을 읽고 hash를 검증한다.
+공유 API·데이터 의미를 바꾸는 작업에서만 아래 관련 원본과 hash를 확인한다. local UI/API patch는 현재 source와 직접 소비하는 계약만 읽는다.
 
 - `src/docs/shared/PROJECT_CONTEXT.md`
 - `src/docs/shared/PRD.md`
@@ -30,7 +30,7 @@ React Web App/PWA와 Django Service Backend를 구현하여 사용자가 장소�
 - `SOURCE_LAYOUT.md` — 실제 React·Django 코드의 `src/` 하위 배치
 - `EXECUTION_PLAYBOOK.md` — 기능 단위 하네스 실행 절차
 
-## 소유 경로
+## Workstream 주 경로
 
 ```text
 src/apps/web/**
@@ -38,4 +38,6 @@ src/services/service-api/**
 src/docs/harnesses/service-product/**
 ```
 
-공동 경로는 계약 변경 절차 없이는 수정하지 않는다.
+이 목록은 agent의 상시 소유권이 아니다. 실제 write scope는 task가 정하며, 공동 경로는 실제 영향받는 producer·consumer와 compatibility를 확인한다.
+
+Local implementation은 primary가 직접 수행하는 것이 기본이다. Full team, workspace handoff, snapshot, release evidence는 요청된 결과나 실제 diff가 필요로 할 때만 활성화한다.

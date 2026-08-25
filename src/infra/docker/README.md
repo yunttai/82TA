@@ -21,9 +21,10 @@ rate-limit and idempotency coordination uses a dedicated Redis container on an
 internal-only Compose network. Redis publishes no host port, persists AOF data
 in the `service-redis-data` volume, and must be healthy before Django starts.
 The fixed key-derivation secret in this Compose file is local-development-only.
-Production migrations are a separate one-off ECS task and are never run by the
-container entry point. Images are built from the repository root so generated
-clients remain the only API DTO source.
+Managed or multi-node GCE database migrations must run as a separate one-off
+process and are never inferred merely from the container entry point. Images are
+built from the repository root so generated clients remain the only API DTO
+source.
 
 Confirm the selected backend and inspect opaque coordination keys without
 publishing Redis to the host:
@@ -58,8 +59,7 @@ Do not put either key in Git. The REST key is injected only into Django; the
 browser build receives only the domain-restricted JavaScript key. Kakao
 Mobility remains outside the Service Product boundary.
 
-The Web Nginx image is useful for local and container smoke tests. AWS staging
-serves the same `dist/` output from private S3 through CloudFront instead.
+The same Web Nginx image is deployed by the current GCE Compose workflow.
 
 ## Service to Routing HTTP E2E
 

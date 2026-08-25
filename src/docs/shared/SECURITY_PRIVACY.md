@@ -14,8 +14,8 @@ Trusted internal: private Routing API, approved model registry, production DB
 
 | 위협 | 통제 |
 |---|---|
-| API key 유출 | Secrets Manager, 최소 권한, rotation, browser 비노출 |
-| Denial of Wallet | WAF, rate limit, cache, candidate/provider call 상한, cost alarm |
+| API key 유출 | server-side secret store, 최소 권한, rotation, browser 비노출 |
+| Denial of Wallet | GCE edge/application rate limit, cache, candidate/provider call 상한, cost alarm |
 | SSRF | Provider URL allowlist, 사용자 URL 금지, egress 제어 |
 | 위치 이력 노출 | 최소 저장, encryption, redaction, 삭제 |
 | 계정 탈취 | secure cookie, CSRF, login rate limit, audit |
@@ -41,8 +41,8 @@ Trusted internal: private Routing API, approved model registry, production DB
 
 ## 내부 서비스 인증
 
-- internal load balancer/private subnet
-- Service task만 ingress 허용
+- GCE private network 또는 host-internal Docker network
+- Service workload만 Routing ingress 허용
 - 짧은 수명의 signed JWT 또는 workload identity
 - `iss`, `aud`, `exp`, `jti` 검증
 - caller·correlation audit

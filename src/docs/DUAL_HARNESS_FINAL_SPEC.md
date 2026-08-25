@@ -1,5 +1,7 @@
 # 82TA
 
+> **Historical design archive:** 초기 dual-harness 설계 기록이다. mandatory snapshot, durable workspace, agent ownership/team-size, prompt-library 절차는 현재 gate가 아니다. 현재 운영은 루트 `AGENTS.md`, `src/docs/codex/CODEX_RUNBOOK.md`, current source와 live lock을 따른다.
+
 ## 1. 문서 목적
 
 이 문서는 Budget Route Platform을 두 명이 독립적으로 개발하면서도 이후 안전하게 합칠 수 있도록 구성한 두 개의 개발 하네스를 설명한다.
@@ -269,7 +271,7 @@ Routing Server  -> Routing DB only
 - DB link·cross query
 - 같은 model class 공유
 
-하나의 RDS cluster에 배치하더라도 database/schema/role/migration은 분리한다.
+하나의 GCE 환경이나 managed PostgreSQL instance에 배치하더라도 database/schema/role/migration은 분리한다.
 
 ## 10. QA 경계 검증
 

@@ -1,7 +1,7 @@
 """RI-382 adversarial controls for the Routing model data plane.
 
 These tests deliberately use only injected DB-API/native seams.  They prove the
-security boundary without claiming that PostgreSQL, S3, or LightGBM exists here.
+security boundary without claiming that PostgreSQL, GCS, or LightGBM exists here.
 """
 
 from __future__ import annotations
@@ -310,7 +310,7 @@ def _active_row(family: str, **changes: object) -> tuple[Any, ...]:
         UUID("00000000-0000-0000-0000-000000000021" if eta else "00000000-0000-0000-0000-000000000022"),
         "eta-prod-v1" if eta else "seat-prod-v1",
         "ACTIVE",
-        "s3://routing-models/eta/prod/v1" if eta else "s3://routing-models/seat/prod/v1",
+        "gs://routing-models/eta/prod/v1" if eta else "gs://routing-models/seat/prod/v1",
         SHA_A,
         ETA_SCHEMA_VERSION if eta else SEAT_SCHEMA_VERSION,
         _training_scope(family),
@@ -524,7 +524,7 @@ def test_active_pair_rejects_naive_or_invalid_startup_as_of(as_of: object) -> No
             },
         ),
         ("ETA", {"artifact_uri": "file:///tmp/model.txt"}),
-        ("ETA", {"artifact_uri": "s3://bucket/model.txt?version=request"}),
+        ("ETA", {"artifact_uri": "gs://bucket/model.txt?version=request"}),
         ("ETA", {"artifact_sha256": "A" * 64}),
         ("ETA", {"feature_schema_version": SEAT_SCHEMA_VERSION}),
         (
@@ -643,7 +643,7 @@ def test_fixed_artifact_materialization_confines_path_and_binds_full_identity(
             materializations=(eta_materialization, eta_materialization),
         )
     with pytest.raises(ModelDeploymentAssemblyError, match="no approved"):
-        resolver.resolve(replace(pair.eta, artifact_uri="s3://other/eta/prod/v1"))
+        resolver.resolve(replace(pair.eta, artifact_uri="gs://other/eta/prod/v1"))
 
 
 @pytest.fixture

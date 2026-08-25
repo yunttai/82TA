@@ -55,5 +55,5 @@
 9. Key 유출·rotation
 10. 비용 급증·Denial of Wallet
 11. 사용자 데이터 삭제 실패
-12. RDS restore
+12. GCE database backup/restore
 13. Production deploy rollback

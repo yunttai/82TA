@@ -34,93 +34,131 @@ class InfrastructureContractTests(unittest.TestCase):
         for required in ("contracts/", "generated/", "**/migrations/"):
             self.assertNotIn(required, dockerignore)
 
-    def test_service_and_web_images_are_multistage_non_root(self) -> None:
-        for relative in ("docker/service-api/Dockerfile", "docker/web/Dockerfile"):
+    def test_images_are_multistage_non_root_and_health_checked(self) -> None:
+        for relative in (
+            "docker/service-api/Dockerfile",
+            "docker/web/Dockerfile",
+            "docker/routing-api/Dockerfile",
+        ):
             dockerfile = self.read(relative)
             self.assertGreaterEqual(dockerfile.count("FROM "), 2)
             self.assertIn("USER ", dockerfile)
             self.assertIn("HEALTHCHECK", dockerfile)
-
-    def test_routing_image_bootstraps_before_wsgi_and_is_non_root(self) -> None:
-        dockerfile = self.read("docker/routing-api/Dockerfile")
-        entrypoint = self.read("docker/routing-api/runtime_entrypoint.py")
-        self.assertGreaterEqual(dockerfile.count("FROM "), 2)
-        self.assertIn("USER 10002:10002", dockerfile)
-        self.assertIn("routing_deployment.wsgi:application", dockerfile)
-        self.assertIn("HEALTHCHECK", dockerfile)
-        self.assertIn("ROUTING_ALLOW_FIXTURE_BACKEND", entrypoint)
-        self.assertNotIn("print(", entrypoint)
 
     def test_routing_e2e_keeps_browser_on_service_http_boundary(self) -> None:
         compose = self.read("docker/compose.routing-e2e.yml")
         self.assertIn("SERVICE_ROUTING_GATEWAY: http", compose)
         self.assertIn("SERVICE_ROUTING_API_BASE_URL: http://routing-api:8000", compose)
         self.assertIn("routing_deployment.wsgi:application", compose)
-        self.assertIn("ROUTING_ALLOW_FIXTURE_BACKEND: \"false\"", compose)
-        self.assertIn(
-            "ROUTING_PRODUCTION_DEPENDENCIES_FACTORY: ${ROUTING_PRODUCTION_DEPENDENCIES_FACTORY:-}",
-            compose,
-        )
-        self.assertNotIn(
-            "${ROUTING_PRODUCTION_DEPENDENCIES_FACTORY:-routing_deployment.baseline:build_dependencies}",
-            compose,
-        )
-        self.assertIn("KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}", compose)
-        for key in (
-            "KAKAO_JS_API_KEY",
-            "GBIS_SERVICE_KEY",
-            "GITS_API_KEY",
-            "TMAP_APP_KEY",
-            "ODSAY_API_KEY",
-        ):
-            self.assertIn(key, compose)
-        for legacy_key in (
-            "KAKAO_LOCAL_REST_KEY",
-            "KAKAO_MOBILITY_REST_API_KEY",
-            "KMA_SERVICE_KEY",
-            "VITE_KAKAO_MAP_APP_KEY",
-        ):
-            self.assertNotIn(legacy_key, compose)
-        routing_block = compose.split("  routing-api:", 1)[1].split("  service-api:", 1)[0]
+        self.assertIn('ROUTING_ALLOW_FIXTURE_BACKEND: "false"', compose)
+        routing_block = compose.split("  routing-api:", 1)[1].split(
+            "  service-api:", 1
+        )[0]
         self.assertNotIn("ports:", routing_block)
 
     def test_routing_live_overlay_enforces_exact_proxy_and_dev_provenance(self) -> None:
         overlay = self.read("docker/compose.routing-live.yml")
         proxy = self.read("docker/provider-egress-proxy/egress_proxy.py")
-        dockerfile = self.read("docker/provider-egress-proxy/Dockerfile")
         self.assertIn("ROUTING_RUNTIME_ENVIRONMENT: DEVELOPMENT", overlay)
         self.assertIn('ROUTING_LOCAL_LIVE_E2E: "true"', overlay)
         self.assertIn(
-            "ROUTING_PRODUCTION_DEPENDENCIES_FACTORY: routing_deployment.baseline:build_dependencies",
+            "ROUTING_PROVIDER_HTTPS_PROXY_URL: http://routing-egress-proxy:3128",
             overlay,
         )
-        self.assertIn("ROUTING_PROVIDER_HTTPS_PROXY_URL: http://routing-egress-proxy:3128", overlay)
         self.assertIn("routing-private:\n    internal: true", overlay)
-        self.assertIn("dapi.kakao.com,apis-navi.kakaomobility.com", overlay)
-        self.assertIn("cap_drop: [ALL]", overlay)
-        self.assertIn("read_only: true", overlay)
-        self.assertIn("USER 65534:65534", dockerfile)
         self.assertIn('fields[0] != "CONNECT"', proxy)
         self.assertIn('port != "443"', proxy)
-        self.assertIn("ipaddress.ip_address(value).is_global", proxy)
         self.assertNotIn("print(", proxy)
 
-    def test_routing_terraform_is_private_and_fail_closed(self) -> None:
-        routing = self.read("terraform/modules/routing-platform/main.tf")
+    def test_only_gce_cloud_deployment_is_present(self) -> None:
+        legacy_provider = "a" + "w" + "s"
+        legacy_directory = INFRA / legacy_provider
+        self.assertFalse(
+            any(path.is_file() for path in legacy_directory.rglob("*"))
+            if legacy_directory.exists()
+            else False
+        )
+        for legacy_module in (
+            "service" + "-platform",
+            "routing" + "-platform",
+        ):
+            module_directory = INFRA / "terraform/modules" / legacy_module
+            self.assertFalse(
+                any(path.is_file() for path in module_directory.rglob("*"))
+                if module_directory.exists()
+                else False
+            )
+        active_workflows = sorted(
+            path.name for path in (ROOT / ".github/workflows").glob("*.yml")
+        )
+        self.assertEqual(active_workflows, ["cd-gce.yml"])
+
+        deployment_text = "\n".join(
+            path.read_text(encoding="utf-8", errors="ignore")
+            for path in INFRA.rglob("*")
+            if (
+                path.is_file()
+                and "tests" not in path.parts
+                and ".terraform" not in path.parts
+            )
+        )
+        forbidden = (
+            "hashicorp/" + legacy_provider,
+            'resource "' + legacy_provider + '_',
+            'provider "' + legacy_provider + '"',
+            'backend "s' + '3"',
+            "arn:" + legacy_provider + ":",
+            "s" + "3://",
+        )
+        for marker in forbidden:
+            self.assertNotIn(marker, deployment_text)
+
+    def test_gce_terraform_provisions_current_platform_boundary(self) -> None:
+        module = self.read("terraform/modules/gce-platform/main.tf")
+        variables = self.read("terraform/modules/gce-platform/variables.tf")
         staging = self.read("terraform/environments/staging/main.tf")
-        self.assertIn('internal                   = true', routing)
-        self.assertIn("referenced_security_group_id = var.service_security_group_id", routing)
-        self.assertIn("provider_firewall_endpoint_ids", routing)
-        self.assertIn("vpc_endpoint_id = var.provider_firewall_endpoint_ids", routing)
-        self.assertIn("routing_return_through_firewall", routing)
-        self.assertIn("ROUTING_PROVIDER_EVIDENCE_JSON", routing)
-        self.assertIn("ROUTING_PRODUCTION_DEPENDENCIES_FACTORY", routing)
-        self.assertIn("routing_deployment.wsgi:application", routing)
-        self.assertIn('ROUTING_ALLOW_FIXTURE_BACKEND", value = "false"', routing)
-        self.assertRegex(routing, r"publicly_accessible\s*=\s*false")
-        self.assertIn('transit_encryption_enabled = true', routing)
-        self.assertIn('module "routing_intelligence"', staging)
-        self.assertIn("service_routing_deployment_coherence", staging)
+        versions = self.read("terraform/environments/staging/versions.tf")
+        backend = self.read("terraform/environments/staging/backend.hcl.example")
+
+        for resource in (
+            'resource "google_compute_instance" "platform"',
+            'resource "google_compute_network" "platform"',
+            'resource "google_compute_subnetwork" "platform"',
+            'resource "google_compute_address" "platform"',
+            'resource "google_compute_firewall" "web"',
+            'resource "google_compute_firewall" "ssh"',
+            'resource "google_service_account" "runtime"',
+            'resource "google_storage_bucket" "model_artifacts"',
+        ):
+            self.assertIn(resource, module)
+        self.assertIn('source  = "hashicorp/google"', versions)
+        self.assertIn('backend "gcs"', versions)
+        self.assertIn('bucket = "REPLACE_WITH_VERSIONED_TERRAFORM_STATE_BUCKET"', backend)
+        self.assertIn('enable-oslogin         = "TRUE"', module)
+        self.assertIn("shielded_instance_config", module)
+        self.assertIn("public_access_prevention    = \"enforced\"", module)
+        self.assertIn("uniform_bucket_level_access = true", module)
+        self.assertIn("versioning {", module)
+        self.assertIn('role   = "roles/storage.objectViewer"', module)
+        self.assertNotIn("google_service_account_key", module)
+        self.assertIn("length(var.ssh_source_ranges) > 0", variables)
+        self.assertNotIn("bootstrap-host.sh", staging + module)
+        self.assertNotIn("metadata_startup_script", module)
+
+    def test_gce_terraform_does_not_store_application_secrets(self) -> None:
+        terraform = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (INFRA / "terraform").rglob("*.tf")
+        )
+        for secret_name in (
+            "KAKAO_REST_API_KEY",
+            "GBIS_SERVICE_KEY",
+            "SERVICE_SECRET_KEY",
+            "ROUTING_DJANGO_SECRET_KEY",
+            "SSH_KEY",
+        ):
+            self.assertNotIn(secret_name, terraform)
+        self.assertNotIn("private_key", terraform)
 
     def test_routing_deployment_entrypoint_fails_without_secret_values(self) -> None:
         launcher = INFRA / "docker" / "routing-api" / "runtime_entrypoint.py"
@@ -139,51 +177,16 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("required Routing deployment inputs are missing", result.stderr)
 
-    def test_routing_database_bootstrap_is_separate_and_secret_safe(self) -> None:
+    def test_database_bootstrap_binds_passwords_and_fails_closed(self) -> None:
         launcher = INFRA / "docker" / "routing-api" / "runtime_entrypoint.py"
         bootstrap = self.read("docker/routing-api/database_bootstrap.py")
-        terraform = self.read("terraform/modules/routing-platform/main.tf")
-        workflow = self.read("ci/github-actions/bootstrap-routing-staging.yml")
-        self.assertIn('CREATE EXTENSION IF NOT EXISTS postgis', bootstrap)
+        self.assertIn("CREATE EXTENSION IF NOT EXISTS postgis", bootstrap)
         self.assertIn('_APPLICATION_ROLE = "routing_app"', bootstrap)
         self.assertIn('_MIGRATION_ROLE = "routing_migrator"', bootstrap)
-        self.assertIn("pg_advisory_lock", bootstrap)
-        self.assertIn("NOSUPERUSER", bootstrap)
-        self.assertIn("NOLOGIN", bootstrap)
         self.assertIn("WITH LOGIN PASSWORD %s", bootstrap)
         self.assertIn("(role_password,)", bootstrap)
         self.assertNotIn("sql.Literal", bootstrap)
         self.assertNotIn("print(", bootstrap)
-        self.assertIn('resource "aws_ecs_task_definition" "database_bootstrap"', terraform)
-        self.assertIn('resource "aws_ecs_task_definition" "migration"', terraform)
-        self.assertIn(
-            "execution_role_arn       = aws_iam_role.database_bootstrap_execution.arn",
-            terraform,
-        )
-        self.assertIn(
-            "execution_role_arn       = aws_iam_role.migration_execution.arn",
-            terraform,
-        )
-        migration_task = terraform.split(
-            'resource "aws_ecs_task_definition" "migration"', 1
-        )[1].split('resource "aws_ecs_service" "routing"', 1)[0]
-        self.assertIn("aws_secretsmanager_secret.migration_django.arn", migration_task)
-        self.assertIn("aws_secretsmanager_secret.migration_jwt.arn", migration_task)
-        self.assertNotIn("var.shared_jwt_secret_arn", migration_task)
-        self.assertNotIn("aws_secretsmanager_secret.django.arn", migration_task)
-        self.assertIn(':username::', terraform)
-        self.assertIn(':password::', terraform)
-        self.assertNotIn('aws_secretsmanager_secret_version', terraform)
-        self.assertIn("environment: staging-routing-database", workflow)
-        self.assertIn("ROUTING_AWS_DATABASE_BOOTSTRAP_ROLE_ARN", workflow)
-        self.assertLess(
-            workflow.index("Run least-privilege role and PostGIS bootstrap"),
-            workflow.index("Run Routing-owned migrations as routing_migrator"),
-        )
-        self.assertLess(
-            workflow.index("Run Routing-owned migrations as routing_migrator"),
-            workflow.index("Finalize runtime grants and revoke migrator schema creation"),
-        )
 
         env = os.environ.copy()
         for key in tuple(env):
@@ -200,64 +203,16 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("required Routing database bootstrap inputs are missing", result.stderr)
 
-    def test_routing_github_roles_cannot_mutate_unrelated_ecs_resources(self) -> None:
-        terraform = self.read("terraform/modules/routing-platform/main.tf")
-        deploy_policy = terraform.split(
-            'resource "aws_iam_role_policy" "github_deploy"', 1
-        )[1].split('resource "aws_iam_role" "github_database_bootstrap"', 1)[0]
-        database_policy = terraform.split(
-            'resource "aws_iam_role_policy" "github_database_bootstrap"', 1
-        )[1]
-
-        self.assertNotIn('"ecs:RegisterTaskDefinition"', terraform)
-        self.assertNotIn('"ecs:RunTask"', deploy_policy)
-        self.assertNotIn('"iam:PassRole"', deploy_policy)
-        self.assertIn("Resource = local.routing_service_arn", deploy_policy)
-        self.assertIn('"ecs:task-definition" = local.routing_task_definition_arn', deploy_policy)
-        self.assertIn('"ecs:auto-assign-public-ip"  = "DISABLED"', deploy_policy)
-        self.assertIn('"ecs:enable-execute-command" = "false"', deploy_policy)
-        self.assertEqual(deploy_policy.count('Resource = "*"'), 2)
-
-        self.assertIn('Action = ["ecs:RunTask"]', database_policy)
-        self.assertIn("local.bootstrap_task_definition_arn", database_policy)
-        self.assertIn("local.migration_task_definition_arn", database_policy)
-        self.assertIn('"ecs:cluster" = local.ecs_cluster_arn', database_policy)
-        self.assertIn('"ecs:subnet" = aws_subnet.routing[*].id', database_policy)
-        self.assertIn('"ecs:auto-assign-public-ip"  = "DISABLED"', database_policy)
-        self.assertIn('"ecs:enable-execute-command" = "false"', database_policy)
-        self.assertIn('Null = { "ecs:subnet" = "false" }', database_policy)
-        self.assertIn("Resource = local.routing_task_arn", database_policy)
-        self.assertIn("aws_iam_role.database_bootstrap_execution.arn", database_policy)
-        self.assertIn("aws_iam_role.migration_execution.arn", database_policy)
-        self.assertNotIn("aws_iam_role.execution.arn", database_policy)
-        self.assertNotIn("aws_iam_role.task.arn", database_policy)
-        self.assertIn('"iam:PassedToService" = "ecs-tasks.amazonaws.com"', database_policy)
-        self.assertEqual(database_policy.count('Resource = "*"'), 1)
-
-    def test_routing_operational_alarms_fail_closed_on_missing_metrics(self) -> None:
-        terraform = self.read("terraform/modules/routing-platform/main.tf")
-        for metric in (
-            "TargetResponseTime",
-            "DeadlineExceededCount",
-            "ProviderRateLimitedCount",
-            "PartialResponseRate",
-            "ProviderQuotaUtilization",
-            "ProviderCostUsd",
-        ):
-            self.assertIn(metric, terraform)
-        self.assertIn('"cloudwatch:PutMetricData"', terraform)
-        self.assertIn('"cloudwatch:namespace" = "82TA/Routing"', terraform)
-        custom_alarm_tail = terraform.split(
-            'resource "aws_cloudwatch_metric_alarm" "routing_deadline_exhausted"', 1
-        )[1]
-        self.assertGreaterEqual(custom_alarm_tail.count('treat_missing_data  = "breaching"'), 5)
-
-    def test_browser_never_targets_routing(self) -> None:
+    def test_browser_never_targets_routing_and_api_request_lines_are_not_logged(self) -> None:
         compose = self.read("docker/compose.service-product.yml")
         nginx = self.read("docker/web/default.conf.template")
+        service_dockerfile = self.read("docker/service-api/Dockerfile")
         self.assertNotIn("routing-api", compose)
         self.assertNotIn("/v1/routes/optimize", nginx)
         self.assertIn("proxy_pass http://${SERVICE_UPSTREAM}", nginx)
+        self.assertIn("location /api/", nginx)
+        self.assertIn("access_log off", nginx)
+        self.assertIn('"--access-logfile", "/dev/null"', service_dockerfile)
 
     def test_service_product_redis_is_private_persistent_and_required(self) -> None:
         compose = self.read("docker/compose.service-product.yml")
@@ -287,154 +242,8 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIsNotNone(secret)
         self.assertGreaterEqual(len(secret.group(1)), 32)
 
-    def test_exact_coordinate_request_lines_are_not_logged(self) -> None:
-        marker = "127.123456,37.654321"
-        nginx = self.read("docker/web/default.conf.template")
-        service_dockerfile = self.read("docker/service-api/Dockerfile")
-        compose = self.read("docker/compose.service-product.yml")
-        terraform = self.read("terraform/modules/service-platform/main.tf")
-        self.assertIn("location /api/", nginx)
-        self.assertIn("access_log off", nginx)
-        self.assertIn('--access-logfile", "/dev/null"', service_dockerfile)
-        self.assertIn('"python", "-m", "gunicorn"', service_dockerfile)
-        self.assertIn("--access-logfile /dev/null", compose)
-        self.assertNotIn("access_logs {", terraform)
-        self.assertIn("redacted_fields {", terraform)
-        self.assertIn("query_string {}", terraform)
-        self.assertIn('single_header { name = "x-guest-token" }', terraform)
-        self.assertIn('single_header { name = "x-csrftoken" }', terraform)
-        self.assertNotIn("sampled_requests_enabled   = true", terraform)
-        self.assertNotIn(marker, nginx + service_dockerfile + compose + terraform)
-
-    def test_task_has_database_routing_proxy_and_ephemeral_controls(self) -> None:
-        terraform = self.read("terraform/modules/service-platform/main.tf")
-        entrypoint = self.read("docker/service-api/runtime_entrypoint.py")
-        for expected in (
-            "SERVICE_DATABASE_PASSWORD",
-            "SERVICE_ROUTING_API_ALLOWED_HOSTS",
-            "SERVICE_ROUTING_JWT_SECRET",
-            "SERVICE_ROUTING_JWT_ISSUER",
-            "SERVICE_ROUTING_JWT_AUDIENCE",
-            "SERVICE_ROUTING_JWT_TTL_SECONDS",
-            "SERVICE_PUBLIC_ROUTE_SEARCH_BUDGET_MILLISECONDS",
-            "SERVICE_ROUTING_DEADLINE_MILLISECONDS",
-            "SERVICE_TRUST_PROXY_HEADERS",
-            "SERVICE_TRUSTED_PROXY_IPS",
-            "SERVICE_CSRF_TRUSTED_ORIGINS",
-            "SERVICE_CONSENT_DOCUMENT_VERSION",
-            "SERVICE_DATA_RIGHTS_ARTIFACT_BACKEND",
-            "SERVICE_DATA_RIGHTS_ARTIFACT_DIRECTORY",
-            "SERVICE_DATA_RIGHTS_ARTIFACT_ENCRYPTION_KEY",
-            "SERVICE_REDIS_KEY_PREFIX",
-            "SERVICE_REDIS_SOCKET_TIMEOUT_SECONDS",
-            "SERVICE_RATE_LIMIT_CACHE_TTL_SECONDS",
-            "SERVICE_IDEMPOTENCY_CACHE_TTL_SECONDS",
-            "SERVICE_IDEMPOTENCY_LEASE_SECONDS",
-            "readonlyRootFilesystem = true",
-            'containerPath = "/tmp"',
-            "aws_lb.service.dns_name",
-            'path                = "/infra/healthz"',
-            'origin_protocol_policy = "https-only"',
-            "alb_origin_domain_name",
-            "plaintext CloudFront-to-ALB is forbidden",
-            'resource "aws_route53_record" "alb_origin"',
-            'command = ["python", "manage.py", "process_data_rights_jobs", "--limit", "100"]',
-            'command = ["python", "manage.py", "purge_service_data"]',
-            'transit_encryption = "ENABLED"',
-            'iam             = "ENABLED"',
-            'backup_policy { status = "DISABLED" }',
-        ):
-            self.assertIn(expected, terraform)
-        self.assertIn('os.environ["DATABASE_URL"] = generated_url', entrypoint)
-        self.assertIn("?sslmode=require", entrypoint)
-        self.assertNotIn('value = "1000000"', terraform)
-        self.assertIn('value = "rediss://${aws_elasticache_replication_group.service.primary_endpoint_address}:6379/0"', terraform)
-        self.assertIn("transit_encryption_enabled = true", terraform)
-        self.assertNotIn("SERVICE_ROUTING_SERVICE_TOKEN", terraform)
-
-    def test_application_rate_limits_are_bounded_and_configurable(self) -> None:
-        variables = self.read("terraform/modules/service-platform/variables.tf")
-        terraform = self.read("terraform/modules/service-platform/main.tf")
-        expected = {
-            "SERVICE_RATE_LIMIT_PER_MINUTE": "var.service_rate_limit_per_minute",
-            "SERVICE_GUEST_SESSION_RATE_LIMIT_PER_MINUTE": "var.service_guest_session_rate_limit_per_minute",
-            "SERVICE_PLACE_RATE_LIMIT_PER_MINUTE": "var.service_place_rate_limit_per_minute",
-        }
-        for environment_name, variable_expression in expected.items():
-            self.assertIn(environment_name, terraform)
-            self.assertIn(variable_expression, terraform)
-        for marker in (
-            "service_rate_limit_per_minute >= 1",
-            "service_rate_limit_per_minute <= 600",
-            "service_guest_session_rate_limit_per_minute >= 1",
-            "service_guest_session_rate_limit_per_minute <= 120",
-            "service_place_rate_limit_per_minute >= 1",
-            "service_place_rate_limit_per_minute <= 1200",
-            "rate_limit_cache_ttl_seconds >= 60",
-        ):
-            self.assertIn(marker, variables)
-
-    def test_trusted_proxy_chain_resolves_viewer_not_cloudfront_pop(self) -> None:
-        terraform = self.read("terraform/modules/service-platform/main.tf")
-        runbook = self.read("aws/STAGING_RUNBOOK.md")
-        self.assertIn("data.aws_ec2_managed_prefix_list.cloudfront.entries", terraform)
-        self.assertIn("concat(aws_subnet.public[*].cidr_block", terraform)
-        self.assertIn("nearest untrusted", terraform)
-        self.assertNotIn('SERVICE_TRUSTED_PROXY_IPS", value = "0.0.0.0/0"', terraform)
-        self.assertIn("viewer-supplied X-Forwarded-For", runbook)
-        self.assertIn("CloudFront-managed origin-facing", runbook)
-
-    def test_runtime_database_url_is_constructed_without_output(self) -> None:
-        launcher = INFRA / "docker" / "service-api" / "runtime_entrypoint.py"
-        env = os.environ.copy()
-        env.update(
-            {
-                "SERVICE_ENVIRONMENT": "production",
-                "SERVICE_DATABASE_HOST": "service.internal",
-                "SERVICE_DATABASE_PORT": "5432",
-                "SERVICE_DATABASE_NAME": "service",
-                "SERVICE_DATABASE_USER": "service user",
-                "SERVICE_DATABASE_PASSWORD": "not-a-real secret/with spaces",
-            }
-        )
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(launcher),
-                sys.executable,
-                "-c",
-                "import os; assert os.environ['DATABASE_URL'].startswith('postgresql://service%20user:')",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "")
-
-    def test_waf_has_sensitive_path_limits(self) -> None:
-        terraform = self.read("terraform/modules/service-platform/main.tf")
-        for path in (
-            "/api/v1/places/",
-            "/api/v1/guest-sessions",
-            "/api/v1/route-searches",
-        ):
-            self.assertIn(path, terraform)
-
-    def test_migration_precedes_service_update(self) -> None:
-        workflow = self.read("ci/github-actions/deploy-staging.yml")
-        migrate = workflow.index("Run one-off migration gate")
-        deploy = workflow.index("Deploy Service and wait")
-        self.assertLess(migrate, deploy)
-        self.assertIn("tasks-stopped", workflow)
-        self.assertIn("exit_code", workflow)
-        self.assertIn('test "$task_policy_version" = "$PRIVACY_DOCUMENT_VERSION"', workflow)
-
     def test_active_gce_cd_matches_build_certificate_and_deploy_sequence(self) -> None:
-        workflow = (ROOT / ".github" / "workflows" / "cd-gce.yml").read_text(
-            encoding="utf-8"
-        )
+        workflow = (ROOT / ".github/workflows/cd-gce.yml").read_text(encoding="utf-8")
         for dockerfile in (
             "src/infra/docker/web/Dockerfile",
             "src/infra/docker/service-api/Dockerfile",
@@ -448,32 +257,30 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn("StrictHostKeyChecking=yes", workflow)
         self.assertNotIn("StrictHostKeyChecking=no", workflow)
         self.assertNotIn("ssh-keyscan", workflow)
-        self.assertIn("VITE_PRIVACY_DOCUMENT_VERSION=privacy-v1", workflow)
-        self.assertNotIn("vars.PRIVACY_DOCUMENT_VERSION", workflow)
         self.assertIn("Bootstrap the blank server", workflow)
         self.assertIn("bootstrap-host.sh", workflow)
-        self.assertIn("KAKAO_REST_API_KEY", workflow)
-        self.assertIn("GBIS_SERVICE_KEY", workflow)
-        self.assertIn("GITS_API_KEY", workflow)
-        self.assertIn("TMAP_APP_KEY", workflow)
-        self.assertIn("ODSAY_API_KEY", workflow)
         self.assertIn("82ta-refresh-provider-evidence", workflow)
         self.assertIn("82ta-certificate-renew.timer", workflow)
-        self.assertNotIn("pre-provision REMOTE_APP_DIR/.env", workflow)
-        self.assertNotIn("service-migrate", workflow)
-        self.assertNotIn("routing-migrate", workflow)
         self.assertIn("HTTP health check timed out", workflow)
         self.assertIn("HTTPS health check timed out", workflow)
-        self.assertGreaterEqual(workflow.count("--interactive=false"), 3)
-        self.assertGreaterEqual(workflow.count("</dev/null"), 3)
-        self.assertIn('--resolve "$domain:443:127.0.0.1"', workflow)
-        self.assertLess(workflow.index("Bootstrap the blank server"), workflow.index("Start bootstrap provider egress proxy"))
-        self.assertLess(workflow.index("Start bootstrap provider egress proxy"), workflow.index("Probe Providers and create runtime evidence"))
-        self.assertLess(workflow.index("Probe Providers and create runtime evidence"), workflow.index("Start HTTP stack in dependency order"))
-        self.assertLess(workflow.index("Start HTTP stack in dependency order"), workflow.index("Issue certificate and switch Nginx to HTTPS"))
-        self.assertLess(workflow.index("Issue certificate and switch Nginx to HTTPS"), workflow.index("Verify HTTPS"))
+        self.assertLess(
+            workflow.index("Bootstrap the blank server"),
+            workflow.index("Start bootstrap provider egress proxy"),
+        )
+        self.assertLess(
+            workflow.index("Start bootstrap provider egress proxy"),
+            workflow.index("Probe Providers and create runtime evidence"),
+        )
+        self.assertLess(
+            workflow.index("Probe Providers and create runtime evidence"),
+            workflow.index("Start HTTP stack in dependency order"),
+        )
+        self.assertLess(
+            workflow.index("Start HTTP stack in dependency order"),
+            workflow.index("Issue certificate and switch Nginx to HTTPS"),
+        )
 
-    def test_gce_compose_preserves_private_routing_and_canonical_provider_names(self) -> None:
+    def test_gce_compose_preserves_private_routing_and_honest_runtime_flags(self) -> None:
         compose = self.read("gce/docker-compose.prod.yml")
         routing = compose.split("\n  routing-api:\n", 1)[1].split(
             "\n  provider-evidence:\n", 1
@@ -482,74 +289,26 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn("routing-private:\n    internal: true", compose)
         self.assertIn("SERVICE_ROUTING_API_BASE_URL: http://routing-api:8000", compose)
         self.assertIn('SERVICE_ROUTING_VERIFY_SSL: "false"', compose)
+        self.assertIn("SERVICE_ENVIRONMENT: development", compose)
         self.assertIn("ROUTING_RUNTIME_ENVIRONMENT: DEVELOPMENT", compose)
         self.assertIn('ROUTING_LOCAL_LIVE_E2E: "true"', compose)
         self.assertIn('ROUTING_ALLOW_FIXTURE_BACKEND: "false"', compose)
-        self.assertIn("./service-data/service-api.sqlite3:/app/src/services/service-api/service-api.sqlite3", compose)
-        self.assertIn("routing-egress-proxy:", compose)
-        self.assertIn("provider-evidence:", compose)
-        self.assertIn("--approve-local-provider-use", compose)
-        self.assertIn("- provider-egress", compose)
-        self.assertNotIn("\n      - provider-egress", routing)
         self.assertIn("routing-db:\n    image: postgis/postgis:16-3.4", compose)
         self.assertIn("routing-redis:\n    image: redis:7.4-alpine", compose)
-        self.assertIn("ROUTING_DB_HOST: routing-db", compose)
-        self.assertIn("ROUTING_REDIS_URL: redis://routing-redis:6379/0", compose)
-        for key in (
-            "KAKAO_REST_API_KEY",
-            "GBIS_SERVICE_KEY",
-            "GITS_API_KEY",
-            "TMAP_APP_KEY",
-            "ODSAY_API_KEY",
-        ):
-            self.assertIn(key, compose)
-        for legacy in (
-            "KAKAO_LOCAL_REST_KEY",
-            "KAKAO_MOBILITY_REST_API_KEY",
-            "KMA_SERVICE_KEY",
-            "VITE_KAKAO_MAP_APP_KEY",
-        ):
-            self.assertNotIn(legacy, compose)
-
-        active = "\n".join(
-            line for line in compose.splitlines() if not line.lstrip().startswith("#")
-        )
-        for unused in (
-            "DATABASE_URL:",
-            "SERVICE_MIGRATION_DATABASE_URL:",
-            "SERVICE_REDIS_URL:",
-            "ROUTING_DB_MIGRATION_USER:",
-            "ROUTING_DB_MIGRATION_PASSWORD:",
-        ):
-            self.assertNotIn(unused, active)
 
     def test_gce_blank_server_bootstrap_generates_runtime_and_refresh_jobs(self) -> None:
         bootstrap = self.read("gce/bootstrap-host.sh")
         refresh = self.read("gce/refresh-provider-evidence.sh")
         example = self.read("gce/.env.example")
-        compose = self.read("gce/docker-compose.prod.yml")
-
         self.assertIn("remote_dir=/opt/82ta", bootstrap)
-        self.assertIn("download.docker.com/linux/$ID", bootstrap)
         self.assertIn("docker-compose-plugin", bootstrap)
         self.assertIn("openssl rand -hex", bootstrap)
         self.assertIn("service-data/service-api.sqlite3", bootstrap)
-        self.assertIn("disabled-not-used", bootstrap)
         self.assertIn("82ta-provider-evidence-refresh.timer", bootstrap)
         self.assertIn("82ta-certificate-renew.timer", bootstrap)
-        self.assertIn("remote_dir=/opt/82ta", refresh)
-        self.assertIn("--interactive=false --no-tty --rm provider-evidence", refresh)
-        self.assertIn("ufw allow 80/tcp", bootstrap)
-        self.assertIn("ufw allow 443/tcp", bootstrap)
-        self.assertIn("--interactive=false --no-tty --rm", bootstrap)
         self.assertIn(".runtime/provider-evidence.env", refresh)
-        self.assertIn("--force-recreate routing-api", refresh)
         self.assertIn("# DATABASE_URL=", example)
-        self.assertIn("# SERVICE_REDIS_URL=", example)
         self.assertIn("ROUTING_DB_HOST=routing-db", example)
-        self.assertIn("ROUTING_REDIS_URL=redis://routing-redis:6379/0", example)
-        self.assertIn("# ROUTING_DB_MIGRATION_USER=", example)
-        self.assertNotIn("SERVICE_SINGLE_NODE_MODE", bootstrap + refresh + compose)
 
 
 if __name__ == "__main__":

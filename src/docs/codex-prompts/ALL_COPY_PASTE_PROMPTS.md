@@ -1,5 +1,7 @@
 # Codex 전체 복붙 프롬프트 모음
 
+> **역사 자료:** 초기 하네스 구축 당시의 복붙 레시피다. 현재 활성 지시나 완료 gate가 아니며, 현재 구현·적용되는 `AGENTS.md`·작업 관련 skill을 우선한다.
+
 각 프롬프트는 독립적으로 복사할 수 있다. `[ ]` placeholder를 실제 값으로 바꾼다.
 
 ## 00. 저장소 최초 점검
@@ -477,7 +479,7 @@ $platform-release-gate
 
 [범위]의 보안·개인정보 리뷰를 수행해줘. 먼저 findings만 작성한다.
 
-검증: root/nested AGENTS 경계, auth/IDOR/CSRF/CORS/CSP, service-to-service auth, SSRF/egress allowlist, API key, WAF/rate/Denial-of-Wallet, exact location/logs/retention/deletion, DB/S3/Redis encryption, model artifact/hash/pickle, mapping/data poisoning, dependency/container/IaC/SBOM, admin/audit/rollback.
+검증: root/nested AGENTS 경계, auth/IDOR/CSRF/CORS/CSP, service-to-service auth, SSRF/egress allowlist, API key, GCE edge/rate/Denial-of-Wallet, exact location/logs/retention/deletion, DB/GCS/Redis encryption, model artifact/hash/pickle, mapping/data poisoning, dependency/container/IaC/SBOM, admin/audit/rollback.
 
 각 finding에 severity, exploit/impact, evidence, owner, fix, retest를 기록하고 release blocker를 명시한다.
 ```
@@ -574,7 +576,7 @@ $integration-coherence-qa
 - P95/availability/partial/fallback
 - auth/privacy/location/deletion
 - threat model/security scans/SBOM
-- AWS HA/backup/restore/rollback/observability/runbooks
+- GCE HA/backup/restore/rollback/observability/runbooks
 - admin/model/mapping audit
 - unresolved risks/TBD
 
@@ -611,7 +613,7 @@ PASS, CONDITIONAL, FAIL로 판정하고 blocking items, accepted risks(owner/exp
 - Provider capability
 - data/mapping/model coverage
 - R1~R4/replay
-- performance/security/AWS/release
+- performance/security/GCE/release
 - TODO/BLOCKED/UNVERIFIED/dead code
 
 PRD requirement별 DONE/PARTIAL/NOT_STARTED/UNVERIFIED 표와 두 담당자별 다음 작업, 통합 순서, 가장 큰 위험 10개를 제시하라. 코드 수정 금지.

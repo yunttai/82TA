@@ -1,6 +1,6 @@
 """Create the least-privilege Routing application role and PostGIS extension.
 
-This module is executed only by the dedicated one-off ECS bootstrap task. It
+This module is executed only by a dedicated one-off GCE database bootstrap process. It
 does not log SQL, connection details, role passwords, or secret values.
 """
 
