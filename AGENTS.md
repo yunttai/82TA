@@ -46,6 +46,17 @@ When the user asks to implement, fix, or continue code, the result must include 
 - On continuation, reuse still-valid source findings, contract hashes, and passing test evidence. Do not recreate snapshots, ledgers, plans, or rerun unchanged suites merely because a new task turn began.
 - Missing live provider credentials or production approval do not block pure-domain or fixture-backed offline work. They block only the live capability or production claim that depends on them.
 
+## Narrow-default scope and questions
+
+Use the narrowest interpretation that satisfies the requested change and matches an existing production path. Adjacent capabilities are separate work, not implicit acceptance criteria. For example, shared coordination for rate limiting or idempotency does not also require Provider-response caching, cache-retention policy, or cloud rollout unless the user asked for those outcomes.
+
+- Do not pause for scope confirmation when the named slice has one safe, reversible, implementation-backed interpretation. Record adjacent ideas as out of scope or TBD and continue.
+- Ask only when unresolved alternatives would materially change public/shared semantics, data ownership or privacy, security posture, an irreversible action, or external state beyond the task's authority.
+- A shared path is not itself an approval gate. Inspect the current diff and active writers, preserve compatible edits, and coordinate only an actual overlapping change.
+- Activating or extending repository-local PR validation is routine implementation when the user requested working CI. Separate authority is needed only for secrets/permissions, deployment, destructive behavior, billing, or another external side effect.
+- Completion evidence stops at the environment named by the task. Local or PR-CI proof does not imply a deployed-GCE check; a GCE deployment claim requires GCE evidence. Never revive a removed AWS path as a prerequisite.
+- When the user explicitly requests speed or minimal verification, run the smallest checks that directly exercise the changed behavior plus mandatory safety/contract checks actually triggered by the diff.
+
 ## Workstream boundaries
 
 The following are architectural responsibilities, not exclusive agent ownership declarations.
@@ -64,7 +75,7 @@ The following are architectural responsibilities, not exclusive agent ownership 
 
 ### Shared surfaces
 
-`src/contracts/**`, `src/docs/shared/**`, `src/generated/**`, `src/tests/contracts/**`, `src/tests/integration/**`, and `src/infra/**` require impact review by every affected producer or consumer. They do not require unrelated artifacts to change.
+For `src/contracts/**`, `src/docs/shared/**`, `src/generated/**`, `src/tests/contracts/**`, `src/tests/integration/**`, and `src/infra/**`, inspect the affected producers and consumers. Synchronous approval is required only when the task lacks authority for a material semantic, ownership, security, irreversible, or external-state decision. A shared path alone is not a gate, and unrelated artifacts do not need to change.
 
 ## Contract changes are impact-based
 

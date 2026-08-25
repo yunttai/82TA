@@ -39,6 +39,14 @@
       "text": "구현 요청은 bounded discovery 뒤 실제 production code를 수정하며 audit·plan·ADR·release verdict로 대체되지 않는다"
     },
     {
+      "id": "H-DEFAULT-SCOPE-001",
+      "text": "모호한 인접 기능은 가장 좁은 현재 slice 밖의 TBD로 두고 실제 의미·보안·비가역·외부 상태 결정이 없으면 승인 질문으로 구현을 지연하지 않는다"
+    },
+    {
+      "id": "H-CONFLICT-001",
+      "text": "shared path 자체는 승인 gate가 아니며 현재 diff와 active writer의 실제 overlap만 조율한다"
+    },
+    {
       "id": "H-EVIDENCE-001",
       "text": "unchanged call-path findings와 green test evidence를 continuation에서 재사용하고 snapshot·ledger·full suite를 반복하지 않는다"
     },

@@ -26,3 +26,13 @@
 - live Provider key·approval 부재가 pure-domain/fixture algorithm 구현을 막지 않도록 했다.
 - 내부 graph completeness, cache, provider-call accounting 변화가 public 의미를 바꾸지 않으면 contract/ADR 작업을 자동 유발하지 않게 했다.
 - ordinary implementation 보고에서 `GO`/`NO_GO`를 금지하고 explicit deployment/release gate에만 남겼다.
+
+### Focused Service task bottleneck follow-up
+
+- 기존 production path에 대응하는 가장 좁은 요청 slice를 기본값으로 삼고, 인접 기능의 미결정을 blocker가 아닌 out-of-scope/TBD로 처리하게 했다.
+- rate-limit/idempotency Redis coordination이 Kakao Local·Routing Provider 응답 캐싱, TTL·약관·좌표 key 정책, cloud rollout을 자동 요구하지 않게 했다.
+- `src/infra/**` 등 shared path 자체의 승인 gate를 없애고 현재 diff와 active writer의 실제 overlap만 조율하게 했다.
+- working PR CI 요청에서 repository-local workflow 활성화를 routine implementation으로 분류하고, secret·permission·배포·비용·외부 상태 변화에만 추가 권한을 요구하게 했다.
+- local/PR-CI/GCE 완료 증거를 분리하고 제거된 AWS·ElastiCache 경로가 질문이나 선행조건으로 되살아나지 않게 했다.
+- 사용자가 속도·최소 검증을 명시하면 변경된 경계와 실제로 유발된 필수 안전·계약 검사만 수행하게 했다.
+- Redis coordination dry-run과 narrow-scope/shared-path 구조 assertion을 추가했다.

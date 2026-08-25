@@ -1,20 +1,20 @@
 {
-  "generatedAt": "2026-08-25T07:52:58Z",
-  "changeType": "harness-only-current-implementation-alignment-and-linked-task-conflict-relaxation",
+  "generatedAt": "2026-08-25T08:53:30Z",
+  "changeType": "harness-only-focused-scope-and-approval-bottleneck-relaxation",
   "result": "PASS",
   "protectedScope": {
-    "trackedFileCountBefore": 651,
-    "trackedFileCountAfter": 651,
-    "aggregateAlgorithm": "sha256(sorted UTF-8 '<path>\\t<file-sha256>' records joined by LF)",
-    "beforeAggregateSha256": "7d37fe6f25347afb48f2ac0fa397e07cdbd5ca2d4fb29514fa96afafb602730c",
-    "afterAggregateSha256": "7d37fe6f25347afb48f2ac0fa397e07cdbd5ca2d4fb29514fa96afafb602730c",
+    "fileCountBefore": 642,
+    "fileCountAfter": 642,
+    "aggregateAlgorithm": "sha256(sorted UTF-8 '<Windows-relative-path>\\0<file-sha256>\\n' records)",
+    "beforeAggregateSha256": "4b34d51e2f1eb058e86fd19b47f61aea219222feda41d55fe7cf1e39705719df",
+    "afterAggregateSha256": "4b34d51e2f1eb058e86fd19b47f61aea219222feda41d55fe7cf1e39705719df",
     "unexpectedChanges": []
   },
   "contractLock": {
-    "canonicalFileCount": 38,
+    "canonicalFileCount": 39,
     "contextVersion": "1.4.0",
     "contractVersion": "1.4.0",
-    "aggregateSha256": "e5b8d028200c253806f45b090cfdd726c4620bf3a12c9686c3946325c0e3d9e0",
+    "aggregateSha256": "59729c98afc71606db1577871f1516421c913453034b8974720afb51dd96cd46",
     "verified": true
   },
   "productImpact": {
@@ -22,6 +22,8 @@
     "businessContractsChanged": false,
     "migrationsChanged": false,
     "generatedClientsChanged": false,
+    "redisBehaviorChanged": false,
+    "ciWorkflowChanged": false,
     "deploymentImplementationChanged": false,
     "sharedProductMeaningChanged": false
   }

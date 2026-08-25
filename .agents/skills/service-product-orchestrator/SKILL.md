@@ -19,6 +19,10 @@ An audit, UX plan, contract proposal, workspace ledger, or release verdict is no
 - Real Routing integration: verify the changed private-client/projection boundary and live lock parity.
 - Deployment/release: add environment security, accessibility, operations, and rollback evidence only when explicitly requested.
 
+Default to the smallest named slice. Coordination state for rate limiting or idempotency does not imply Kakao Local or Routing Provider response caching. Treat adjacent caching, retention, provider-terms, and cloud-rollout questions as separate TBDs unless the request changes those paths. Validate only the environment the task names; local or PR-CI work does not require a deployed-GCE proof, and removed AWS infrastructure is never a fallback requirement.
+
+Editing or activating a repository-local PR check is ordinary implementation when working CI is requested. Ask for added authority only if the change also touches secrets or permissions, deploys or mutates an external environment, creates material cost, or performs a destructive action. A shared file path requires an actual diff/writer-overlap check, not general team approval.
+
 Do not edit Routing algorithms/providers for a Service task. The browser never calls Routing directly, and Service does not recalculate Routing-owned duration, fare, ETA, risk, or ranking.
 
 ## Delegation and evidence

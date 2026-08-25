@@ -19,6 +19,19 @@
 
 예상: 관련 OpenAPI, example, generated client, producer/consumer test, changelog, lock만 영향 검토한다. persistence/event/code 영향이 없다면 DBML·event·registry는 바꾸지 않는다.
 
+## DR-SVC-003 focused Redis coordination and PR CI
+
+입력: `Service rate-limit/idempotency가 process 사이에서 실제 Redis 상태를 공유하는지 PR CI에서 빠르게 검증해줘. 검증은 최소한으로.`
+
+예상:
+
+1. 범위는 기존 Service coordination consumer, Redis wiring, 직접 integration check로 한정한다.
+2. Kakao Local·Routing Provider 응답 캐싱, TTL·약관·좌표 key 정책은 명시적으로 요청되지 않았으므로 별도 TBD이며 구현을 막는 질문이 아니다.
+3. `src/infra/**`가 shared라는 이유만으로 팀 승인을 기다리지 않고, 현재 diff와 active writer의 실제 겹침만 확인한다.
+4. 실제 PR 실행을 요청했으므로 repository-local workflow 활성화·보강은 routine implementation이다. secret·permission·배포·비용·외부 상태를 바꿀 때만 추가 권한을 묻는다.
+5. 완료 증거는 요청된 local/PR-CI까지다. 배포된 GCE 검증은 별도 deployment claim에 필요하며, 제거된 AWS/ElastiCache를 선택지나 선행조건으로 제시하지 않는다.
+6. 속도와 최소 검증 요청을 존중해 직접 Redis 공유·장애 동작과 workflow 구문 등 변경된 경계만 검사한다.
+
 ## DR-RT-001 isolated optimizer fix
 
 입력: `taxi upper-cost 합산 bug를 수정해줘`
