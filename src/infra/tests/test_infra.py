@@ -91,7 +91,7 @@ class InfrastructureContractTests(unittest.TestCase):
         active_workflows = sorted(
             path.name for path in (ROOT / ".github/workflows").glob("*.yml")
         )
-        self.assertEqual(active_workflows, ["cd-gce.yml"])
+        self.assertEqual(active_workflows, ["cd-gce.yml", "pr-service-product.yml"])
 
         deployment_text = "\n".join(
             path.read_text(encoding="utf-8", errors="ignore")
@@ -263,6 +263,11 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn("82ta-certificate-renew.timer", workflow)
         self.assertIn("HTTP health check timed out", workflow)
         self.assertIn("HTTPS health check timed out", workflow)
+        self.assertIn(
+            "Verify Service coordination backend matches current GCE topology",
+            workflow,
+        )
+        self.assertIn('[[ "$coordination_backend" != "local" ]]', workflow)
         self.assertLess(
             workflow.index("Bootstrap the blank server"),
             workflow.index("Start bootstrap provider egress proxy"),
@@ -274,6 +279,12 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertLess(
             workflow.index("Probe Providers and create runtime evidence"),
             workflow.index("Start HTTP stack in dependency order"),
+        )
+        self.assertLess(
+            workflow.index("Start HTTP stack in dependency order"),
+            workflow.index(
+                "Verify Service coordination backend matches current GCE topology"
+            ),
         )
         self.assertLess(
             workflow.index("Start HTTP stack in dependency order"),
@@ -295,6 +306,33 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn('ROUTING_ALLOW_FIXTURE_BACKEND: "false"', compose)
         self.assertIn("routing-db:\n    image: postgis/postgis:16-3.4", compose)
         self.assertIn("routing-redis:\n    image: redis:7.4-alpine", compose)
+        self.assertNotIn("\n  service-redis:", compose)
+        self.assertIn(
+            "# SERVICE_REDIS_URL: intentionally unset; Service uses its local coordination backend.",
+            compose,
+        )
+
+    def test_service_product_pr_workflow_is_active_pinned_and_uses_real_redis(self) -> None:
+        active = (ROOT / ".github/workflows/pr-service-product.yml").read_text(
+            encoding="utf-8"
+        )
+        template = self.read("ci/github-actions/pr-service-product.yml")
+        self.assertEqual(active, template)
+        self.assertIn("pull_request:", active)
+        self.assertIn("Start Service Product with real Redis", active)
+        self.assertIn("service-redis redis-cli PING", active)
+        self.assertIn('[[ "$backend" == "redis" ]]', active)
+        self.assertIn('[[ "$first_rate" == "True" ]]', active)
+        self.assertIn('[[ "$second_rate" == "False" ]]', active)
+        self.assertIn('[[ "$first_idempotency" == "CLAIMED" ]]', active)
+        self.assertIn('[[ "$second_idempotency" == "IN_PROGRESS" ]]', active)
+        self.assertIn("down -v --remove-orphans", active)
+        self.assertNotIn("fakeredis", active.lower())
+
+        action_refs = re.findall(r"uses:\s*([^\s#]+)", active)
+        self.assertTrue(action_refs)
+        for action_ref in action_refs:
+            self.assertRegex(action_ref, r"^[^@]+@[0-9a-f]{40}$")
 
     def test_gce_blank_server_bootstrap_generates_runtime_and_refresh_jobs(self) -> None:
         bootstrap = self.read("gce/bootstrap-host.sh")

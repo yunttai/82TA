@@ -20,6 +20,8 @@ and a disposable SQLite database; it is not a production topology. Service
 rate-limit and idempotency coordination uses a dedicated Redis container on an
 internal-only Compose network. Redis publishes no host port, persists AOF data
 in the `service-redis-data` volume, and must be healthy before Django starts.
+In other words, route recommendations are Stub data in this stack, while Service
+coordination is backed by a real Redis server rather than `fakeredis` or a mock.
 The fixed key-derivation secret in this Compose file is local-development-only.
 Managed or multi-node GCE database migrations must run as a separate one-off
 process and are never inferred merely from the container entry point. Images are

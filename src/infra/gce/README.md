@@ -65,6 +65,9 @@ for this workflow.
 Service keeps the locally used SQLite/no-Redis setup, so `DATABASE_URL`,
 `SERVICE_MIGRATION_DATABASE_URL`, and `SERVICE_REDIS_URL` remain commented.
 Service persists its database at `/opt/82ta/service-data/service-api.sqlite3`.
+After starting the stack, CD reads Django settings inside the running Service
+container and requires `COORDINATION_BACKEND=local`. This prevents an accidental
+configuration mismatch; it does not install Service Redis on GCE.
 
 Routing does use PostGIS and Redis locally, so this Compose file starts both and
 the bootstrap generates `ROUTING_DB_PASSWORD`. The separate Routing migration
