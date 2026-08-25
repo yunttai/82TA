@@ -1,6 +1,20 @@
 name: 82ta-service-product
 
 services:
+  service-redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - service-redis-data:/data
+    networks:
+      - service-coordination
+
   service-api:
     build:
       context: ../..
@@ -12,12 +26,22 @@ services:
       SERVICE_ALLOWED_HOSTS: service-api,localhost,127.0.0.1,${SERVICE_PUBLIC_HOST:-}
       SERVICE_CSRF_TRUSTED_ORIGINS: ${SERVICE_CSRF_TRUSTED_ORIGINS:-}
       SERVICE_ROUTING_GATEWAY: stub
+      SERVICE_REDIS_URL: redis://service-redis:6379/0
+      SERVICE_REDIS_KEY_PREFIX: 82ta:service:local
+      SERVICE_REDIS_KEY_DERIVATION_SECRET: local-compose-redis-key-derivation-only-2026
+      SERVICE_REDIS_SOCKET_TIMEOUT_SECONDS: "0.25"
       DATABASE_URL: sqlite:////tmp/service-api.sqlite3
       KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}
     command:
       - /bin/sh
       - -ec
       - python manage.py migrate --noinput && exec python -m gunicorn service_wsgi:application --bind=0.0.0.0:8000 --workers=2 --threads=4 --timeout=10 --access-logfile /dev/null --error-logfile=-
+    depends_on:
+      service-redis:
+        condition: service_healthy
+    networks:
+      - default
+      - service-coordination
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/infra/healthz', timeout=2).read()"]
       interval: 5s
@@ -45,3 +69,10 @@ services:
       - /var/cache/nginx
       - /var/run
       - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
+
+volumes:
+  service-redis-data:
+
+networks:
+  service-coordination:
+    internal: true

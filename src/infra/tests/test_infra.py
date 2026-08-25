@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -257,6 +258,34 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertNotIn("routing-api", compose)
         self.assertNotIn("/v1/routes/optimize", nginx)
         self.assertIn("proxy_pass http://${SERVICE_UPSTREAM}", nginx)
+
+    def test_service_product_redis_is_private_persistent_and_required(self) -> None:
+        compose = self.read("docker/compose.service-product.yml")
+        redis_block = compose.split("  service-redis:", 1)[1].split("  service-api:", 1)[0]
+        service_block = compose.split("  service-api:", 1)[1].split("  web:", 1)[0]
+
+        self.assertIn("image: redis:7.4-alpine", redis_block)
+        self.assertIn(
+            '["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]',
+            redis_block,
+        )
+        self.assertIn("restart: unless-stopped", redis_block)
+        self.assertIn('["CMD", "redis-cli", "ping"]', redis_block)
+        self.assertIn("service-redis-data:/data", redis_block)
+        self.assertNotIn("ports:", redis_block)
+        self.assertIn("service-coordination:\n    internal: true", compose)
+
+        self.assertIn("SERVICE_REDIS_URL: redis://service-redis:6379/0", service_block)
+        self.assertIn("service-redis:\n        condition: service_healthy", service_block)
+        self.assertIn("- service-coordination", service_block)
+        self.assertNotIn("SERVICE_SINGLE_NODE_MODE", compose)
+
+        secret = re.search(
+            r"SERVICE_REDIS_KEY_DERIVATION_SECRET:\s*([^\s]+)",
+            service_block,
+        )
+        self.assertIsNotNone(secret)
+        self.assertGreaterEqual(len(secret.group(1)), 32)
 
     def test_exact_coordinate_request_lines_are_not_logged(self) -> None:
         marker = "127.123456,37.654321"
