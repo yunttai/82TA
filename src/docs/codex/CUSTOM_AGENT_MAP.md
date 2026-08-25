@@ -1,43 +1,47 @@
 # Codex Custom Agent Map
 
+Custom agent는 필요할 때 선택하는 전문 역할이며 상시 path owner가 아니다. 실제 수정 범위는 primary task가 비중복 write scope로 정한다.
+
 ## Service Product
 
-| Agent | 역할 | 주 소유 |
-|---|---|---|
-| service-product-lead | 계획·의존성·통합 | Service 전체 |
-| service-ux-engineer | 상태·정보구조·접근성 | UI spec |
-| service-frontend-engineer | React/PWA/Kakao Map | `src/apps/web` |
-| service-backend-engineer | Django Public API/RoutingGateway | `src/services/service-api` |
-| service-data-engineer | Service DB·보존·삭제 | Service models/migrations |
-| service-security-engineer | auth/privacy/abuse | Service security |
-| service-qa-engineer | API↔UI↔DB QA | Service/cross tests |
+| Agent | 전문 영역 |
+|---|---|
+| service-product-lead | 큰 Service slice의 계획·의존성·통합 |
+| service-ux-engineer | 상태·정보구조·접근성 |
+| service-frontend-engineer | React/PWA/Kakao Map |
+| service-backend-engineer | Django Public API/RoutingGateway |
+| service-data-engineer | Service DB·보존·삭제 |
+| service-security-engineer | auth/privacy/abuse |
+| service-qa-engineer | 변경된 API↔UI↔DB 경계 QA |
 
 ## Routing & Intelligence
 
-| Agent | 역할 | 주 소유 |
-|---|---|---|
-| routing-technical-lead | dependency/deadline/fan-in | Routing 전체 |
-| provider-integration-engineer | Adapter/cache/resilience | provider-core |
-| transport-mapping-engineer | route/stop/direction | mapping |
-| route-optimization-engineer | candidate/time/budget/Pareto | routing-domain |
-| bus-intelligence-engineer | ETA/seat/wait | bus-intelligence-core |
-| routing-data-ml-engineer | collector/dataset/registry | workers/model |
-| routing-security-performance-engineer | private auth/SSRF/quota/SLO | Routing/platform |
-| routing-qa-engineer | Adapter→API QA | Routing tests |
+| Agent | 전문 영역 |
+|---|---|
+| routing-technical-lead | 큰 Routing slice의 dependency/deadline/fan-in |
+| provider-integration-engineer | Adapter/cache/resilience |
+| transport-mapping-engineer | route/stop/direction mapping |
+| route-optimization-engineer | candidate/time/budget/Pareto |
+| bus-intelligence-engineer | ETA/seat/wait |
+| routing-data-ml-engineer | collector/dataset/model registry |
+| routing-security-performance-engineer | private auth/SSRF/quota/SLO |
+| routing-qa-engineer | 변경된 Adapter→API 경계 QA |
 
 ## Shared
 
-| Agent | 역할 |
+| Agent | 전문 영역 |
 |---|---|
-| contract-steward | OpenAPI/DBML/events/codes/version |
-| architecture-auditor | bounded context, ownership, src-only, integration |
-| integration-qa | producer-consumer, replay, merge/release gate |
+| contract-steward | 실제 영향받는 shared contract와 compatibility |
+| architecture-auditor | bounded context, DB ownership, current↔target gap |
+| integration-qa | producer-consumer와 release-dependent evidence |
 
 ## 위임 원칙
 
-- Primary thread가 plan과 최종 diff를 소유한다.
-- 독립 작업만 병렬 위임한다.
-- 같은 파일을 두 subagent에 동시에 쓰게 하지 않는다.
-- subagent는 배정 경로와 acceptance/test를 받는다.
-- 결과를 기다린 뒤 primary thread가 conflict를 해결한다.
-- 대화가 아니라 WORKPLAN/STATUS/HANDOFF에 durable state를 남긴다.
+- local task는 primary가 직접 수행해도 된다.
+- 위임은 사용자가 요청했거나 독립 작업의 병렬화가 실질적으로 유리할 때만 하며, focused task는 최대 한 implementer와 한 reviewer를 사용한다.
+- profile의 path 목록은 expertise hint다.
+- 각 delegated task에는 명시적 write scope와 acceptance/check를 준다.
+- 같은 파일이나 넓은 glob을 여러 agent에 동시에 배정하지 않는다.
+- 결과 통합과 conflict resolution은 primary가 담당한다.
+- durable ledger는 선택 사항이며 current source와 git diff를 대체하지 않는다.
+- 구현 요청에 audit/governance/integration/security/release agent를 자동으로 붙이지 않고, ordinary implementation에 release verdict를 만들지 않는다.

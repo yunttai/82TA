@@ -17,7 +17,7 @@
 | NFR-REL-001 | Provider 부분 장애 시 PARTIAL 결과 |
 | NFR-REL-002 | timeout·retry·circuit breaker·stale policy |
 | NFR-REL-003 | deterministic replay |
-| NFR-REL-004 | RDS PITR와 정기 restore drill |
+| NFR-REL-004 | GCE 데이터베이스의 검증된 backup/PITR와 정기 restore drill |
 | NFR-REL-005 | model rollback 15분 이내 목표 |
 
 ## 데이터·모델
@@ -39,7 +39,7 @@
 | NFR-SEC-002 | private Routing API와 service authentication |
 | NFR-SEC-003 | 정확한 위치·번호판·token 로그 금지 |
 | NFR-SEC-004 | model registry·hash·schema 검증 |
-| NFR-SEC-005 | WAF·rate limit·Denial of Wallet 대응 |
+| NFR-SEC-005 | GCE edge/application rate limit·Denial of Wallet 대응 |
 | NFR-SEC-006 | 사용자 삭제·export·동의 기록 |
 
 ## 계약·유지보수

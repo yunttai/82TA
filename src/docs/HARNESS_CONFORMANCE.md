@@ -1,5 +1,7 @@
 # revfactory/harness 적용 대응표
 
+> **Historical conformance archive:** 초기 하네스 구축 당시 대응표다. 현재 active harness는 위임·workspace·snapshot을 선택 사항으로 두고 task-specific scope와 proportionate checks를 사용한다.
+
 이 패키지는 `revfactory/harness`의 팀 아키텍처·에이전트·스킬·오케스트레이터 원칙을 프로젝트에 맞게 적용한다.
 
 | Harness Phase | 이 패키지의 구현 |

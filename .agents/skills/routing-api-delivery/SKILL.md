@@ -5,12 +5,12 @@ description: "Django private Routing API의 /v1/routes/optimize, capabilities, h
 
 # Routing API Delivery
 
-## 공통 사전 조건
+## 작업 범위 확인
 
-1. `python src/scripts/validate_repository.py`와 `verify_contract_lock.py`를 통과한다.
-2. `src/contracts/openapi/routing-private.v1.yaml`, common components, examples를 읽는다.
-3. `src/docs/shared/PROJECT_CONTEXT.md`, `CONTEXT_MAP.md`, `API_CONTRACT_GUIDE.md`를 읽는다.
-4. `routing-intelligence` context snapshot을 확인한다.
+1. 적용되는 `AGENTS.md`, 현재 endpoint/use case, 직접 영향받는 테스트를 읽는다.
+2. request/response 또는 의미가 바뀔 때만 private OpenAPI, common components, examples와 Service consumer를 함께 읽는다.
+3. 가장 작은 관련 검증을 우선한다. 전체 repository/lock 검증과 context parity는 공유 경계·통합·릴리스에 사용한다.
+4. `_workspace` snapshot은 선택적 진단이며 최신성의 근거가 아니다.
 
 ## 경계
 

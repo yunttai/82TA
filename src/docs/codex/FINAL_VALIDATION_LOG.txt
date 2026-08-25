@@ -1,25 +1,64 @@
+Harness validation — 2026-08-25
+
+PY_COMPILE_OK
+
+=== validate_repository --harness-only ===
+ACTIVE CODEX HARNESS OK: 18 agents, 25 skills; legacy registry retained as non-authoritative
+HARNESS TRIGGER MATRIX OK: 25 skills, >=4 positive and negative cases each
+REPOSITORY VALIDATION OK
+
+=== validate_repository --layout-only ===
+REPOSITORY VALIDATION OK
+
 === validate_repository ===
 OpenAPI YAML and local $ref targets OK
 OPENAPI EXAMPLES OK: 4 canonical examples
-CODEX HARNESS REGISTRY OK: 2 harnesses, 18 agents, 25 registered skills
-CODEX HARNESS EVALS OK: 25 skills
-CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+ACTIVE CODEX HARNESS OK: 18 agents, 25 skills; legacy registry retained as non-authoritative
+HARNESS TRIGGER MATRIX OK: 25 skills, >=4 positive and negative cases each
+CONTRACT LOCK OK: 38 canonical files, contract 1.4.0, aggregate e5b8d028200c253806f45b090cfdd726c4620bf3a12c9686c3946325c0e3d9e0
 REPOSITORY VALIDATION OK
 
-=== verify_contract_lock ===
-CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+=== live context parity ===
+CONTRACT LOCK OK: 38 canonical files, contract 1.4.0, aggregate e5b8d028200c253806f45b090cfdd726c4620bf3a12c9686c3946325c0e3d9e0
+LIVE CONTEXT PARITY OK: context=1.4.0 contract=1.4.0 aggregate=e5b8d028200c253806f45b090cfdd726c4620bf3a12c9686c3946325c0e3d9e0
 
-=== snapshot service ===
-CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
-_workspace/service-product/00_context_snapshot_20260822T235833Z.json
+=== snapshot overwrite behavior ===
+_workspace/integration/00_context_snapshot_current.json
+timestamp archive count: before=37 after=37
 
-=== snapshot routing ===
-CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
-_workspace/routing-intelligence/00_context_snapshot_20260822T235834Z.json
+=== product preservation ===
+protected tracked files: before=651 after=651
+aggregate before: 7d37fe6f25347afb48f2ac0fa397e07cdbd5ca2d4fb29514fa96afafb602730c
+aggregate after:  7d37fe6f25347afb48f2ac0fa397e07cdbd5ca2d4fb29514fa96afafb602730c
+result: PASS
 
-=== snapshot integration ===
-CONTRACT LOCK OK: 35 canonical files, contract 1.0.0, aggregate c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
-_workspace/integration/00_context_snapshot_20260822T235835Z.json
+=== linked Routing task conflict-relaxation follow-up ===
+Skill Creator quick validation: PASS (9 modified orchestration/governance skills)
+ACTIVE CODEX HARNESS OK: 18 agents, 25 skills; legacy registry retained as non-authoritative
+HARNESS TRIGGER MATRIX OK: 25 skills, >=4 positive and negative cases each
+Focused agent concurrency: max_concurrent_threads_per_session=2
 
-=== compare snapshots ===
-CONTEXT PARITY OK: context=1.0.1 contract=1.0.0 aggregate=c0390f148341e71d3bb9d0f7d13d3036656702c3cc477959c25a0d34a28a1b3a
+Implementation-first regression coverage:
+- bounded CodeGraph discovery then production implementation
+- continuation reuse of unchanged findings/green checks
+- primary or at most one implementer + one reviewer
+- owner-specific Routing/Service/integration test runtimes
+- optional enrichment candidate-drop/PARTIAL/no-feasible semantics, not blanket 504
+- offline domain/fixture work does not require live Provider keys
+- no speculative CCR/ADR or GO/NO_GO for ordinary implementation
+
+=== follow-up repository checks ===
+PY_COMPILE_OK
+validate_repository --harness-only: PASS
+validate_repository --layout-only: PASS
+validate_repository: PASS
+verify_contract_lock: PASS, 38 canonical files, aggregate e5b8d028200c253806f45b090cfdd726c4620bf3a12c9686c3946325c0e3d9e0
+live context parity: PASS, context=1.4.0 contract=1.4.0
+git diff --check: PASS (Windows LF/CRLF conversion warnings only)
+
+=== follow-up product preservation ===
+protected tracked files: before=651 after=651
+aggregate before: 7d37fe6f25347afb48f2ac0fa397e07cdbd5ca2d4fb29514fa96afafb602730c
+aggregate after:  7d37fe6f25347afb48f2ac0fa397e07cdbd5ca2d4fb29514fa96afafb602730c
+unexpected protected changes: 0
+result: PASS

@@ -15,7 +15,7 @@ client / Stub or Replay RoutingGateway. It does not move provider, Bus
 Intelligence, model, candidate generation, or ranking logic into Service.
 
 Internet staging is `NO-GO`: the repository evidence does not verify a real
-Routing producer, Kakao Local/Maps, AWS apply, managed PostgreSQL/PostGIS,
+Routing producer, Kakao Local/Maps, GCE apply, managed PostgreSQL/PostGIS,
 physical iOS/Android devices, or live privacy/restore/rollback drills. The
 local WebKit project also cannot launch on this host because its GTK/GStreamer
 and media libraries are absent. These are release-evidence blockers, not
@@ -39,7 +39,7 @@ failures of the exercised local Stub/Replay slice.
 | PWA install/update/offline | PASS locally | Manifest/iOS assets, shell-only cache, explicit update confirmation, offline E2E |
 | Mobile accessibility | PASS on Chromium | 320 px reflow and axe serious/critical gate pass; map-picker semantics are covered |
 | iOS/WebKit | UNVERIFIED | Playwright WebKit cannot launch because host runtime libraries are missing |
-| Real external integrations | UNVERIFIED | No credentialed Kakao, live Routing, AWS staging, or device run was in scope |
+| Real external integrations | UNVERIFIED | No credentialed Kakao, live Routing, GCE staging promotion, or device run was in scope |
 
 ## Executable evidence
 
@@ -92,11 +92,10 @@ copy registries, and a server-owned freshness threshold.
 - The service worker does not cache API requests or non-GET traffic.
 - Production settings require HTTPS origins, secure cookies, PostgreSQL, an
   explicit RoutingGateway, and verified TLS for HTTP Routing mode.
-- The staging topology requires CloudFront-to-ALB HTTPS, an ALB 443 listener
-  with a matching certificate and Route53 alias, and limits ALB ingress to the
-  CloudFront managed prefix list. Missing DNS/certificate inputs fail Terraform
-  preconditions; health checks use private `/infra/healthz` without weakening
-  public HTTPS redirects.
+- The GCE staging topology requires a static external IP, matching DNS,
+  Nginx/Let's Encrypt HTTPS, pinned SSH host identity and restricted deploy-runner
+  ingress. Missing domain/host-key/secret inputs fail the active workflow before
+  deploy; health checks use the public HTTPS boundary after certificate issuance.
 
 The bounded export/deletion worker, encrypted filesystem artifact store,
 fail-closed physical purge, scheduled worker/purge infrastructure and DLQ are

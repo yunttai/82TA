@@ -2,7 +2,7 @@
 
 사용자 인증, 장소 검색 proxy, 사용자 입력 검증, Routing Gateway, 검색 기록, 즐겨찾기, 설정, 개인정보 권리를 구현한다. 교통 Provider와 모델을 직접 호출하지 않는다.
 
-## Public Service API 1.4.0
+## Public Service API 1.5.0
 
 ```bash
 uv sync
@@ -10,11 +10,17 @@ uv run python manage.py test
 uv run python manage.py runserver
 ```
 
-The backend implements the Public 1.4.0 endpoint set for guest/session lifecycle,
-place suggestion/reverse geocoding, route search/history/detail/feedback,
+The backend implements the Public 1.5.0 endpoint set for guest/session lifecycle,
+place suggestion/reverse geocoding, nearby Seoul Bike options,
+route search/history/detail/feedback,
 preferences, saved places, favorite journeys, consents, data export/deletion
 jobs, capabilities, and health. Requests and Routing responses are validated
 against the locked OpenAPI sources under `src/contracts/`.
+
+`GET /api/v1/bike-options` reads the bundled official Seoul Bike station snapshot.
+It estimates station-to-station cycling time at 15 km/h and keeps live bicycle and
+empty-rack availability explicit as `NOT_PROVIDED`; it does not alter Routing-owned
+candidate generation, ranking, fare, or route duration.
 
 Development defaults to the canonical `stub` gateway so valid dynamic
 `DEPART_AT` UI requests can exercise the full browser-to-Service flow. Use
@@ -50,7 +56,7 @@ responses are schema-normalized before returning to the browser.
 Kakao responses use the same identity-encoding rule and a separate
 `SERVICE_KAKAO_LOCAL_MAX_RESPONSE_BYTES` bound (default 512 KiB).
 
-Public 1.4.0 provides CSRF-protected email registration and login backed by
+Public 1.5.0 provides CSRF-protected email registration and login backed by
 Django adaptive password hashing and an HttpOnly/SameSite session cookie.
 Authentication attempts are rate limited and login failure does not reveal
 whether an email exists. A route POST without a credential gets an ephemeral browser guest session;
@@ -94,9 +100,9 @@ that account's export artifacts are physically removed. Deletion jobs remain
 removes the owner-bound job with the account and leaves a de-identified
 `DATA_DELETION_COMPLETED` audit event.
 
-Public 1.4.0 currently has no authenticated artifact-download operation, so
-`downloadUrl` intentionally remains `null`. Infrastructure wires the encrypted
-filesystem backend to private EFS and schedules both lifecycle commands, but a
+Public 1.5.0 currently has no authenticated artifact-download operation, so
+`downloadUrl` intentionally remains `null`. The current GCE path can wire the encrypted
+filesystem backend to a private durable host volume and schedule both lifecycle commands, but a
 short-lived owner-bound delivery contract plus live worker, backup/analytics
 deletion, and recovery drills remain staging release gates. The filesystem
 backend is suitable only when the mounted volume itself is private and durable.
@@ -116,21 +122,19 @@ Guest-session issuance, place suggest/reverse, and route search have
 client-address rate limits. Configure them with
 `SERVICE_GUEST_SESSION_RATE_LIMIT_PER_MINUTE`,
 `SERVICE_PLACE_RATE_LIMIT_PER_MINUTE`, and `SERVICE_RATE_LIMIT_PER_MINUTE`.
-Forwarding headers are ignored by default. Behind the ALB, set
+Forwarding headers are ignored by default. Behind the GCE Nginx ingress, set
 `SERVICE_TRUST_PROXY_HEADERS=true` and provide comma-separated exact IPs or
 CIDRs in `SERVICE_TRUSTED_PROXY_IPS`. Only a request whose immediate peer is in
 those networks may supply forwarding headers; the resolver removes trusted
-hops from the right of the append-only `X-Forwarded-For` chain. The ALB must be
-configured to append/sanitize XFF, its security group must restrict direct
-ingress, and WAF remains the authoritative distributed abuse control. For the
-CloudFront → ALB topology, include both the ALB subnet CIDRs and AWS-managed
-CloudFront origin-facing CIDRs. The resolver then skips the trusted ALB and
-CloudFront hops and selects the viewer address; a forged browser-supplied
-leftmost XFF value cannot replace that nearer untrusted hop. Do not add general
-public address ranges to this allowlist.
+hops from the right of the append-only `X-Forwarded-For` chain. Every trusted GCE
+proxy must append/sanitize XFF and direct application ingress must remain closed.
+Include only the exact Nginx/load-balancer proxy CIDRs. The resolver skips those
+trusted hops and selects the nearest untrusted viewer address; a forged
+browser-supplied leftmost XFF value cannot replace that nearer hop. Do not add
+general public address ranges to this allowlist.
 
 Set `SERVICE_CSRF_TRUSTED_ORIGINS` to comma-separated, exact HTTPS origins for
-the CloudFront and custom web domains. Userinfo, paths, queries, fragments,
+the GCE-hosted web domains. Userinfo, paths, queries, fragments,
 wildcards, and non-HTTPS values are rejected; this list is distinct from
 `SERVICE_ALLOWED_HOSTS`.
 

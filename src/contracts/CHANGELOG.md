@@ -1,5 +1,24 @@
 # Contract Changelog
 
+## Context 1.5.1 — 2026-08-25
+
+- Accepted GCE as the only supported cloud compute deployment platform and
+  removed the alternate-cloud Terraform, runbooks and CI/CD templates.
+- Made the implemented single-GCE-VM Docker Compose workflow the honest current
+  baseline without relabeling its development flags, SQLite or internal HTTP as
+  production-ready.
+- Replaced cloud model/data artifact identities with canonical `gs://` URIs while
+  preserving bucket allowlists, path canonicalization, safe formats and SHA-256
+  verification.
+- Added GCE Terraform for the VM/network/static IP/firewall/runtime identity and a
+  private versioned GCS artifact bucket. Exact Google managed-service topology is
+  intentionally not frozen by the harness.
+- Regenerated the canonical Public route response from the current producer and
+  Service projection so user-entered display names and public text redaction match
+  the executable integration chain.
+- Contract version remains `1.5.0`; OpenAPI, DBML, events, code registry, generated
+  clients, ranking and public/private API wire semantics are unchanged.
+
 ## 1.5.0 — 2026-08-25
 
 - Added the optional `GET /api/v1/bike-options` Public endpoint for nearby Seoul

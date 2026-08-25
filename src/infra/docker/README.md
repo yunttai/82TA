@@ -16,10 +16,10 @@ curl --fail http://127.0.0.1:8080/api/v1/health
 ```
 
 Then open `http://127.0.0.1:8080`. Local Compose deliberately uses Stub mode
-and a disposable SQLite database; it is not a production topology. Production
-migrations are a separate one-off ECS task and are never run by the container
-entry point. Images are built from the repository root so generated clients
-remain the only API DTO source.
+and a disposable SQLite database; it is not a production topology. Managed or
+multi-node GCE database migrations must run as a separate one-off process and are
+never inferred merely from the container entry point. Images are built from the
+repository root so generated clients remain the only API DTO source.
 
 To enable real Kakao Local search without committing credentials, export the
 server REST key only in the launching shell. Kakao Maps JS requires the
@@ -36,8 +36,7 @@ Do not put either key in Git. The REST key is injected only into Django; the
 browser build receives only the domain-restricted JavaScript key. Kakao
 Mobility remains outside the Service Product boundary.
 
-The Web Nginx image is useful for local and container smoke tests. AWS staging
-serves the same `dist/` output from private S3 through CloudFront instead.
+The same Web Nginx image is deployed by the current GCE Compose workflow.
 
 ## Service to Routing HTTP E2E
 

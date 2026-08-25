@@ -28,7 +28,7 @@ operation-scoped binding으로 감싼다. 키가 있다는 사실만으로 `KEY_
 `PRODUCTION_APPROVED`가 되지는 않으며, capability registry와 만료 가능한 runtime
 evidence는 배포 composition이 별도로 주입해야 한다. `.env.local`은 Django가 자동
 로딩하지 않는다. 로컬 셸에서는 실행 전에 아래처럼 export하고, 컨테이너에서는
-Compose/ECS secret 환경변수로 주입한다.
+GCE Compose secret 환경변수로 주입한다.
 
 ```bash
 set -a

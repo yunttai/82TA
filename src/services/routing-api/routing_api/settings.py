@@ -162,7 +162,7 @@ if _DEPLOYMENT:
         raise ImproperlyConfigured("ROUTING_SECURE_SSL_REDIRECT=true is required")
     if not _strict_boolean("ROUTING_TRUST_X_FORWARDED_PROTO"):
         raise ImproperlyConfigured(
-            "ROUTING_TRUST_X_FORWARDED_PROTO=true is required behind the trusted internal ALB"
+            "ROUTING_TRUST_X_FORWARDED_PROTO=true is required behind the trusted GCE ingress proxy"
         )
 else:
     # Explicit TEST/DEVELOPMENT only. Never accepted in a deployment runtime.

@@ -1,272 +1,30 @@
 {
-  "generatedAt": "2026-08-22T23:56:09+00:00",
-  "scope": "application source, business OpenAPI, DBML, events, codes, shared product documents",
-  "counts": {
-    "ALLOWED_HARNESS_CONTEXT_CHANGE": 1,
-    "UNCHANGED": 42
+  "generatedAt": "2026-08-25T08:53:30Z",
+  "changeType": "harness-only-focused-scope-and-approval-bottleneck-relaxation",
+  "result": "PASS",
+  "protectedScope": {
+    "fileCountBefore": 642,
+    "fileCountAfter": 642,
+    "aggregateAlgorithm": "sha256(sorted UTF-8 '<Windows-relative-path>\\0<file-sha256>\\n' records)",
+    "beforeAggregateSha256": "4b34d51e2f1eb058e86fd19b47f61aea219222feda41d55fe7cf1e39705719df",
+    "afterAggregateSha256": "4b34d51e2f1eb058e86fd19b47f61aea219222feda41d55fe7cf1e39705719df",
+    "unexpectedChanges": []
   },
-  "allowedContextChanges": [
-    "src/docs/shared/SOURCE_LAYOUT_POLICY.md"
-  ],
-  "unexpectedChanges": [],
-  "files": [
-    {
-      "path": "src/apps/web/README.md",
-      "beforeSha256": "592b15c772e7204e9e1c23d64563314075414816856ab6a2a9f705e5f1d2bcfb",
-      "afterSha256": "592b15c772e7204e9e1c23d64563314075414816856ab6a2a9f705e5f1d2bcfb",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/services/routing-api/README.md",
-      "beforeSha256": "71492799fe22d5a156103c4eba9eae058c1b326d6bbf04f4f210e40ef7ba21de",
-      "afterSha256": "71492799fe22d5a156103c4eba9eae058c1b326d6bbf04f4f210e40ef7ba21de",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/services/service-api/README.md",
-      "beforeSha256": "d9de485e8d60130d80632f824274a81641af5550c9a9a69dc9fdb3e2b046fe52",
-      "afterSha256": "d9de485e8d60130d80632f824274a81641af5550c9a9a69dc9fdb3e2b046fe52",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/packages/bus-intelligence-core/README.md",
-      "beforeSha256": "0fef2afdd34667e9d52c518a96deb749a9bc9284b61e1856ada7cf350ed3bdcb",
-      "afterSha256": "0fef2afdd34667e9d52c518a96deb749a9bc9284b61e1856ada7cf350ed3bdcb",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/packages/observability/README.md",
-      "beforeSha256": "7fc05ecf54b06a6a6b2f7e1b2fba06f8aae32c869a615986a7f4109bb784a05d",
-      "afterSha256": "7fc05ecf54b06a6a6b2f7e1b2fba06f8aae32c869a615986a7f4109bb784a05d",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/packages/provider-core/README.md",
-      "beforeSha256": "aeb5709e1f2fc7c2e9393105b43976b0775dd85edcdbe49723cbcb1c58cb605c",
-      "afterSha256": "aeb5709e1f2fc7c2e9393105b43976b0775dd85edcdbe49723cbcb1c58cb605c",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/packages/routing-domain/README.md",
-      "beforeSha256": "d6d76f630acfaf7e4f05fff640406061bab296d5237710943def045272cee473",
-      "afterSha256": "d6d76f630acfaf7e4f05fff640406061bab296d5237710943def045272cee473",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/workers/data-quality/README.md",
-      "beforeSha256": "bea32acd86e7a8750edc15150b918662c925e3985ad02b47fc954fccee6d656e",
-      "afterSha256": "bea32acd86e7a8750edc15150b918662c925e3985ad02b47fc954fccee6d656e",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/workers/model-jobs/README.md",
-      "beforeSha256": "e6fa057e210894e84c9742879ae939b80b149ba2129c67e809545ef72ff765a1",
-      "afterSha256": "e6fa057e210894e84c9742879ae939b80b149ba2129c67e809545ef72ff765a1",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/workers/transport-collector/README.md",
-      "beforeSha256": "743bb0bd23f3f957e6106cb424e8d7c8b07bdcdb14be611290c916562ec33aa2",
-      "afterSha256": "743bb0bd23f3f957e6106cb424e8d7c8b07bdcdb14be611290c916562ec33aa2",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/openapi/common/components.v1.yaml",
-      "beforeSha256": "8dd39c201f98eda41029b353a9fdf74a1dc23895fc5b85c026adc52716c4f3b8",
-      "afterSha256": "8dd39c201f98eda41029b353a9fdf74a1dc23895fc5b85c026adc52716c4f3b8",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/openapi/examples/public-route-search-request.json",
-      "beforeSha256": "ec42808edb0245b726c3d1a75eceb4a84ad89ee8a3d463e8a82f3fb63ca0d857",
-      "afterSha256": "ec42808edb0245b726c3d1a75eceb4a84ad89ee8a3d463e8a82f3fb63ca0d857",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/openapi/examples/public-route-search-response.json",
-      "beforeSha256": "6da9ef28fe5bd387f93fbfe34a62264ac74fc1d9f776be27d3d01cf349445614",
-      "afterSha256": "6da9ef28fe5bd387f93fbfe34a62264ac74fc1d9f776be27d3d01cf349445614",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/openapi/examples/routing-optimize-request.json",
-      "beforeSha256": "31ecb2f40bb5414ab11cf032c66870a0461e61fbface453ff3138905ed376514",
-      "afterSha256": "31ecb2f40bb5414ab11cf032c66870a0461e61fbface453ff3138905ed376514",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/openapi/examples/routing-optimize-response.json",
-      "beforeSha256": "cd1e2091ea9b768645a4f3cf6209f57f88f07dee73c5f072d9521aeb74339e45",
-      "afterSha256": "cd1e2091ea9b768645a4f3cf6209f57f88f07dee73c5f072d9521aeb74339e45",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/openapi/routing-private.v1.yaml",
-      "beforeSha256": "62e0d13c829c23b67550652b5cbc16bd24e88754f73e95af86a5469102fda32b",
-      "afterSha256": "62e0d13c829c23b67550652b5cbc16bd24e88754f73e95af86a5469102fda32b",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/openapi/service-public.v1.yaml",
-      "beforeSha256": "a3b5f24dcd7f66ac0b97f978f513b5a6a017e92b3503cbc39a4323b922c57510",
-      "afterSha256": "a3b5f24dcd7f66ac0b97f978f513b5a6a017e92b3503cbc39a4323b922c57510",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/database/migration-policy.md",
-      "beforeSha256": "ba842de0367da14dbd4b69522e3188a2b2b0c1b37a44146c8478898d24c82839",
-      "afterSha256": "ba842de0367da14dbd4b69522e3188a2b2b0c1b37a44146c8478898d24c82839",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/database/routing-db.dbml",
-      "beforeSha256": "18711e721c11c239ae1963a4a7ce389a47fe78501be89e3e59da9f078222d7c4",
-      "afterSha256": "18711e721c11c239ae1963a4a7ce389a47fe78501be89e3e59da9f078222d7c4",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/database/schema-ownership.yaml",
-      "beforeSha256": "d0f39a6f72796865acb96e6947a0a746ad75a9d15bf683ff3f8f0c2bb31e9315",
-      "afterSha256": "d0f39a6f72796865acb96e6947a0a746ad75a9d15bf683ff3f8f0c2bb31e9315",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/database/service-db.dbml",
-      "beforeSha256": "1467a7b1249bb7dba89e41214872c03c7a2b87e095c4fb57679220292442e950",
-      "afterSha256": "1467a7b1249bb7dba89e41214872c03c7a2b87e095c4fb57679220292442e950",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/events/domain-events.v1.yaml",
-      "beforeSha256": "ee6d16fddfbe4b1981c512bb0db66ec9c930b2733215d68abfd9ad8a55306f9e",
-      "afterSha256": "ee6d16fddfbe4b1981c512bb0db66ec9c930b2733215d68abfd9ad8a55306f9e",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/contracts/codes/reason-warning-error-codes.yaml",
-      "beforeSha256": "670de42932bf091b91d10615cf9e0a60a9376ca168be20f9f75df6dc4a94cfc4",
-      "afterSha256": "670de42932bf091b91d10615cf9e0a60a9376ca168be20f9f75df6dc4a94cfc4",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/API_CONTRACT_GUIDE.md",
-      "beforeSha256": "880d62b3dfb04b210bec40783dd0998de18dc47a6182254f85b86c575ef41f03",
-      "afterSha256": "880d62b3dfb04b210bec40783dd0998de18dc47a6182254f85b86c575ef41f03",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/AWS_DEPLOYMENT.md",
-      "beforeSha256": "a71d2fae6f65002202698814045c8ae409b859cbefd8d407fa12a08d7cd25047",
-      "afterSha256": "a71d2fae6f65002202698814045c8ae409b859cbefd8d407fa12a08d7cd25047",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/CONTEXT_MAP.md",
-      "beforeSha256": "f6a42c86756fc58810baa3d6d4c71d2f3ac5833741dc3804da22f567abe375ae",
-      "afterSha256": "f6a42c86756fc58810baa3d6d4c71d2f3ac5833741dc3804da22f567abe375ae",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/DATA_MODEL_AND_OWNERSHIP.md",
-      "beforeSha256": "e2865e68bda3f12936efa2be4aceb932908e854fb995e52cc68217c38a0ed075",
-      "afterSha256": "e2865e68bda3f12936efa2be4aceb932908e854fb995e52cc68217c38a0ed075",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/DECISION_AND_CHANGE_CONTROL.md",
-      "beforeSha256": "3f4b4f44ccf513fda53dcaefb12326234f27c719c35aa0510fe422b00e5687af",
-      "afterSha256": "3f4b4f44ccf513fda53dcaefb12326234f27c719c35aa0510fe422b00e5687af",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/ERD.md",
-      "beforeSha256": "94d458d08cd8a72fdfb47dd1fd92532af4015d0c8cd8409edda80a39a3f3ff19",
-      "afterSha256": "94d458d08cd8a72fdfb47dd1fd92532af4015d0c8cd8409edda80a39a3f3ff19",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/GLOSSARY.md",
-      "beforeSha256": "741e42e28da5983daf65b0e39e257ebbbf33c1cadc31eb768642983cbf51ba3f",
-      "afterSha256": "741e42e28da5983daf65b0e39e257ebbbf33c1cadc31eb768642983cbf51ba3f",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/INTEGRATION_PLAYBOOK.md",
-      "beforeSha256": "902032d051460522899844c5b1182dd9f80d464861f02041b09571ddaebbc111",
-      "afterSha256": "902032d051460522899844c5b1182dd9f80d464861f02041b09571ddaebbc111",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/NON_FUNCTIONAL_REQUIREMENTS.md",
-      "beforeSha256": "5c900eb778c1b54688b786924aa3f960a55728a0cc8854d4aa5fc9edef9a590a",
-      "afterSha256": "5c900eb778c1b54688b786924aa3f960a55728a0cc8854d4aa5fc9edef9a590a",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/OBSERVABILITY_RUNBOOKS.md",
-      "beforeSha256": "452a6bb93d3c0dc9abfdb579782c68d26a372d989587f4c0a3ce5340dab767f7",
-      "afterSha256": "452a6bb93d3c0dc9abfdb579782c68d26a372d989587f4c0a3ce5340dab767f7",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/PRD.md",
-      "beforeSha256": "f8e5142a9c5304f5017ea62e94223354840f464716b99144135e9257d467aaf7",
-      "afterSha256": "f8e5142a9c5304f5017ea62e94223354840f464716b99144135e9257d467aaf7",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/PROJECT_CONTEXT.md",
-      "beforeSha256": "1a088e1837a218f5485e969f99bd9d42cb6be1ba0127f6bba76288f79dc41c48",
-      "afterSha256": "1a088e1837a218f5485e969f99bd9d42cb6be1ba0127f6bba76288f79dc41c48",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/PROVIDER_CAPABILITY_MATRIX.md",
-      "beforeSha256": "2145d06195dbef4f9e2e88d8c592905fdc58200df6ca53c28db6195f0c6ec129",
-      "afterSha256": "2145d06195dbef4f9e2e88d8c592905fdc58200df6ca53c28db6195f0c6ec129",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/README.md",
-      "beforeSha256": "9f91c9f88ffef74ad85ccfc6fe3c31b6e2f59b50329e8ec97448dd06a1e7e42b",
-      "afterSha256": "9f91c9f88ffef74ad85ccfc6fe3c31b6e2f59b50329e8ec97448dd06a1e7e42b",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/RELEASE_GATES.md",
-      "beforeSha256": "633116d1c366c02b3cbd18b8d12873b64e414e36a94e6d15efa3684ccac567bb",
-      "afterSha256": "633116d1c366c02b3cbd18b8d12873b64e414e36a94e6d15efa3684ccac567bb",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/REQUIREMENTS_TRACEABILITY.md",
-      "beforeSha256": "1ac3b665cff1145b89058443cc067a560d1633e87e0874c8a9174c3bae489394",
-      "afterSha256": "1ac3b665cff1145b89058443cc067a560d1633e87e0874c8a9174c3bae489394",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/SECURITY_PRIVACY.md",
-      "beforeSha256": "e4d39da9fb160a914da70138d369d16b951edcdb1e3ffaabd052e4e3606ecd35",
-      "afterSha256": "e4d39da9fb160a914da70138d369d16b951edcdb1e3ffaabd052e4e3606ecd35",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/SOURCE_LAYOUT_POLICY.md",
-      "beforeSha256": "4b261c43c5e465aeacc77fec91ed9657561b3a83f2f65a68d86753f2e187596a",
-      "afterSha256": "167989c3137f1fa9f37945ae5afbafa7a7bdca767316e1224c38785702973cab",
-      "status": "ALLOWED_HARNESS_CONTEXT_CHANGE"
-    },
-    {
-      "path": "src/docs/shared/SYSTEM_ARCHITECTURE.md",
-      "beforeSha256": "d558202e3cc73cfaa51efb5129a3573ce2febc16efe5150bfde6027c3688dbfc",
-      "afterSha256": "d558202e3cc73cfaa51efb5129a3573ce2febc16efe5150bfde6027c3688dbfc",
-      "status": "UNCHANGED"
-    },
-    {
-      "path": "src/docs/shared/TEST_ACCEPTANCE.md",
-      "beforeSha256": "fb617db6ec96361962b27e5bca02f3c5e6b20ff79c2e2599951e43ca4334236f",
-      "afterSha256": "fb617db6ec96361962b27e5bca02f3c5e6b20ff79c2e2599951e43ca4334236f",
-      "status": "UNCHANGED"
-    }
-  ]
+  "contractLock": {
+    "canonicalFileCount": 39,
+    "contextVersion": "1.4.0",
+    "contractVersion": "1.4.0",
+    "aggregateSha256": "59729c98afc71606db1577871f1516421c913453034b8974720afb51dd96cd46",
+    "verified": true
+  },
+  "productImpact": {
+    "applicationCodeChanged": false,
+    "businessContractsChanged": false,
+    "migrationsChanged": false,
+    "generatedClientsChanged": false,
+    "redisBehaviorChanged": false,
+    "ciWorkflowChanged": false,
+    "deploymentImplementationChanged": false,
+    "sharedProductMeaningChanged": false
+  }
 }

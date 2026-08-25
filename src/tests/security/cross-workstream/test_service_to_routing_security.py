@@ -331,14 +331,15 @@ def test_effective_deadline_is_capped_and_actual_http_timeout_returns_504() -> N
 
 
 def test_deployment_wires_service_jwt_contract_instead_of_a_static_bearer() -> None:
-    terraform = (
-        SRC_ROOT / "infra" / "terraform" / "modules" / "service-platform" / "main.tf"
+    compose = (
+        SRC_ROOT / "infra" / "gce" / "docker-compose.prod.yml"
     ).read_text(encoding="utf-8")
     required = {
         "SERVICE_ROUTING_JWT_SECRET",
         "SERVICE_ROUTING_JWT_ISSUER",
         "SERVICE_ROUTING_JWT_AUDIENCE",
     }
-    missing = sorted(name for name in required if f'name = "{name}"' not in terraform)
-    assert not missing, f"Service task is missing Routing JWT configuration: {missing}"
-    assert 'name = "SERVICE_ROUTING_SERVICE_TOKEN"' not in terraform
+    missing = sorted(name for name in required if f"{name}:" not in compose)
+    assert not missing, f"GCE Service container is missing Routing JWT configuration: {missing}"
+    assert "SERVICE_ROUTING_SERVICE_TOKEN:" not in compose
+    assert "ROUTING_SERVICE_JWT_SECRET: ${SERVICE_ROUTING_JWT_SECRET" in compose
