@@ -317,8 +317,26 @@ class InfrastructureContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         template = self.read("ci/github-actions/pr-service-product.yml")
+        cd_gce = (ROOT / ".github/workflows/cd-gce.yml").read_text(encoding="utf-8")
+        gce_compose = self.read("gce/docker-compose.prod.yml")
         self.assertEqual(active, template)
         self.assertIn("pull_request:", active)
+        privacy_version = re.search(
+            r"^\s*VITE_PRIVACY_DOCUMENT_VERSION:\s*(\S+)\s*$",
+            active,
+            re.MULTILINE,
+        )
+        cd_privacy_version = re.search(
+            r"VITE_PRIVACY_DOCUMENT_VERSION=(\S+)", cd_gce
+        )
+        service_privacy_version = re.search(
+            r"SERVICE_CONSENT_DOCUMENT_VERSION:\s*(\S+)", gce_compose
+        )
+        self.assertIsNotNone(privacy_version)
+        self.assertIsNotNone(cd_privacy_version)
+        self.assertIsNotNone(service_privacy_version)
+        self.assertEqual(privacy_version.group(1), cd_privacy_version.group(1))
+        self.assertEqual(privacy_version.group(1), service_privacy_version.group(1))
         self.assertIn("Start Service Product with real Redis", active)
         self.assertIn("service-redis redis-cli PING", active)
         self.assertIn('[[ "$backend" == "redis" ]]', active)
@@ -328,6 +346,10 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn('[[ "$second_idempotency" == "IN_PROGRESS" ]]', active)
         self.assertIn("down -v --remove-orphans", active)
         self.assertNotIn("fakeredis", active.lower())
+        self.assertIn(
+            "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25",
+            active,
+        )
 
         action_refs = re.findall(r"uses:\s*([^\s#]+)", active)
         self.assertTrue(action_refs)
